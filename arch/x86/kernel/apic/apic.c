@@ -54,6 +54,7 @@
 #include <asm/mce.h>
 #include <asm/tsc.h>
 #include <asm/hypervisor.h>
+#include <asm/intel-mid.h>
 
 unsigned int num_processors;
 
@@ -2224,6 +2225,19 @@ static int lapic_suspend(void)
 	unsigned long flags;
 	int maxlvt;
 
+	/*
+	 * On intel_mid, the suspend flow is a bit different, and the lapic
+	 * hw implementation, and integration is not supporting standard
+	 * suspension.
+	 * This implementation is only putting high value to the timer, so that
+	 * AONT global timer will be updated with this big value at s0i3 entry,
+	 * and wont produce timer based wake up event.
+	 */
+	if (intel_mid_identify_cpu() != 0) {
+		apic_write(APIC_TMICT, ~0);
+		return 0;
+	}
+
 	if (!apic_pm_state.active)
 		return 0;
 
@@ -2261,6 +2275,15 @@ static void lapic_resume(void)
 	unsigned int l, h;
 	unsigned long flags;
 	int maxlvt;
+
+	/*
+	 * On intel_mid, the resume flow is a bit different.
+	 * Refer explanation on lapic_suspend.
+	 */
+	if (intel_mid_identify_cpu() != 0) {
+		apic_write(APIC_TMICT, 10);
+		return;
+	}
 
 	if (!apic_pm_state.active)
 		return;
