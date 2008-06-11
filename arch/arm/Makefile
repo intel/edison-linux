@@ -283,6 +283,9 @@ archprepare:
 # Convert bzImage to zImage
 bzImage: zImage
 
+# These targets cannot be built in parallel
+.NOTPARALLEL: zImage Image xipImage bootpImage uImage
+
 zImage Image xipImage bootpImage uImage: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
 
