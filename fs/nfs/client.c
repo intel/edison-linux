@@ -9,7 +9,6 @@
  * 2 of the License, or (at your option) any later version.
  */
 
-
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/sched.h>
@@ -70,7 +69,7 @@ static const struct rpc_version *nfs_version[5] = {
 	[4] = NULL,
 };
 
-const struct rpc_program nfs_program = {
+struct rpc_program nfs_program = {
 	.name			= "nfs",
 	.number			= NFS_PROGRAM,
 	.nrvers			= ARRAY_SIZE(nfs_version),
@@ -162,6 +161,7 @@ struct nfs_client *nfs_alloc_client(const struct nfs_client_initdata *cl_init)
 		goto error_dealloc;
 
 	clp->rpc_ops = clp->cl_nfs_mod->rpc_ops;
+	clp->nfs_prog = cl_init->nfs_prog;
 
 	atomic_set(&clp->cl_count, 1);
 	clp->cl_cons_state = NFS_CS_INITING;
@@ -421,6 +421,9 @@ static struct nfs_client *nfs_match_client(const struct nfs_client_initdata *dat
 		/* Match nfsv4 minorversion */
 		if (clp->cl_minorversion != data->minorversion)
 			continue;
+		if (clp->nfs_prog != data->nfs_prog)
+			continue;
+
 		/* Match the full socket address */
 		if (!nfs_sockaddr_cmp(sap, clap))
 			continue;
@@ -608,6 +611,10 @@ int nfs_create_rpc_client(struct nfs_client *clp,
 	if (!IS_ERR(clp->cl_rpcclient))
 		return 0;
 
+	if (clp->nfs_prog)
+		nfs_program.number = clp->nfs_prog;
+	else
+		nfs_program.number = NFS_PROGRAM;
 	clnt = rpc_create(&args);
 	if (IS_ERR(clnt)) {
 		dprintk("%s: cannot create RPC client. Error = %ld\n",
@@ -750,6 +757,7 @@ static int nfs_init_server(struct nfs_server *server,
 		.nfs_mod = nfs_mod,
 		.proto = data->nfs_server.protocol,
 		.net = data->net,
+		.nfs_prog = data->nfs_prog,
 	};
 	struct rpc_timeout timeparms;
 	struct nfs_client *clp;

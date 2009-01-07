@@ -56,6 +56,7 @@ struct nfs_client {
 
 	u32			cl_minorversion;/* NFSv4 minorversion */
 	struct rpc_cred		*cl_machine_cred;
+	int			nfs_prog;
 
 #if IS_ENABLED(CONFIG_NFS_V4)
 	struct list_head	cl_ds_clients; /* auth flavor data servers */
@@ -81,7 +82,9 @@ struct nfs_client {
 	 * This is used to generate the mv0 callback address.
 	 */
 	char			cl_ipaddr[48];
+
 	u32			cl_cb_ident;	/* v4.0 callback identifier */
+
 	const struct nfs4_minor_version_ops *cl_mvops;
 	unsigned long		cl_mig_gen;
 
