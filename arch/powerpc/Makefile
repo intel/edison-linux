@@ -238,7 +238,7 @@ endif
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
 
-archprepare: checkbin
+archprepare: checkbin arch/powerpc/lib/crtsavres.o
 
 # Use the file '.tmp_gas_check' for binutils tests, as gas won't output
 # to stdout and these checks are run even on install targets.
