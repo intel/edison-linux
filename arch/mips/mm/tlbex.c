@@ -484,6 +484,7 @@ static void __cpuinit __maybe_unused build_tlb_probe_entry(u32 **p)
 	case CPU_R4700:
 	case CPU_R5000:
 	case CPU_NEVADA:
+	case CPU_4KC:
 		uasm_i_nop(p);
 		uasm_i_tlbp(p);
 		break;
@@ -550,6 +551,7 @@ static void __cpuinit build_tlb_write_entry(u32 **p, struct uasm_label **l,
 
 	case CPU_R4600:
 	case CPU_R4700:
+	case CPU_4KC:
 		uasm_i_nop(p);
 		tlbw(p);
 		uasm_i_nop(p);
@@ -574,7 +576,6 @@ static void __cpuinit build_tlb_write_entry(u32 **p, struct uasm_label **l,
 	case CPU_R10000:
 	case CPU_R12000:
 	case CPU_R14000:
-	case CPU_4KC:
 	case CPU_4KEC:
 	case CPU_M14KC:
 	case CPU_M14KEC:
