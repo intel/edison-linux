@@ -35,6 +35,7 @@
 #include <linux/io.h>
 #include <linux/gpio.h>
 #include <linux/slab.h>
+#include <linux/lnw_gpio.h>
 #include <linux/pm_runtime.h>
 #include <linux/irqdomain.h>
 #include <asm/intel_scu_flis.h>
@@ -1235,4 +1236,4 @@ static int __init lnw_gpio_init(void)
 	return ret;
 }
 
-device_initcall(lnw_gpio_init);
+fs_initcall(lnw_gpio_init);
