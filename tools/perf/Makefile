@@ -691,9 +691,10 @@ ifndef NO_SLANG
 	ifneq ($(call try-cc,$(SOURCE_SLANG),$(FLAGS_SLANG),libslang),y)
 		msg := $(warning slang not found, disables TUI support. Please install slang-devel or libslang-dev);
 	else
-		# Fedora has /usr/include/slang/slang.h, but ubuntu /usr/include/slang.h
-		BASIC_CFLAGS += -I/usr/include/slang
+		# Some releases like Fedora has /usr/include/slang/slang.h other than /usr/include/slang.h
+		SLANG_INC ?= -idirafter =/usr/include/slang
 		BASIC_CFLAGS += -DSLANG_SUPPORT
+		BASIC_CFLAGS += $(SLANG_INC)
 		EXTLIBS += -lslang
 		LIB_OBJS += $(OUTPUT)ui/browser.o
 		LIB_OBJS += $(OUTPUT)ui/browsers/annotate.o
