@@ -1502,6 +1502,53 @@ MODULE_DEVICE_TABLE(pci, pci_ids);
  *                                                                           *
 \*****************************************************************************/
 
+static int try_request_regulator(struct device *dev, void *data)
+{
+	struct pci_dev        *pdev = container_of(dev, struct pci_dev, dev);
+	struct sdhci_pci_chip *chip;
+	struct sdhci_pci_slot *slot;
+	struct sdhci_host     *host;
+	int i;
+
+	chip = pci_get_drvdata(pdev);
+	if (!chip)
+		return 0;
+
+	for (i = 0; i < chip->num_slots; i++) {
+		slot = chip->slots[i];
+		if (!slot)
+			continue;
+		host = slot->host;
+		if (!host)
+			continue;
+		if (sdhci_try_get_regulator(host) == 0)
+			mmc_detect_change(host->mmc, 0);
+	}
+	return 0;
+}
+
+static struct pci_driver sdhci_driver;
+
+/**
+ *      sdhci_pci_request_regulators - retry requesting regulators of
+ *                                     all sdhci-pci devices
+ *
+ *      One some platforms, the regulators associated to the mmc are available
+ *      late in the boot.
+ *      sdhci_pci_request_regulators() is called by platform code to retry
+ *      getting the regulators associated to pci sdhcis
+ */
+
+int sdhci_pci_request_regulators(void)
+{
+	/* driver not yet registered */
+	if (!sdhci_driver.driver.p)
+		return 0;
+	return driver_for_each_device(&sdhci_driver.driver,
+				      NULL, NULL, try_request_regulator);
+}
+EXPORT_SYMBOL_GPL(sdhci_pci_request_regulators);
+
 static int sdhci_pci_enable_dma(struct sdhci_host *host)
 {
 	struct sdhci_pci_slot *slot;
