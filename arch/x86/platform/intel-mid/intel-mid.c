@@ -80,22 +80,33 @@ static unsigned long __init intel_mid_calibrate_tsc(void)
 	return 0;
 }
 /* Unified message bus read/write operation */
-DEFINE_SPINLOCK(msgbus_lock);
+static DEFINE_SPINLOCK(msgbus_lock);
+
+static struct pci_dev *pci_root;
+
+static int intel_mid_msgbus_init(void)
+{
+	pci_root = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
+	if (!pci_root) {
+		printk(KERN_ALERT "%s: Error: msgbus PCI handle NULL",
+			__func__);
+		return -ENODEV;
+	}
+	return 0;
+}
+
+fs_initcall(intel_mid_msgbus_init);
+
 
 u32 intel_mid_msgbus_read32_raw(u32 cmd)
 {
-	struct pci_dev *pci_root;
 	unsigned long irq_flags;
 	u32 data;
-
-	pci_root = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
 
 	spin_lock_irqsave(&msgbus_lock, irq_flags);
 	pci_write_config_dword(pci_root, PCI_ROOT_MSGBUS_CTRL_REG, cmd);
 	pci_read_config_dword(pci_root, PCI_ROOT_MSGBUS_DATA_REG, &data);
 	spin_unlock_irqrestore(&msgbus_lock, irq_flags);
-
-	pci_dev_put(pci_root);
 
 	return data;
 }
@@ -103,17 +114,12 @@ EXPORT_SYMBOL(intel_mid_msgbus_read32_raw);
 
 void intel_mid_msgbus_write32_raw(u32 cmd, u32 data)
 {
-	struct pci_dev *pci_root;
 	unsigned long irq_flags;
-
-	pci_root = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
 
 	spin_lock_irqsave(&msgbus_lock, irq_flags);
 	pci_write_config_dword(pci_root, PCI_ROOT_MSGBUS_DATA_REG, data);
 	pci_write_config_dword(pci_root, PCI_ROOT_MSGBUS_CTRL_REG, cmd);
 	spin_unlock_irqrestore(&msgbus_lock, irq_flags);
-
-	pci_dev_put(pci_root);
 }
 EXPORT_SYMBOL(intel_mid_msgbus_write32_raw);
 
