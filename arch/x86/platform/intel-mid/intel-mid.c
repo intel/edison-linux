@@ -123,21 +123,54 @@ void intel_mid_msgbus_write32_raw(u32 cmd, u32 data)
 }
 EXPORT_SYMBOL(intel_mid_msgbus_write32_raw);
 
-u32 intel_mid_msgbus_read32(u8 port, u8 addr)
+u32 intel_mid_msgbus_read32(u8 port, u32 addr)
 {
-	u32 cmd = (PCI_ROOT_MSGBUS_READ << 24) | (port << 16) |
-		  (addr << 8) | PCI_ROOT_MSGBUS_DWORD_ENABLE;
+	unsigned long irq_flags;
+	u32 data;
+	u32 cmd;
+	u32 cmdext;
 
-	return intel_mid_msgbus_read32_raw(cmd);
+	cmd = (PCI_ROOT_MSGBUS_READ << 24) | (port << 16) |
+		((addr & 0xff) << 8) | PCI_ROOT_MSGBUS_DWORD_ENABLE;
+	cmdext = addr & 0xffffff00;
+
+	spin_lock_irqsave(&msgbus_lock, irq_flags);
+
+	if (cmdext) {
+		/* This resets to 0 automatically, no need to write 0 */
+		pci_write_config_dword(pci_root, PCI_ROOT_MSGBUS_CTRL_EXT_REG,
+			cmdext);
+	}
+
+	pci_write_config_dword(pci_root, PCI_ROOT_MSGBUS_CTRL_REG, cmd);
+	pci_read_config_dword(pci_root, PCI_ROOT_MSGBUS_DATA_REG, &data);
+	spin_unlock_irqrestore(&msgbus_lock, irq_flags);
+
+	return data;
 }
 EXPORT_SYMBOL(intel_mid_msgbus_read32);
 
-void intel_mid_msgbus_write32(u8 port, u8 addr, u32 data)
+void intel_mid_msgbus_write32(u8 port, u32 addr, u32 data)
 {
-	u32 cmd = (PCI_ROOT_MSGBUS_WRITE << 24) | (port << 16) |
-		  (addr << 8) | PCI_ROOT_MSGBUS_DWORD_ENABLE;
+	unsigned long irq_flags;
+	u32 cmd;
+	u32 cmdext;
 
-	intel_mid_msgbus_write32_raw(cmd, data);
+	cmd = (PCI_ROOT_MSGBUS_WRITE << 24) | (port << 16) |
+		((addr & 0xFF) << 8) | PCI_ROOT_MSGBUS_DWORD_ENABLE;
+	cmdext = addr & 0xffffff00;
+
+	spin_lock_irqsave(&msgbus_lock, irq_flags);
+	pci_write_config_dword(pci_root, PCI_ROOT_MSGBUS_DATA_REG, data);
+
+	if (cmdext) {
+		/* This resets to 0 automatically, no need to write 0 */
+		pci_write_config_dword(pci_root, PCI_ROOT_MSGBUS_CTRL_EXT_REG,
+			cmdext);
+	}
+
+	pci_write_config_dword(pci_root, PCI_ROOT_MSGBUS_CTRL_REG, cmd);
+	spin_unlock_irqrestore(&msgbus_lock, irq_flags);
 }
 EXPORT_SYMBOL(intel_mid_msgbus_write32);
 
