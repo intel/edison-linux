@@ -60,6 +60,10 @@
  */
 __cpuinitdata enum intel_mid_timer_options intel_mid_timer_options;
 
+/* intel_mid_ops to store sub arch ops */
+struct intel_mid_ops *intel_mid_ops;
+/* getter function for sub arch ops*/
+static void *(*get_intel_mid_ops[])(void) = INTEL_MID_OPS_INIT;
 enum intel_mid_cpu_type __intel_mid_cpu_chip;
 EXPORT_SYMBOL_GPL(__intel_mid_cpu_chip);
 
@@ -74,6 +78,10 @@ static void intel_mid_power_off(void)
 	pmu_power_off();
 };
 
+static void intel_mid_power_off(void)
+{
+};
+
 static void intel_mid_reboot(void)
 {
 	if (intel_scu_ipc_fw_update()) {
@@ -83,6 +91,11 @@ static void intel_mid_reboot(void)
 		rpmsg_send_generic_simple_command(IPCMSG_COLD_BOOT, 0);
 	else
 		rpmsg_send_generic_simple_command(IPCMSG_COLD_RESET, 0);
+}
+
+static unsigned long __init intel_mid_calibrate_tsc(void)
+{
+	return 0;
 }
 
 static unsigned long __init intel_mid_calibrate_tsc(void)
@@ -121,11 +134,28 @@ static void __cpuinit intel_mid_arch_setup(void)
 		__intel_mid_cpu_chip = INTEL_MID_CPU_CHIP_PENWELL;
 	else if (boot_cpu_data.x86 == 6 && boot_cpu_data.x86_model == 0x35)
 		__intel_mid_cpu_chip = INTEL_MID_CPU_CHIP_CLOVERVIEW;
-	else {
-		pr_err("Unknown Intel MID CPU (%d:%d), default to Penwell\n",
-			boot_cpu_data.x86, boot_cpu_data.x86_model);
+		break;
+	case 0x3C:
+	case 0x4A:
+		__intel_mid_cpu_chip = INTEL_MID_CPU_CHIP_TANGIER;
+		break;
+	case 0x5A:
+		__intel_mid_cpu_chip = INTEL_MID_CPU_CHIP_ANNIEDALE;
+		break;
+	case 0x27:
+	default:
 		__intel_mid_cpu_chip = INTEL_MID_CPU_CHIP_PENWELL;
 	}
+
+	if (__intel_mid_cpu_chip < MAX_CPU_OPS(get_intel_mid_ops))
+		intel_mid_ops = get_intel_mid_ops[__intel_mid_cpu_chip]();
+	else {
+		intel_mid_ops = get_intel_mid_ops[INTEL_MID_CPU_CHIP_PENWELL]();
+		pr_info("ARCH: Uknown SoC, assuming PENWELL!\n");
+	}
+
+	if (intel_mid_ops->arch_setup)
+		intel_mid_ops->arch_setup();
 }
 
 /* MID systems don't have i8042 controller */
