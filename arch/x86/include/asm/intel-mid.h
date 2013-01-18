@@ -115,6 +115,9 @@ extern enum intel_mid_timer_options intel_mid_timer_options;
 extern struct console early_mrst_console;
 extern void mrst_early_console_init(void);
 
+extern struct console early_mrfld_console;
+extern void mrfld_early_console_init(void);
+
 extern struct console early_hsu_console;
 extern void hsu_early_console_init(const char *);
 

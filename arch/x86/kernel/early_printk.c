@@ -228,7 +228,10 @@ static int __init setup_early_printk(char *buf)
 			mrst_early_console_init();
 			early_console_register(&early_mrst_console, keep);
 		}
-
+		if (!strncmp(buf, "mrfld", 5)) {
+			mrfld_early_console_init();
+			early_console_register(&early_mrfld_console, keep);
+		}
 		if (!strncmp(buf, "hsu", 3)) {
 			hsu_early_console_init(buf + 3);
 			early_console_register(&early_hsu_console, keep);
