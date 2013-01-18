@@ -3,6 +3,7 @@
 
 /* HW register offset definition */
 #define UART_FOR	0x08
+#define UART_ABR	0x09
 #define UART_PS		0x0C
 #define UART_MUL	0x0D
 #define UART_DIV	0x0E
@@ -18,8 +19,8 @@
 #define HSU_GBL_INT_BIT_DMA	0x5
 
 #define HSU_GBL_ISR	0x8
-#define HSU_GBL_DMASR	0x000
-#define HSU_GBL_DMAISR	0x004
+#define HSU_GBL_DMASR	0x0
+#define HSU_GBL_DMAISR	0x4
 
 #define HSU_PORT_REG_OFFSET	0x80
 #define HSU_PORT0_REG_OFFSET	0x80
@@ -44,11 +45,4 @@
 #define HSU_CH_D3SAR		0x38
 #define HSU_CH_D3TSR		0x3C
 
-#if defined(CONFIG_X86_MDFLD)
-void mfld_hsu_port1_switch(int on);
-#else
-inline void mfld_hsu_port1_switch(int on)
-{
-}
-#endif
 #endif
