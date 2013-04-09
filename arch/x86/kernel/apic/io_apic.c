@@ -316,6 +316,24 @@ void io_apic_eoi(unsigned int apic, unsigned int vector)
 	writel(vector, &io_apic->eoi);
 }
 
+/*
+ * This index matches with 1024 - 4 address in SCU RTE table area.
+ * That is not used for anything. Works in CLVP only
+ */
+#define LAST_INDEX_IN_IO_APIC_SPACE 255
+#define KERNEL_TO_SCU_PANIC_REQUEST (0x0515dead)
+void apic_scu_panic_dump(void)
+{
+	unsigned long flags;
+
+	printk(KERN_ERR "Request SCU panic dump");
+	raw_spin_lock_irqsave(&ioapic_lock, flags);
+	io_apic_write(0, LAST_INDEX_IN_IO_APIC_SPACE,
+		      KERNEL_TO_SCU_PANIC_REQUEST);
+	raw_spin_unlock_irqrestore(&ioapic_lock, flags);
+}
+EXPORT_SYMBOL_GPL(apic_scu_panic_dump);
+
 unsigned int native_io_apic_read(unsigned int apic, unsigned int reg)
 {
 	struct io_apic __iomem *io_apic = io_apic_base(apic);
