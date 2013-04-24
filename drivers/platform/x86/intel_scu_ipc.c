@@ -24,7 +24,7 @@
 #include <linux/pci.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
-#include <asm/mrst.h>
+#include <asm/intel-mid.h>
 #include <asm/intel_scu_ipc.h>
 #include <linux/pm_qos.h>
 #include <linux/intel_mid_pm.h>
@@ -549,7 +549,7 @@ static struct pci_driver ipc_driver = {
 
 static int intel_scu_ipc_init(void)
 {
-	platform = mrst_identify_cpu();
+	platform = intel_mid_identify_cpu();
 	if (platform == 0)
 		return -ENODEV;
 

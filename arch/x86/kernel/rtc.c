@@ -11,8 +11,8 @@
 
 #include <asm/vsyscall.h>
 #include <asm/x86_init.h>
+#include <asm/intel-mid.h>
 #include <asm/time.h>
-#include <asm/mrst.h>
 #include <asm/rtc.h>
 #include <asm/io_apic.h>
 
@@ -214,8 +214,6 @@ static __init int add_rtc_cmos(void)
 	if (of_have_populated_dt())
 		return 0;
 
-	/* Intel MID platforms don't have ioport rtc */
-	if (mrst_identify_cpu())
 	/* Intel MID platforms don't have ioport rtc
 	 * except Tangier platform, which doesn't have vRTC
 	 */
