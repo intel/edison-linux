@@ -15,8 +15,13 @@
 #include <linux/pci.h>
 #include <linux/platform_device.h>
 
-extern int intel_mid_pci_init(void);
+#ifdef CONFIG_SFI
 extern int get_gpio_by_name(const char *name);
+#else
+static inline int get_gpio_by_name(const char *name) { return -1; }
+#endif
+
+extern int intel_mid_pci_init(void);
 extern void intel_delayed_device_register(void *dev,
 			void (*delayed_callback)(void *dev_desc));
 extern void intel_scu_device_register(struct platform_device *pdev);
