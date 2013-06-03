@@ -1376,6 +1376,7 @@ static struct sdhci_pci_slot *sdhci_pci_probe_slot(
 		slot->data = sdhci_pci_get_data(pdev, slotno);
 
 	if (slot->data) {
+		slot->data->pdev = pdev;
 		if (slot->data->setup) {
 			ret = slot->data->setup(slot->data);
 			if (ret) {

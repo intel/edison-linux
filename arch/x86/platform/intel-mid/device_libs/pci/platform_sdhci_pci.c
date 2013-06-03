@@ -21,6 +21,10 @@
 #include <linux/intel_mid_pm.h>
 #include <linux/hardirq.h>
 #include <linux/mmc/sdhci.h>
+#include <linux/regulator/machine.h>
+#include <linux/regulator/fixed.h>
+#include <linux/acpi.h>
+#include <linux/acpi_gpio.h>
 
 #include "platform_sdhci_pci.h"
 
@@ -57,12 +61,11 @@ static int panic_mode_emmc0_power_up(void *data)
 }
 #endif
 
-static unsigned int sdhci_pdata_quirks;
+static unsigned int sdhci_pdata_quirks = SDHCI_QUIRK2_ADVERTISE_2V0_FORCE_1V8
+		| SDHCI_QUIRK2_ENABLE_MMC_PM_IGNORE_PM_NOTIFY;
 
 int sdhci_pdata_set_quirks(unsigned int quirks)
 {
-	/*Should not be set more than once*/
-	WARN_ON(sdhci_pdata_quirks);
 	sdhci_pdata_quirks = quirks;
 	return 0;
 }
@@ -73,7 +76,68 @@ static void mrfl_sdio_cleanup(struct sdhci_pci_data *data);
 static void (*sdhci_embedded_control)(void *dev_id, void (*virtual_cd)
 					(void *dev_id, int card_present));
 
-static unsigned int sdhci_pdata_quirks;
+/*****************************************************************************\
+ *                                                                           *
+ *  Regulator declaration for WLAN SDIO card                                 *
+ *                                                                           *
+\*****************************************************************************/
+
+#define DELAY_ONOFF 250
+
+static struct regulator_consumer_supply wlan_vmmc_supply = {
+	.supply		= "vmmc",
+};
+
+static struct regulator_init_data wlan_vmmc_data = {
+	.constraints = {
+		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies	= 1,
+	.consumer_supplies = &wlan_vmmc_supply,
+};
+
+static struct fixed_voltage_config vwlan = {
+	.supply_name		= "vwlan",
+	.microvolts		= 1800000,
+	.gpio			= -EINVAL,
+	.startup_delay		= 1000 * DELAY_ONOFF,
+	.enable_high		= 1,
+	.enabled_at_boot	= 0,
+	.init_data		= &wlan_vmmc_data,
+};
+
+static void vwlan_device_release(struct device *dev) {}
+
+static struct platform_device vwlan_device = {
+	.name		= "reg-fixed-voltage",
+	.id		= PLATFORM_DEVID_AUTO,
+	.dev = {
+		.platform_data	= &vwlan,
+		.release = vwlan_device_release,
+	},
+};
+
+
+/* Board specific setup related to SDIO goes here */
+static int mfld_sdio_setup(struct sdhci_pci_data *data)
+{
+	struct pci_dev *pdev = data->pdev;
+	/* Control card power through a regulator */
+	wlan_vmmc_supply.dev_name = dev_name(&pdev->dev);
+	vwlan.gpio = get_gpio_by_name("WLAN-enable");
+	if (vwlan.gpio < 0)
+		pr_err("%s: No WLAN-enable GPIO in SFI table\n",
+	       __func__);
+	pr_info("vwlan gpio %d\n", vwlan.gpio);
+	/* add a regulator to control wlan enable gpio */
+	if (platform_device_register(&vwlan_device))
+		pr_err("regulator register failed\n");
+	else
+		sdhci_pci_request_regulators();
+
+	return 0;
+}
+
 
 /* MFLD platform data */
 static struct sdhci_pci_data mfld_sdhci_pci_data[] = {
@@ -109,10 +173,31 @@ static struct sdhci_pci_data mfld_sdhci_pci_data[] = {
 			.cd_gpio = -EINVAL,
 			.quirks = 0,
 			.platform_quirks = 0,
-			.setup = 0,
+			.setup = mfld_sdio_setup,
 			.cleanup = 0,
 	},
 };
+
+/* Board specific setup related to SDIO goes here */
+static int clv_sdio_setup(struct sdhci_pci_data *data)
+{
+	struct pci_dev *pdev = data->pdev;
+	/* Control card power through a regulator */
+	wlan_vmmc_supply.dev_name = dev_name(&pdev->dev);
+	vwlan.gpio = get_gpio_by_name("WLAN-enable");
+	if (vwlan.gpio < 0)
+		pr_err("%s: No WLAN-enable GPIO in SFI table\n",
+	       __func__);
+	pr_info("vwlan gpio %d\n", vwlan.gpio);
+	/* add a regulator to control wlan enable gpio */
+	if (platform_device_register(&vwlan_device))
+		pr_err("regulator register failed\n");
+	else
+		sdhci_pci_request_regulators();
+
+	return 0;
+}
+
 
 /* CLV platform data */
 static struct sdhci_pci_data clv_sdhci_pci_data[] = {
@@ -148,20 +233,39 @@ static struct sdhci_pci_data clv_sdhci_pci_data[] = {
 			.cd_gpio = -EINVAL,
 			.quirks = 0,
 			.platform_quirks = 0,
-			.setup = 0,
+			.setup = clv_sdio_setup,
 			.cleanup = 0,
 	},
 };
+
+/* Board specific cleanup related to SD goes here */
+static void mrfl_sd_cleanup(struct sdhci_pci_data *data)
+{
+}
+
 
 /* Board specific cleanup related to SDIO goes here */
 static void mrfl_sdio_cleanup(struct sdhci_pci_data *data)
 {
 }
 
-
 /* Board specific setup related to SDIO goes here */
 static int mrfl_sdio_setup(struct sdhci_pci_data *data)
 {
+	struct pci_dev *pdev = data->pdev;
+	/* Control card power through a regulator */
+	wlan_vmmc_supply.dev_name = dev_name(&pdev->dev);
+	vwlan.gpio = get_gpio_by_name("WLAN-enable");
+	if (vwlan.gpio < 0)
+		pr_err("%s: No WLAN-enable GPIO in SFI table\n",
+	       __func__);
+	pr_info("vwlan gpio %d\n", vwlan.gpio);
+	/* add a regulator to control wlan enable gpio */
+	if (platform_device_register(&vwlan_device))
+		pr_err("regulator register failed\n");
+	else
+		sdhci_pci_request_regulators();
+
 	return 0;
 }
 
@@ -210,10 +314,38 @@ static struct sdhci_pci_data mrfl_sdhci_pci_data[] = {
 	},
 };
 
-/* Board specific setup related to SDIO goes here */
 
+/* Board specific setup related to SDIO goes here */
 static int byt_sdio_setup(struct sdhci_pci_data *data)
 {
+	struct pci_dev *pdev = data->pdev;
+#ifdef CONFIG_ACPI
+	acpi_handle handle;
+	acpi_status status;
+#endif
+
+	/* Control card power through a regulator */
+	wlan_vmmc_supply.dev_name = dev_name(&pdev->dev);
+
+#ifdef CONFIG_ACPI
+	status = acpi_get_handle(NULL, "\\_SB.SDHB", &handle);
+	if (ACPI_FAILURE(status))
+		pr_err("wlan: cannot get SDHB acpi handle");
+	ACPI_HANDLE_SET(&pdev->dev, handle);
+	vwlan.gpio = acpi_get_gpio_by_index(&pdev->dev, 0, NULL);
+#endif
+	if (vwlan.gpio < 0)
+		pr_err("%s: No wlan-enable GPIO in SDHB ACPI block\n",
+		       __func__);
+
+	pr_info("vwlan gpio %d\n", vwlan.gpio);
+
+	/* add a regulator to control wlan enable gpio */
+	if (platform_device_register(&vwlan_device))
+		pr_err("regulator register failed\n");
+	else
+		sdhci_pci_request_regulators();
+
 	return 0;
 }
 
