@@ -77,7 +77,7 @@
 
 /* WIFI devices */
 #include "device_libs/platform_wl12xx.h"
-#include "device_libs/platform_bcm43xx.h"
+#include "device_libs/platform_wifi.h"
 
 static void __init *no_platform_data(void *info)
 {
@@ -87,8 +87,8 @@ static void __init *no_platform_data(void *info)
 struct devs_id __initconst device_ids[] = {
 	/* SD devices */
 	{"wl12xx_clk_vmmc", SFI_DEV_TYPE_SD, 0, &wl12xx_platform_data, NULL},
-	{"bcm43xx_clk_vmmc", SFI_DEV_TYPE_SD, 0, &bcm43xx_platform_data, NULL},
-	{"bcm43xx_vmmc", SFI_DEV_TYPE_SD, 0, &bcm43xx_platform_data, NULL},
+	{"bcm43xx_clk_vmmc", SFI_DEV_TYPE_SD, 0, &wifi_platform_data, NULL},
+	{"bcm43xx_vmmc", SFI_DEV_TYPE_SD, 0, &wifi_platform_data, NULL},
 
 	/* SPI devices */
 	{"bma023", SFI_DEV_TYPE_I2C, 1, &no_platform_data, NULL},
