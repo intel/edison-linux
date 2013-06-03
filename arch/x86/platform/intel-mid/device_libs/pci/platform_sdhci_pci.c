@@ -298,6 +298,11 @@ static int mrfl_flis_check(void *data, unsigned int clk)
 	return ret;
 }
 
+/* Board specific cleanup related to SDIO goes here */
+static void mrfl_sdio_cleanup(struct sdhci_pci_data *data)
+{
+}
+
 /* Board specific setup related to eMMC goes here */
 static int mrfl_emmc_setup(struct sdhci_pci_data *data)
 {
