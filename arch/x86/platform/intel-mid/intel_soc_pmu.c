@@ -505,6 +505,21 @@ static inline u32 find_index_in_hash(struct pci_dev *pdev, int *found)
 	return h_index;
 }
 
+static bool is_display_subclass(unsigned int sub_class)
+{
+	/* On MDFLD and CLV, we have display PCI device class 0x30000,
+	 * On MRFLD, we have display PCI device class 0x38000
+	 */
+
+	if ((sub_class == 0x0 &&
+		(platform_is(INTEL_ATOM_MFLD) ||
+		platform_is(INTEL_ATOM_CLV))) ||
+		(sub_class == 0x80 && platform_is(INTEL_ATOM_MRFLD)))
+		return true;
+
+	return false;
+}
+
 static int get_pci_to_pmu_index(struct pci_dev *pdev)
 {
 	int pm, type;
@@ -533,7 +548,8 @@ static int get_pci_to_pmu_index(struct pci_dev *pdev)
 	type = ss & LOG_SS_MASK;
 	ss = ss & LOG_ID_MASK;
 
-	if ((base_class == PCI_BASE_CLASS_DISPLAY) && !sub_class)
+	if ((base_class == PCI_BASE_CLASS_DISPLAY) &&
+			is_display_subclass(sub_class))
 		index = 1;
 	else if ((base_class == PCI_BASE_CLASS_MULTIMEDIA) &&
 			(sub_class == ISP_SUB_CLASS))
@@ -597,7 +613,8 @@ static void get_pci_lss_info(struct pci_dev *pdev)
 		return;
 
 	/* initialize gfx subsystem info */
-	if ((base_class == PCI_BASE_CLASS_DISPLAY) && !sub_class) {
+	if ((base_class == PCI_BASE_CLASS_DISPLAY) &&
+			is_display_subclass(sub_class)) {
 		set_mid_pci_log_id(index, (u32)index);
 		set_mid_pci_cap(index, PM_SUPPORT);
 	} else if ((base_class == PCI_BASE_CLASS_MULTIMEDIA) &&
