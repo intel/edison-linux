@@ -39,5 +39,5 @@ struct hsu_port_pin_cfg {
 	irq_handler_t wake_isr;
 };
 
-extern void *hsu_dev_platform_data(void *data) __attribute__((weak));
+extern int hsu_dev_platform_data(void) __attribute__((weak));
 #endif
