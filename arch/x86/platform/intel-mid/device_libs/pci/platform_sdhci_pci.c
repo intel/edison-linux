@@ -139,6 +139,8 @@ struct sdhci_pci_data *mmc_sdhci_pci_get_data(struct pci_dev *pci_dev, int slotn
 static int __init init_sdhci_get_data(void)
 {
 	sdhci_pci_get_data = mmc_sdhci_pci_get_data;
+
+	return 0;
 }
 
 arch_initcall(init_sdhci_get_data);
