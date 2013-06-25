@@ -62,6 +62,9 @@ static int gpio_num_entry;
 static u32 sfi_mtimer_usage[SFI_MTMR_MAX_NUM];
 int sfi_mrtc_num;
 int sfi_mtimer_num;
+struct kobject *spid_kobj;
+struct soft_platform_id spid;
+char intel_mid_ssn[INTEL_MID_SSN_SIZE + 1];
 
 struct sfi_rtc_table_entry sfi_mrtc_array[SFI_MRTC_MAX];
 EXPORT_SYMBOL_GPL(sfi_mrtc_array);
@@ -475,11 +478,222 @@ static int __init sfi_parse_devs(struct sfi_table_header *table)
 	return 0;
 }
 
+static int __init sfi_parse_oemb(struct sfi_table_header *table)
+{
+	struct sfi_table_oemb *oemb;
+	u32 board_id;
+	u8 sig[SFI_SIGNATURE_SIZE + 1] = {'\0'};
+	u8 oem_id[SFI_OEM_ID_SIZE + 1] = {'\0'};
+	u8 oem_table_id[SFI_OEM_TABLE_ID_SIZE + 1] = {'\0'};
+
+	oemb = (struct sfi_table_oemb *) table;
+	if (!oemb) {
+		pr_err("%s: fail to read SFI OEMB Layout\n",
+			__func__);
+		return -ENODEV;
+	}
+
+	board_id = oemb->board_id | (oemb->board_fab << 4);
+
+	memcpy(&spid, &oemb->spid, sizeof(struct soft_platform_id));
+
+	if (oemb->header.len <
+			(char *)oemb->ssn + INTEL_MID_SSN_SIZE - (char *)oemb) {
+		pr_err("SFI OEMB does not contains SSN\n");
+		intel_mid_ssn[0] = '\0';
+	} else {
+		memcpy(intel_mid_ssn, oemb->ssn, INTEL_MID_SSN_SIZE);
+		intel_mid_ssn[INTEL_MID_SSN_SIZE] = '\0';
+	}
+
+	snprintf(sig, (SFI_SIGNATURE_SIZE + 1), "%s", oemb->header.sig);
+	snprintf(oem_id, (SFI_OEM_ID_SIZE + 1), "%s", oemb->header.oem_id);
+	snprintf(oem_table_id, (SFI_OEM_TABLE_ID_SIZE + 1), "%s",
+		 oemb->header.oem_table_id);
+	pr_info("SFI OEMB Layout\n");
+	pr_info("\tOEMB signature               : %s\n"
+		"\tOEMB length                  : %d\n"
+		"\tOEMB revision                : %d\n"
+		"\tOEMB checksum                : 0x%X\n"
+		"\tOEMB oem_id                  : %s\n"
+		"\tOEMB oem_table_id            : %s\n"
+		"\tOEMB board_id                : 0x%02X\n"
+		"\tOEMB iafw version            : %03d.%03d\n"
+		"\tOEMB val_hooks version       : %03d.%03d\n"
+		"\tOEMB ia suppfw version       : %03d.%03d\n"
+		"\tOEMB scu runtime version     : %03d.%03d\n"
+		"\tOEMB ifwi version            : %03d.%03d\n"
+		"\tOEMB spid customer id        : %04x\n"
+		"\tOEMB spid vendor id          : %04x\n"
+		"\tOEMB spid manufacturer id    : %04x\n"
+		"\tOEMB spid platform family id : %04x\n"
+		"\tOEMB spid product line id    : %04x\n"
+		"\tOEMB spid hardware id        : %04x\n"
+		"\tOEMB spid fru[4..0]          : %02x %02x %02x %02x %02x\n"
+		"\tOEMB spid fru[9..5]          : %02x %02x %02x %02x %02x\n"
+		"\tOEMB ssn                     : %s\n",
+		sig,
+		oemb->header.len,
+		oemb->header.rev,
+		oemb->header.csum,
+		oem_id,
+		oem_table_id,
+		board_id,
+		oemb->iafw_major_version,
+		oemb->iafw_main_version,
+		oemb->val_hooks_major_version,
+		oemb->val_hooks_minor_version,
+		oemb->ia_suppfw_major_version,
+		oemb->ia_suppfw_minor_version,
+		oemb->scu_runtime_major_version,
+		oemb->scu_runtime_minor_version,
+		oemb->ifwi_major_version,
+		oemb->ifwi_minor_version,
+		spid.customer_id,
+		spid.vendor_id,
+		spid.manufacturer_id,
+		spid.platform_family_id,
+		spid.product_line_id,
+		spid.hardware_id,
+		spid.fru[4], spid.fru[3], spid.fru[2], spid.fru[1],
+		spid.fru[0], spid.fru[9], spid.fru[8], spid.fru[7],
+		spid.fru[6], spid.fru[5],
+		intel_mid_ssn);
+	return 0;
+}
+
+static ssize_t customer_id_show(struct kobject *kobj,
+				struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%04x\n", spid.customer_id);
+}
+spid_attr(customer_id);
+
+static ssize_t vendor_id_show(struct kobject *kobj, struct kobj_attribute *attr,
+			      char *buf)
+{
+	return sprintf(buf, "%04x\n", spid.vendor_id);
+}
+spid_attr(vendor_id);
+
+static ssize_t manufacturer_id_show(struct kobject *kobj,
+				    struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%04x\n", spid.manufacturer_id);
+}
+spid_attr(manufacturer_id);
+
+static ssize_t platform_family_id_show(struct kobject *kobj,
+				       struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%04x\n", spid.platform_family_id);
+}
+spid_attr(platform_family_id);
+
+static ssize_t product_line_id_show(struct kobject *kobj,
+				    struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%04x\n", spid.product_line_id);
+}
+spid_attr(product_line_id);
+
+static ssize_t hardware_id_show(struct kobject *kobj,
+				struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%04x\n", spid.hardware_id);
+}
+spid_attr(hardware_id);
+
+static ssize_t fru_show(struct kobject *kobj, struct kobj_attribute *attr,
+			char *buf)
+{
+	return sprintf(buf, "%02x\n%02x\n%02x\n%02x\n%02x\n"
+			    "%02x\n%02x\n%02x\n%02x\n%02x\n",
+			spid.fru[0], spid.fru[1], spid.fru[2], spid.fru[3],
+			spid.fru[4], spid.fru[5], spid.fru[6], spid.fru[7],
+			spid.fru[8], spid.fru[9]);
+}
+spid_attr(fru);
+
+static struct attribute *spid_attrs[] = {
+	&customer_id_attr.attr,
+	&vendor_id_attr.attr,
+	&manufacturer_id_attr.attr,
+	&platform_family_id_attr.attr,
+	&product_line_id_attr.attr,
+	&hardware_id_attr.attr,
+	&fru_attr.attr,
+	NULL,
+};
+
+static struct attribute_group spid_attr_group = {
+	.attrs = spid_attrs,
+};
+
+/* size of SPID cmdline : androidboot.spid=vend:cust:manu:plat:prod:hard */
+#define SPID_CMDLINE_SIZE 46
+#define SPID_PARAM_NAME "androidboot.spid="
+#define SPID_DEFAULT_VALUE "xxxx:xxxx:xxxx:xxxx:xxxx:xxxx"
+
+void populate_spid_cmdline(void)
+{
+	char *spid_param, *spid_default_value;
+	char spid_cmdline[SPID_CMDLINE_SIZE+1];
+
+	/* parameter format : cust:vend:manu:plat:prod:hard */
+	snprintf(spid_cmdline, sizeof(spid_cmdline),
+		 "%04x:%04x:%04x:%04x:%04x:%04x",
+		 spid.vendor_id,
+		 spid.customer_id,
+		 spid.manufacturer_id,
+		 spid.platform_family_id,
+		 spid.product_line_id,
+		 spid.hardware_id);
+
+	/* is there a spid param ? */
+	spid_param = strstr(saved_command_line, SPID_PARAM_NAME);
+	if (spid_param) {
+		/* is the param set to default value ? */
+		spid_default_value = strstr(saved_command_line,
+					    SPID_DEFAULT_VALUE);
+		if (spid_default_value) {
+			spid_param += strlen(SPID_PARAM_NAME);
+			if (strlen(spid_param) > strlen(spid_cmdline))
+				memcpy(spid_param, spid_cmdline,
+						strlen(spid_cmdline));
+			else
+				pr_err("Not enough free space for SPID in command line.\n");
+		} else
+			pr_warning("SPID already populated. Dont overwrite.\n");
+	} else
+		pr_err("SPID not found in kernel command line.\n");
+}
+
 static int __init intel_mid_platform_init(void)
 {
-	/* Get MFD Validation SFI OEMB Layout */
+	int ret = 0;
+
+	/* create sysfs entries for soft platform id */
+	spid_kobj = kobject_create_and_add("spid", NULL);
+	if (!spid_kobj) {
+		pr_err("SPID: ENOMEM for spid_kobj\n");
+		return -ENOMEM;
+	}
+
+	ret = sysfs_create_group(spid_kobj, &spid_attr_group);
+	if (ret) {
+		pr_err("SPID: failed to create /sys/spid\n");
+		return ret;
+	}
+
+	/* Get SFI OEMB Layout */
+	sfi_table_parse(SFI_SIG_OEMB, NULL, NULL, sfi_parse_oemb);
 	sfi_table_parse(SFI_SIG_GPIO, NULL, NULL, sfi_parse_gpio);
 	sfi_table_parse(SFI_SIG_DEVS, NULL, NULL, sfi_parse_devs);
+
+	/* Populate command line with SPID values */
+	populate_spid_cmdline();
+
 	return 0;
 }
 arch_initcall(intel_mid_platform_init);

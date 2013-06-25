@@ -14,6 +14,12 @@
 #include <linux/sfi.h>
 #include <linux/pci.h>
 #include <linux/platform_device.h>
+#include <asm/spid.h>
+
+#define INTEL_MID_SSN_SIZE	32
+
+extern struct soft_platform_id spid;
+extern char intel_mid_ssn[INTEL_MID_SSN_SIZE + 1];
 
 #ifdef CONFIG_SFI
 extern int get_gpio_by_name(const char *name);
@@ -30,6 +36,25 @@ extern int __init sfi_parse_mrtc(struct sfi_table_header *table);
 extern int __init sfi_parse_mtmr(struct sfi_table_header *table);
 extern int sfi_mrtc_num;
 extern struct sfi_rtc_table_entry sfi_mrtc_array[];
+
+/* OEMB table */
+struct sfi_table_oemb {
+	struct sfi_table_header header;
+	u32 board_id;
+	u32 board_fab;
+	u8 iafw_major_version;
+	u8 iafw_main_version;
+	u8 val_hooks_major_version;
+	u8 val_hooks_minor_version;
+	u8 ia_suppfw_major_version;
+	u8 ia_suppfw_minor_version;
+	u8 scu_runtime_major_version;
+	u8 scu_runtime_minor_version;
+	u8 ifwi_major_version;
+	u8 ifwi_minor_version;
+	struct soft_platform_id spid;
+	u8 ssn[INTEL_MID_SSN_SIZE];
+} __packed;
 
 /*
  * Here defines the array of devices platform data that IAFW would export
@@ -101,6 +126,15 @@ enum intel_mid_timer_options {
 };
 
 extern enum intel_mid_timer_options intel_mid_timer_options;
+
+#define spid_attr(_name) \
+static struct kobj_attribute _name##_attr = { \
+	.attr = {                             \
+		.name = __stringify(_name),   \
+		.mode = 0444,                 \
+	},                                    \
+	.show   = _name##_show,               \
+}
 
 /*
  * Penwell uses spread spectrum clock, so the freq number is not exactly
