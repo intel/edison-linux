@@ -76,6 +76,10 @@ static void intel_mid_reboot(void)
 
 static void __init intel_mid_time_init(void)
 {
+
+#ifdef CONFIG_SFI
+	sfi_table_parse(SFI_SIG_MTMR, NULL, NULL, sfi_parse_mtmr);
+#endif
 	switch (intel_mid_timer_options) {
 	case INTEL_MID_TIMER_APBT_ONLY:
 		break;
@@ -90,9 +94,6 @@ static void __init intel_mid_time_init(void)
 		x86_cpuinit.setup_percpu_clockev = setup_secondary_APIC_clock;
 		return;
 	}
-#ifdef CONFIG_SFI
-	sfi_table_parse(SFI_SIG_MTMR, NULL, NULL, sfi_parse_mtmr);
-#endif
 	/* we need at least one APB timer */
 	pre_init_apic_IRQ0();
 	apbt_time_init();
