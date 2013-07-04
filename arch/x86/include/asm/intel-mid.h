@@ -27,6 +27,23 @@ extern int get_gpio_by_name(const char *name);
 static inline int get_gpio_by_name(const char *name) { return -1; }
 #endif
 
+/*
+ * Access to message bus through these 2 registers
+ * in CUNIT(0:0:0) PCI configuration space.
+ * MSGBUS_CTRL_REG(0xD0):
+ *   31:24	= message bus opcode
+ *   23:16	= message bus port
+ *   15:8	= message bus address
+ *   7:4	= message bus byte enables
+ * MSGBUS_DTAT_REG(0xD4):
+ *   hold the data for write or read
+ */
+#define PCI_ROOT_MSGBUS_CTRL_REG	0xD0
+#define PCI_ROOT_MSGBUS_DATA_REG	0xD4
+#define PCI_ROOT_MSGBUS_READ		0x10
+#define PCI_ROOT_MSGBUS_WRITE		0x11
+#define PCI_ROOT_MSGBUS_DWORD_ENABLE	0xf0
+
 extern int intel_mid_pci_init(void);
 extern void intel_delayed_device_register(void *dev,
 			void (*delayed_callback)(void *dev_desc));
@@ -36,6 +53,10 @@ extern int __init sfi_parse_mrtc(struct sfi_table_header *table);
 extern int __init sfi_parse_mtmr(struct sfi_table_header *table);
 extern int sfi_mrtc_num;
 extern struct sfi_rtc_table_entry sfi_mrtc_array[];
+extern u32 intel_mid_msgbus_read32_raw(u32 cmd);
+extern void intel_mid_msgbus_write32_raw(u32 cmd, u32 data);
+extern u32 intel_mid_msgbus_read32(u8 port, u8 addr);
+extern void intel_mid_msgbus_write32(u8 port, u8 addr, u32 data);
 
 /* OEMB table */
 struct sfi_table_oemb {
