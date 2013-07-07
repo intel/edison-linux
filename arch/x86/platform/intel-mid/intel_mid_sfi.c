@@ -402,6 +402,26 @@ static void __init sfi_handle_i2c_dev(struct sfi_device_table_entry *pentry,
 		i2c_register_board_info(pentry->host_num, &i2c_info, 1);
 }
 
+static void __init sfi_handle_sd_dev(struct sfi_device_table_entry *pentry,
+					struct devs_id *dev)
+{
+	struct sd_board_info sd_info;
+	void *pdata = NULL;
+
+	memset(&sd_info, 0, sizeof(sd_info));
+	strncpy(sd_info.name, pentry->name, 16);
+	sd_info.bus_num = pentry->host_num;
+	sd_info.board_ref_clock = pentry->max_freq;
+	sd_info.addr = pentry->addr;
+	pr_info("SDIO bus = %d, name = %16.16s, "
+			"ref_clock = %d, addr =0x%x\n",
+			sd_info.bus_num,
+			sd_info.name,
+			sd_info.board_ref_clock,
+			sd_info.addr);
+	pdata = dev->get_platform_data(&sd_info);
+	sd_info.platform_data = pdata;
+}
 struct devs_id *get_device_id(u8 type, char *name)
 {
 	struct devs_id *dev = device_ids;
@@ -448,7 +468,6 @@ static int __init sfi_parse_devs(struct sfi_table_header *table)
 			irq_attr.polarity = 1;
 			io_apic_set_pci_routing(NULL, irq, &irq_attr);
 		}
-
 		dev = get_device_id(pentry->type, pentry->name);
 
 		if ((dev == NULL) || (dev->get_platform_data == NULL))
@@ -466,6 +485,9 @@ static int __init sfi_parse_devs(struct sfi_table_header *table)
 				break;
 			case SFI_DEV_TYPE_I2C:
 				sfi_handle_i2c_dev(pentry, dev);
+				break;
+			case SFI_DEV_TYPE_SD:
+				sfi_handle_sd_dev(pentry, dev);
 				break;
 			case SFI_DEV_TYPE_HSI:
 			case SFI_DEV_TYPE_UART:
