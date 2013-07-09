@@ -71,12 +71,19 @@
  */
 #include "device_libs/platform_max3111.h"
 
+/* WIFI devices */
+#include "device_libs/platform_wl12xx.h"
+
 static void __init *no_platform_data(void *info)
 {
 	return NULL;
 }
 
 struct devs_id __initconst device_ids[] = {
+	/* SD devices */
+	{"wl12xx_clk_vmmc", SFI_DEV_TYPE_SD, 0, &wl12xx_platform_data, NULL},
+
+	/* SPI devices */
 	{"bma023", SFI_DEV_TYPE_I2C, 1, &no_platform_data, NULL},
 	{"pmic_gpio", SFI_DEV_TYPE_SPI, 1, &pmic_gpio_platform_data, NULL},
 	{"pmic_gpio", SFI_DEV_TYPE_IPC, 1, &pmic_gpio_platform_data,
