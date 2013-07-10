@@ -3109,6 +3109,8 @@ int sdhci_add_host(struct sdhci_host *host)
 
 	if (host->quirks2 & SDHCI_QUIRK2_ADVERTISE_2V0_FORCE_1V8)
 		ocr_avail |= MMC_VDD_20_21;
+	if (host->quirks2 & SDHCI_QUIRK2_ADVERTISE_3V0_FORCE_1V8)
+		ocr_avail |= MMC_VDD_32_33;
 
 	mmc->ocr_avail = ocr_avail;
 	mmc->ocr_avail_sdio = ocr_avail;

@@ -118,6 +118,8 @@ struct sdhci_host {
 #define SDHCI_QUIRK2_WAIT_FOR_IDLE			(1<<25)
 /* BAD sd cd in HOST IC. This will cause system hang when removing SD */
 #define SDHCI_QUIRK2_BAD_SD_CD				(1<<26)
+#define SDHCI_QUIRK2_POWER_PIN_GPIO_MODE		(1<<27)
+#define SDHCI_QUIRK2_ADVERTISE_3V0_FORCE_1V8   (1<<28)
 
 	int irq;		/* Device IRQ */
 	void __iomem *ioaddr;	/* Mapped address */
