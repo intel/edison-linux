@@ -69,10 +69,14 @@ void __init wifi_platform_data_init_sfi(void)
 /* Called from board.c */
 void __init *wifi_platform_data(void *info)
 {
-	unsigned int sdhci_quirk = SDHCI_QUIRK2_ADVERTISE_2V0_FORCE_1V8
-		| SDHCI_QUIRK2_ENABLE_MMC_PM_IGNORE_PM_NOTIFY;
+	struct sd_board_info *sd_info = info;
 
-	pr_err("Using WiFi platform data\n");
+	unsigned int sdhci_quirk = SDHCI_QUIRK2_ADVERTISE_2V0_FORCE_1V8
+		| SDHCI_QUIRK2_ENABLE_MMC_PM_IGNORE_PM_NOTIFY
+		| SDHCI_QUIRK2_ADVERTISE_3V0_FORCE_1V8
+		| SDHCI_QUIRK2_NON_STD_CIS;
+
+	pr_err("Using generic wifi platform data\n");
 
 	/* Set vendor specific SDIO quirks */
 #ifdef CONFIG_MMC_SDHCI_PCI

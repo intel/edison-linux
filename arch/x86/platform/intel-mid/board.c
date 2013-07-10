@@ -92,6 +92,7 @@ struct devs_id __initconst device_ids[] = {
 	{"wl12xx_clk_vmmc", SFI_DEV_TYPE_SD, 0, &wl12xx_platform_data, NULL},
 	{"bcm43xx_clk_vmmc", SFI_DEV_TYPE_SD, 0, &wifi_platform_data, NULL},
 	{"bcm43xx_vmmc", SFI_DEV_TYPE_SD, 0, &wifi_platform_data, NULL},
+	{"iwlwifi_clk_vmmc", SFI_DEV_TYPE_SD, 0, &wifi_platform_data, NULL},
 
 	/* SPI devices */
 	{"bma023", SFI_DEV_TYPE_I2C, 1, &no_platform_data, NULL},
