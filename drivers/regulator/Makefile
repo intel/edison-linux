@@ -2,6 +2,7 @@
 # Makefile for regulator drivers.
 #
 
+CFLAGS_pmic_basin_cove.o		:= -Werror
 
 obj-$(CONFIG_REGULATOR) += core.o dummy.o fixed-helper.o
 obj-$(CONFIG_OF) += of_regulator.o

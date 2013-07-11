@@ -515,4 +515,3 @@ config REGULATOR_AS3711
 	  AS3711 PMIC
 
 endif
-
