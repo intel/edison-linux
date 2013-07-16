@@ -212,6 +212,27 @@ struct mmc_supply {
 	struct regulator *vqmmc;	/* Optional Vccq supply */
 };
 
+struct mmc_panic_host {
+	/*
+	 * DMA buffer for the log
+	 */
+	dma_addr_t      dmabuf;
+	void            *logbuf;
+	const struct mmc_host_panic_ops *panic_ops;
+	unsigned int            panic_ready;
+	unsigned int            totalsecs;
+	unsigned int            max_blk_size;
+	unsigned int            max_blk_count;
+	unsigned int            max_req_size;
+	unsigned int            blkaddr;
+	unsigned int            caps;
+	u32                     ocr;            /* the current OCR setting */
+	struct mmc_ios          ios;            /* current io bus settings */
+	struct mmc_card         *card;
+	struct mmc_host         *mmc;
+	void                    *priv;
+};
+
 struct mmc_host {
 	struct device		*parent;
 	struct device		class_dev;
@@ -390,8 +411,23 @@ struct mmc_host {
 
 	unsigned int		slotno;	/* used for sdio acpi binding */
 
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+	struct {
+		struct sdio_cis			*cis;
+		struct sdio_cccr		*cccr;
+		struct sdio_embedded_func	*funcs;
+		int				num_funcs;
+	} embedded_sdio_data;
+#endif
+	struct mmc_panic_host *phost;
 	unsigned long		private[0] ____cacheline_aligned;
 };
+
+#define SECTOR_SIZE    512
+int mmc_emergency_init(void);
+int mmc_emergency_write(char *, unsigned int);
+void mmc_alloc_panic_host(struct mmc_host *, const struct mmc_host_panic_ops *);
+void mmc_emergency_setup(struct mmc_host *host);
 
 struct mmc_host *mmc_alloc_host(int extra, struct device *);
 int mmc_add_host(struct mmc_host *);
