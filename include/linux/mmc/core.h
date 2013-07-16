@@ -121,6 +121,7 @@ struct mmc_data {
 	unsigned int		sg_len;		/* size of scatter list */
 	struct scatterlist	*sg;		/* I/O scatter list */
 	s32			host_cookie;	/* host private data */
+	dma_addr_t		dmabuf;		/* used in panic mode */
 };
 
 struct mmc_host;
