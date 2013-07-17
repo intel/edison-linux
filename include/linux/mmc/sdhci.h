@@ -125,6 +125,17 @@ struct sdhci_host {
 	int irq;		/* Device IRQ */
 	void __iomem *ioaddr;	/* Mapped address */
 
+	/* XXX: SCU/X86 mutex variables base address in shared SRAM */
+	void __iomem *sram_addr;        /* Shared SRAM address */
+
+#define DEKKER_EMMC_OWNER_OFFSET        0
+#define DEKKER_IA_REQ_OFFSET            0x04
+#define DEKKER_SCU_REQ_OFFSET           0x08
+#define DEKKER_OWNER_IA                 0
+#define DEKKER_OWNER_SCU                1
+
+	atomic_t usage_cnt; /* eMMC mutex usage count */
+
 	const struct sdhci_ops *ops;	/* Low level hw interface */
 
 	struct regulator *vmmc;		/* Power regulator (vmmc) */
