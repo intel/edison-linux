@@ -411,4 +411,5 @@ extern int sdhci_runtime_suspend_host(struct sdhci_host *host);
 extern int sdhci_runtime_resume_host(struct sdhci_host *host);
 #endif
 
+extern void sdhci_alloc_panic_host(struct sdhci_host *host);
 #endif /* __SDHCI_HW_H */
