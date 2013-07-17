@@ -1038,21 +1038,19 @@ void dump_nc_power_history(void)
 }
 EXPORT_SYMBOL(dump_nc_power_history);
 
-static int debug_read_history(char *page, char **start, off_t off,
-		int count, int *eof, void *data)
+static ssize_t debug_read_history(struct file *file, char __user *buffer,
+			size_t count, loff_t *pos)
 {
-	unsigned long len = 0;
-	page[len] = 0;
-
 	dump_nc_power_history();
-	return len;
+
+	return 0;
 }
 
-static int debug_write_read_history_entry(struct file *file,
-		const char __user *buffer, unsigned long count, void *data)
+static ssize_t debug_write_read_history_entry(struct file *file,
+		const char __user *buffer, size_t count, loff_t *pos)
 {
 	char buf[20] = "0";
-	unsigned long len = min((unsigned long)sizeof(buf) - 1, count);
+	unsigned long len = min(sizeof(buf) - 1, count);
 	u32 islands;
 	u32 on;
 	int ret;
@@ -1073,14 +1071,22 @@ static int debug_write_read_history_entry(struct file *file,
 	return count;
 }
 
+static const struct file_operations proc_debug_operations = {
+	.owner	= THIS_MODULE,
+	.read	= debug_read_history,
+	.write	= debug_write_read_history_entry,
+};
+
 static int __init debug_read_history_entry(void)
 {
 	struct proc_dir_entry *res = NULL;
-	res = create_proc_entry("debug_read_history", S_IRUGO | S_IWUSR, NULL);
-	if (res) {
-		res->write_proc = debug_write_read_history_entry;
-		res->read_proc = debug_read_history;
-	}
+
+	res = proc_create("debug_read_history", S_IRUGO | S_IWUSR, NULL,
+		&proc_debug_operations);
+
+	if (!res)
+		return -ENOMEM;
+
 	return 0;
 }
 device_initcall(debug_read_history_entry);
