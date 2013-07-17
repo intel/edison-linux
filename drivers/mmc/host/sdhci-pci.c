@@ -335,6 +335,7 @@ static int mfd_emmc_probe_slot(struct sdhci_pci_slot *slot)
 	case PCI_DEVICE_ID_INTEL_MFD_EMMC0:
 		mfd_emmc_mutex_register(slot);
 		sdhci_alloc_panic_host(slot->host);
+		slot->host->mmc->caps2 |= MMC_CAP2_INIT_CARD_SYNC;
 		break;
 	case PCI_DEVICE_ID_INTEL_MFD_EMMC1:
 		break;
