@@ -2403,9 +2403,11 @@ static void sdhci_tasklet_card(unsigned long param)
 {
 	struct sdhci_host *host = (struct sdhci_host*)param;
 
+	cancel_delayed_work(&host->mmc->detect);
+
 	sdhci_card_event(host->mmc);
 
-	mmc_detect_change(host->mmc, msecs_to_jiffies(200));
+	mmc_detect_change(host->mmc, msecs_to_jiffies(500));
 }
 
 static void sdhci_tasklet_finish(unsigned long param)
@@ -2436,7 +2438,8 @@ static void sdhci_tasklet_finish(unsigned long param)
 	 * upon error conditions.
 	 */
 	if (!(host->flags & SDHCI_DEVICE_DEAD) &&
-	    ((mrq->cmd && mrq->cmd->error) ||
+		((mrq->cmd && mrq->cmd->error &&
+		mrq->cmd->error != -ENOMEDIUM) ||
 		 (mrq->data && (mrq->data->error ||
 		  (mrq->data->stop && mrq->data->stop->error))) ||
 		   (host->quirks & SDHCI_QUIRK_RESET_AFTER_REQUEST))) {
