@@ -29,6 +29,9 @@ obj-$(subst m,y,$(CONFIG_IIO_BASINCOVE_GPADC))	+= platform_bcove_adc.o
 obj-$(subst m,y,$(CONFIG_SERIAL_MFD_HSU_EXT)) += platform_hsu.o
 # SD Devices
 obj-$(subst m,y,$(CONFIG_WILINK_PLATFORM_DATA)) += platform_wl12xx.o
+ifndef CONFIG_ACPI
+obj-$(subst m,y,$(CONFIG_BCM_BT_LPM)) += platform_btlpm.o
+endif
 #I2C Devices
 ifdef CONFIG_BATTERY_MAX17042
 obj-$(subst m,y,$(CONFIG_BATTERY_MAX17042)) += platform_max17042.o
