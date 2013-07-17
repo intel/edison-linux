@@ -125,7 +125,11 @@ struct sdhci_host {
 	int irq;		/* Device IRQ */
 	void __iomem *ioaddr;	/* Mapped address */
 
-	/* XXX: SCU/X86 mutex variables base address in shared SRAM */
+	/*
+	 * XXX: SCU/X86 mutex variables base address in shared SRAM
+	 * NOTE: Max size of this struct is 16 bytes
+	 * without shared SRAM re-organization.
+	 */
 	void __iomem *sram_addr;        /* Shared SRAM address */
 
 	void __iomem *rte_addr;	/* IOAPIC RTE register address */
@@ -133,8 +137,12 @@ struct sdhci_host {
 #define DEKKER_EMMC_OWNER_OFFSET        0
 #define DEKKER_IA_REQ_OFFSET            0x04
 #define DEKKER_SCU_REQ_OFFSET           0x08
+/* 0xc offset: state of the emmc chip to SCU. */
+#define DEKKER_EMMC_STATE               0x0c
 #define DEKKER_OWNER_IA                 0
 #define DEKKER_OWNER_SCU                1
+#define DEKKER_EMMC_CHIP_ACTIVE         0
+#define DEKKER_EMMC_CHIP_SUSPENDED      1
 
 	unsigned int	usage_cnt;	/* eMMC mutex usage count */
 
