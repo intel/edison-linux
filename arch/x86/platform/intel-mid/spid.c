@@ -1,0 +1,321 @@
+/*
+ * spid.c: Soft Platform ID parsing and init code
+ *
+ * (C) Copyright 2012 Intel Corporation
+ * Author:
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; version 2
+ * of the License.
+ */
+
+#include <linux/init.h>
+#include <linux/kernel.h>
+#include <linux/interrupt.h>
+#include <linux/scatterlist.h>
+#include <linux/sfi.h>
+#include <linux/intel_pmic_gpio.h>
+#include <linux/spi/spi.h>
+#include <linux/i2c.h>
+#include <linux/skbuff.h>
+#include <linux/gpio.h>
+#include <linux/gpio_keys.h>
+#include <linux/input.h>
+#include <linux/platform_device.h>
+#include <linux/irq.h>
+#include <linux/module.h>
+#include <linux/notifier.h>
+#include <linux/intel_mid_pm.h>
+#include <linux/hsi/hsi.h>
+#include <linux/spinlock.h>
+#include <linux/mmc/core.h>
+#include <linux/mmc/card.h>
+#include <linux/blkdev.h>
+#include <linux/acpi.h>
+#include <linux/intel_pidv_acpi.h>
+
+#include <asm/setup.h>
+#include <asm/mpspec_def.h>
+#include <asm/hw_irq.h>
+#include <asm/apic.h>
+#include <asm/io_apic.h>
+#include <asm/intel-mid.h>
+#include <asm/io.h>
+#include <asm/i8259.h>
+#include <asm/intel_scu_ipc.h>
+#include <asm/intel_mid_rpmsg.h>
+#include <asm/apb_timer.h>
+#include <asm/reboot.h>
+#include "intel_mid_weak_decls.h"
+
+char intel_platform_ssn[INTEL_PLATFORM_SSN_SIZE + 1];
+struct soft_platform_id spid;
+
+#ifdef CONFIG_ACPI
+struct platform_id pidv;
+struct kobject *pidv_kobj;
+#endif
+
+struct kobject *spid_kobj;
+
+/*
+ *
+ */
+static void populate_spid_cmdline(void)
+{
+	char *spid_param, *spid_default_value;
+	char spid_cmdline[SPID_CMDLINE_SIZE+1];
+
+	/* parameter format : cust:vend:manu:plat:prod:hard */
+	snprintf(spid_cmdline, sizeof(spid_cmdline),
+		 "%04x:%04x:%04x:%04x:%04x:%04x",
+		 spid.vendor_id,
+		 spid.customer_id,
+		 spid.manufacturer_id,
+		 spid.platform_family_id,
+		 spid.product_line_id,
+		 spid.hardware_id);
+
+	/* is there a spid param ? */
+	spid_param = strstr(saved_command_line, SPID_PARAM_NAME);
+	if (spid_param) {
+		/* is the param set to default value ? */
+		spid_default_value = strstr(saved_command_line,
+					    SPID_DEFAULT_VALUE);
+		if (spid_default_value) {
+			spid_param += strlen(SPID_PARAM_NAME);
+			if (strlen(spid_param) > strlen(spid_cmdline))
+				memcpy(spid_param, spid_cmdline,
+						strlen(spid_cmdline));
+			else
+				pr_err("Not enough free space for SPID in command line.\n");
+		} else
+			pr_warn("SPID already populated. Don't overwrite.\n");
+	} else
+		pr_err("SPID not found in kernel command line.\n");
+}
+static ssize_t customer_id_show(struct kobject *kobj,
+				struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%04x\n", spid.customer_id);
+}
+spid_attr(customer_id);
+
+static ssize_t vendor_id_show(struct kobject *kobj, struct kobj_attribute *attr,
+			      char *buf)
+{
+	return sprintf(buf, "%04x\n", spid.vendor_id);
+}
+spid_attr(vendor_id);
+
+static ssize_t manufacturer_id_show(struct kobject *kobj,
+				    struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%04x\n", spid.manufacturer_id);
+}
+spid_attr(manufacturer_id);
+
+static ssize_t platform_family_id_show(struct kobject *kobj,
+				       struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%04x\n", spid.platform_family_id);
+}
+spid_attr(platform_family_id);
+
+static ssize_t product_line_id_show(struct kobject *kobj,
+				    struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%04x\n", spid.product_line_id);
+}
+spid_attr(product_line_id);
+
+static ssize_t hardware_id_show(struct kobject *kobj,
+				struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%04x\n", spid.hardware_id);
+}
+spid_attr(hardware_id);
+
+static ssize_t fru_show(struct kobject *kobj, struct kobj_attribute *attr,
+			char *buf)
+{
+	return sprintf(buf, "%02x\n%02x\n%02x\n%02x\n%02x\n"
+			    "%02x\n%02x\n%02x\n%02x\n%02x\n",
+			spid.fru[0], spid.fru[1], spid.fru[2], spid.fru[3],
+			spid.fru[4], spid.fru[5], spid.fru[6], spid.fru[7],
+			spid.fru[8], spid.fru[9]);
+}
+spid_attr(fru);
+
+static struct attribute *spid_attrs[] = {
+	&customer_id_attr.attr,
+	&vendor_id_attr.attr,
+	&manufacturer_id_attr.attr,
+	&platform_family_id_attr.attr,
+	&product_line_id_attr.attr,
+	&hardware_id_attr.attr,
+	&fru_attr.attr,
+	NULL,
+};
+
+static struct attribute_group spid_attr_group = {
+	.attrs = spid_attrs,
+};
+
+#ifdef CONFIG_ACPI
+static ssize_t iafw_version_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%02X.%02X\n", pidv.iafw_major, pidv.iafw_minor);
+}
+pidv_attr(iafw_version);
+
+static ssize_t secfw_version_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%02X.%02X\n", pidv.secfw_major, pidv.secfw_minor);
+}
+pidv_attr(secfw_version);
+
+
+static struct attribute *pidv_attrs[] = {
+	&iafw_version_attr.attr,
+	&secfw_version_attr.attr,
+	NULL,
+};
+
+static struct attribute_group pidv_attr_group = {
+	.attrs = pidv_attrs,
+};
+
+static int __init acpi_parse_pidv(struct acpi_table_header *table)
+{
+	struct acpi_table_pidv *pidv_tbl;
+
+	pidv_tbl = (struct acpi_table_pidv *)table;
+	if (!pidv_tbl) {
+		pr_warn("Unable to map PIDV\n");
+		return -ENODEV;
+	}
+
+	memcpy(&pidv, &(pidv_tbl->pidv), sizeof(struct platform_id));
+	/*
+	 * FIXME: add spid accessor, instead of memcpy
+	 */
+	memcpy(&spid, &(pidv_tbl->pidv.ext_id_1),
+			sizeof(struct soft_platform_id));
+	/*
+	 * FIXME: add ssn accessor, instead of memcpy
+	 */
+	memcpy(&intel_platform_ssn, &(pidv_tbl->pidv.part_number),
+			INTEL_PLATFORM_SSN_SIZE);
+	intel_platform_ssn[INTEL_PLATFORM_SSN_SIZE] = '\0';
+
+	return 0;
+}
+
+static int __init acpi_spid_init(void)
+{
+	int ret = 0;
+
+	/* create sysfs entries for soft platform id */
+	spid_kobj = kobject_create_and_add("spid", NULL);
+	if (!spid_kobj) {
+		pr_err("SPID: ENOMEM for spid_kobj\n");
+		return -ENOMEM;
+	}
+
+	ret = sysfs_create_group(spid_kobj, &spid_attr_group);
+	if (ret) {
+		pr_err("SPID: failed to create /sys/spid\n");
+		goto err_sysfs_spid;
+	}
+
+	/* parse SPID table from firmware/bios */
+	ret = acpi_table_parse(ACPI_SIG_PIDV, acpi_parse_pidv);
+	if (ret) {
+		pr_err("SPID: PIDV ACPI table not found\n");
+		ret = -EINVAL;
+		goto err_acpi_parse;
+	}
+
+	pidv_kobj = kobject_create_and_add("pidv", firmware_kobj);
+	if (!pidv_kobj) {
+		pr_err("pidv: ENOMEM for pidv_kobj\n");
+		ret = -ENOMEM;
+		goto err_kobj_create_pidv;
+	}
+
+	ret = sysfs_create_group(pidv_kobj, &pidv_attr_group);
+	if (ret) {
+		pr_err("SPID: failed to create /sys/spid\n");
+		goto err_sysfs_pidv;
+	}
+
+	/* Populate command line with SPID values */
+	populate_spid_cmdline();
+
+	return 0;
+
+err_sysfs_pidv:
+	kobject_put(firmware_kobj);
+err_kobj_create_pidv:
+err_acpi_parse:
+	sysfs_remove_group(spid_kobj, &spid_attr_group);
+err_sysfs_spid:
+	kobject_put(spid_kobj);
+
+	return ret;
+
+}
+arch_initcall(acpi_spid_init);
+#endif
+
+int __init sfi_handle_spid(struct sfi_table_header *table)
+{
+	struct sfi_table_oemb *oemb;
+	int ret = 0;
+
+	/* create sysfs entries for soft platform id */
+	spid_kobj = kobject_create_and_add("spid", NULL);
+	if (!spid_kobj) {
+		pr_err("SPID: ENOMEM for spid_kobj\n");
+		return -ENOMEM;
+	}
+
+	ret = sysfs_create_group(spid_kobj, &spid_attr_group);
+	if (ret) {
+		pr_err("SPID: failed to create /sys/spid\n");
+		goto err_sfi_sysfs_spid;
+	}
+
+	oemb = (struct sfi_table_oemb *) table;
+	if (!oemb) {
+		pr_err("%s: fail to read MFD Validation SFI OEMB Layout\n",
+			__func__);
+		ret = -ENODEV;
+		goto err_sfi_oemb_tbl;
+	}
+
+	memcpy(&spid, &oemb->spid, sizeof(struct soft_platform_id));
+
+	if (oemb->header.len <
+			(char *)oemb->ssn + INTEL_PLATFORM_SSN_SIZE - (char *)oemb) {
+		pr_err("SFI OEMB does not contains SSN\n");
+		intel_platform_ssn[0] = '\0';
+	} else {
+		memcpy(intel_platform_ssn, oemb->ssn, INTEL_PLATFORM_SSN_SIZE);
+		intel_platform_ssn[INTEL_PLATFORM_SSN_SIZE] = '\0';
+	}
+
+	/* Populate command line with SPID values */
+	populate_spid_cmdline();
+
+err_sfi_oemb_tbl:
+	sysfs_remove_group(spid_kobj, &spid_attr_group);
+err_sfi_sysfs_spid:
+	kobject_put(spid_kobj);
+
+	return 0;
+}
