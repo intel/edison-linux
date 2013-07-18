@@ -1,5 +1,5 @@
 /*
- * spid.h: Intel MID software platform ID definitions
+ * spid.h: Intel software platform ID definitions
  *
  * (C) Copyright 2012 Intel Corporation
  *
@@ -10,6 +10,28 @@
  */
 #ifndef _ASM_X86_SPID_H
 #define _ASM_X86_SPID_H
+
+#include <linux/sfi.h>
+/* size of SPID cmdline : androidboot.spid=vend:cust:manu:plat:prod:hard */
+#define SPID_CMDLINE_SIZE 46
+#define SPID_PARAM_NAME "androidboot.spid="
+#define SPID_DEFAULT_VALUE "xxxx:xxxx:xxxx:xxxx:xxxx:xxxx"
+
+#define spid_attr(_name) \
+static struct kobj_attribute _name##_attr = { \
+	.attr = {                             \
+		.name = __stringify(_name),   \
+		.mode = 0444,                 \
+	},                                    \
+	.show   = _name##_show,               \
+}
+
+
+#define INTEL_PLATFORM_SSN_SIZE	32
+extern struct soft_platform_id spid;
+extern char intel_platform_ssn[INTEL_PLATFORM_SSN_SIZE + 1];
+
+int __init sfi_handle_spid(struct sfi_table_header *table);
 
 struct soft_platform_id {
 	u16 customer_id; /*Defines the final customer for the product */
