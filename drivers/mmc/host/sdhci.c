@@ -3257,9 +3257,12 @@ retry:
 static void sdhci_mfld_panic_set_ios(struct mmc_panic_host *mmc)
 {
 	struct sdhci_host *host;
-	struct mmc_ios *ios = &mmc->ios;
+	struct mmc_ios *ios;
 	u8 ctrl;
 
+	if (!mmc)
+		return;
+	ios = &mmc->ios;
 	host = (struct sdhci_host *)mmc->priv;
 
 	/*
@@ -3326,9 +3329,11 @@ static void sdhci_mfld_panic_request(struct mmc_panic_host *panic_mmc,
 {
 	struct sdhci_host *host;
 	bool present;
-	host = (struct sdhci_host *)panic_mmc->priv;
 
-	WARN_ON(host->mrq != NULL);
+	if (!panic_mmc || !mrq)
+		return;
+
+	host = (struct sdhci_host *)panic_mmc->priv;
 
 	/*
 	 * only support single block data DMA write
@@ -3428,53 +3433,116 @@ static int sdhci_mfld_panic_acquire_ownership(struct sdhci_host *host)
 			goto timeout;
 	}
 
-	pr_info("Acquire ownership - eMMC owner: %d, IA req: %d, SCU req: %d\n",
+	pr_debug("Acquire ownership - eMMC owner: %d, IA req: %d, SCU req: %d\n",
 			readl(host->sram_addr + DEKKER_EMMC_OWNER_OFFSET),
 			readl(host->sram_addr + DEKKER_IA_REQ_OFFSET),
 			readl(host->sram_addr + DEKKER_SCU_REQ_OFFSET));
 
 	return 0;
 timeout:
-	/* hold eMMC mutex anyway */
-	writel(1, host->sram_addr + DEKKER_IA_REQ_OFFSET);
-	pr_warn("%s: force to hold eMMC mutex\n", __func__);
+
+	pr_warn("%s: Timeout to hold eMMC mutex\n", __func__);
 	return -EBUSY;
 }
 
-static int sdhci_mfld_panic_prepare(struct mmc_panic_host *panic_host)
+static int sdhci_mfld_panic_power_on(struct mmc_panic_host *panic_host)
 {
-	struct mmc_host *mmc = panic_host->mmc;
-	struct sdhci_host *host = panic_host->priv;
 	int ret;
-	/*
-	 * acquire ownership from SCU
-	 */
-	sdhci_mfld_panic_acquire_ownership(host);
-	/*
-	 * power host controller
-	 */
-	pm_runtime_get_noresume(mmc->parent);
+	struct mmc_host *mmc;
+	struct sdhci_host *host;
 
-	if (host->ops->power_up_host) {
-		ret = host->ops->power_up_host(host);
-		if (ret)
-			return ret;
+	if (!panic_host)
+		return -ENODEV;
+	mmc = panic_host->mmc;
+	host = panic_host->priv;
+
+	if (host->runtime_suspended) {
+		/*
+		 * power host controller
+		 */
+		pm_runtime_get_noresume(mmc->parent);
+
+		if (host->ops->power_up_host) {
+			ret = host->ops->power_up_host(host);
+			if (ret)
+				return ret;
+		}
 	}
+	host->runtime_suspended = false;
+
+	/*
+	 * re-init host controller in case SCU FW has changed something
+	 */
 
 	sdhci_panic_reinit_host(panic_host);
+
+	return 0;
+}
+
+static int sdhci_mfld_panic_hold_mutex(struct mmc_panic_host *panic_host)
+{
+	struct sdhci_host *host;
+	int ret;
+
+	if (!panic_host)
+		return -ENODEV;
+
+	host = panic_host->priv;
+
+	ret = sdhci_mfld_panic_acquire_ownership(host);
+	if (ret)
+		return ret;
+
+	return sdhci_mfld_panic_power_on(panic_host);
+}
+
+static void sdhci_mfld_panic_release_mutex(struct mmc_panic_host *panic_host)
+{
+	struct sdhci_host *host;
+
+	if (!panic_host)
+		return;
+	host = panic_host->priv;
+
+	if (!host->sram_addr)
+		return;
+
+	writel(DEKKER_OWNER_SCU,
+			host->sram_addr + DEKKER_EMMC_OWNER_OFFSET);
+	writel(0, host->sram_addr + DEKKER_IA_REQ_OFFSET);
+	DBG("Exit ownership - eMMC owner: %d, IA req: %d, SCU req: %d\n",
+			readl(host->sram_addr + DEKKER_EMMC_OWNER_OFFSET),
+			readl(host->sram_addr + DEKKER_IA_REQ_OFFSET),
+			readl(host->sram_addr + DEKKER_SCU_REQ_OFFSET));
+}
+
+static void sdhci_mfld_panic_prepare(struct mmc_panic_host *panic_host)
+{
+	struct sdhci_host *host;
+
+	if (!panic_host)
+		return;
+	host = panic_host->priv;
+
+	/*
+	 * assume host is powered off
+	 */
+	host->runtime_suspended = true;
 
 #ifdef CONFIG_PM_RUNTIME
 	/*
 	 * disable runtime pm directly
 	 */
-	mmc->parent->power.disable_depth = 1;
+	panic_host->mmc->parent->power.disable_depth = 1;
 #endif
-	return 0;
 }
 
 static int sdhci_mfld_panic_setup(struct mmc_panic_host *panic_host)
 {
 	struct sdhci_host *host;
+
+	if (!panic_host)
+		return 0;
 
 	host = mmc_priv(panic_host->mmc);
 	panic_host->priv = (void *)host;
@@ -3487,6 +3555,9 @@ const struct mmc_host_panic_ops sdhci_panic_ops = {
 	.prepare        = sdhci_mfld_panic_prepare,
 	.setup          = sdhci_mfld_panic_setup,
 	.set_ios        = sdhci_mfld_panic_set_ios,
+	.power_on       = sdhci_mfld_panic_power_on,
+	.hold_mutex     = sdhci_mfld_panic_hold_mutex,
+	.release_mutex  = sdhci_mfld_panic_release_mutex,
 };
 
 void sdhci_alloc_panic_host(struct sdhci_host *host)
