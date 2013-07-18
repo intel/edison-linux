@@ -1571,6 +1571,12 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 
 	spin_lock_irqsave(&host->lock, flags);
 
+	if (host->suspended) {
+		pr_err("%s: %s: host is in suspend state\n",
+				__func__, mmc_hostname(mmc));
+		BUG_ON(1);
+	}
+
 	WARN_ON(host->mrq != NULL);
 
 #ifndef SDHCI_USE_LEDS_CLASS
@@ -3489,6 +3495,7 @@ EXPORT_SYMBOL_GPL(sdhci_disable_irq_wakeups);
 int sdhci_suspend_host(struct sdhci_host *host)
 {
 	int ret;
+	unsigned long flags;
 
 	if (host->ops->platform_suspend)
 		host->ops->platform_suspend(host);
@@ -3524,6 +3531,12 @@ int sdhci_suspend_host(struct sdhci_host *host)
 		enable_irq_wake(host->irq);
 	}
 
+	/* Card succesfully suspended. Tell information to SCU */
+	sdhci_set_emmc_state(host, DEKKER_EMMC_CHIP_SUSPENDED);
+
+	spin_lock_irqsave(&host->lock, flags);
+	host->suspended = true;
+	spin_unlock_irqrestore(&host->lock, flags);
 out:
 	sdhci_release_ownership(host->mmc);
 	return ret;
@@ -3534,6 +3547,7 @@ EXPORT_SYMBOL_GPL(sdhci_suspend_host);
 int sdhci_resume_host(struct sdhci_host *host)
 {
 	int ret;
+	unsigned long flags;
 
 	sdhci_acquire_ownership(host->mmc);
 
@@ -3563,6 +3577,10 @@ int sdhci_resume_host(struct sdhci_host *host)
 		sdhci_init(host, (host->mmc->pm_flags & MMC_PM_KEEP_POWER));
 		mmiowb();
 	}
+
+	spin_lock_irqsave(&host->lock, flags);
+	host->suspended = false;
+	spin_unlock_irqrestore(&host->lock, flags);
 
 	ret = mmc_resume_host(host->mmc);
 	sdhci_enable_card_detection(host);
