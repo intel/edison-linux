@@ -325,6 +325,7 @@ static void mfd_emmc_mutex_register(struct sdhci_pci_slot *slot)
 				readl(slot->host->sram_addr +
 					DEKKER_SCU_REQ_OFFSET));
 	}
+	spin_lock_init(&slot->host->dekker_lock);
 }
 
 static int mfd_emmc_probe_slot(struct sdhci_pci_slot *slot)
