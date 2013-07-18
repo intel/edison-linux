@@ -136,7 +136,7 @@ struct sdhci_host {
 #define DEKKER_OWNER_IA                 0
 #define DEKKER_OWNER_SCU                1
 
-	atomic_t usage_cnt; /* eMMC mutex usage count */
+	unsigned int	usage_cnt;	/* eMMC mutex usage count */
 
 	const struct sdhci_ops *ops;	/* Low level hw interface */
 
@@ -153,6 +153,7 @@ struct sdhci_host {
 #endif
 
 	spinlock_t lock;	/* Mutex */
+	spinlock_t dekker_lock; /* eMMC Dekker Mutex lock */
 
 	int flags;		/* Host attributes */
 #define SDHCI_USE_SDMA		(1<<0)	/* Host is SDMA capable */

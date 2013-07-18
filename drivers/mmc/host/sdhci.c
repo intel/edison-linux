@@ -1400,17 +1400,23 @@ static int sdhci_do_acquire_ownership(struct mmc_host *mmc)
 {
 	struct sdhci_host *host;
 	unsigned long t1, t2;
+	unsigned long flags;
 
 	host = mmc_priv(mmc);
 
 	if (!host->sram_addr)
 		return 0;
 
-	atomic_inc(&host->usage_cnt);
+	/* if host has sram_addr, dekker_lock is initialized */
+	spin_lock_irqsave(&host->dekker_lock, flags);
+
+	host->usage_cnt++;
 
 	/* If IA has already hold the eMMC mutex, then just exit */
-	if (readl(host->sram_addr + DEKKER_IA_REQ_OFFSET))
+	if (readl(host->sram_addr + DEKKER_IA_REQ_OFFSET)) {
+		spin_unlock_irqrestore(&host->dekker_lock, flags);
 		return 0;
+	}
 
 	DBG("Acquire ownership - eMMC owner: %d, IA req: %d, SCU req: %d\n",
 			readl(host->sram_addr + DEKKER_EMMC_OWNER_OFFSET),
@@ -1431,7 +1437,10 @@ static int sdhci_do_acquire_ownership(struct mmc_host *mmc)
 					DEKKER_EMMC_OWNER_OFFSET) ==
 						DEKKER_OWNER_IA)
 					break;
+				spin_unlock_irqrestore(&host->dekker_lock,
+						flags);
 				usleep_range(8000, 12000);
+				spin_lock_irqsave(&host->dekker_lock, flags);
 				t2--;
 			}
 			if (t2)
@@ -1446,6 +1455,7 @@ static int sdhci_do_acquire_ownership(struct mmc_host *mmc)
 		cpu_relax();
 	}
 
+	spin_unlock_irqrestore(&host->dekker_lock, flags);
 	/*
 	 * if the last owner is SCU, will do the re-config host controller
 	 * in the next
@@ -1464,6 +1474,8 @@ timeout:
 	/* Release eMMC mutex anyway */
 	writel(DEKKER_OWNER_SCU, host->sram_addr + DEKKER_EMMC_OWNER_OFFSET);
 	writel(0, host->sram_addr + DEKKER_IA_REQ_OFFSET);
+
+	spin_unlock_irqrestore(&host->dekker_lock, flags);
 
 	return -EBUSY;
 }
@@ -1496,13 +1508,17 @@ static int sdhci_acquire_ownership(struct mmc_host *mmc)
 static void sdhci_release_ownership(struct mmc_host *mmc)
 {
 	struct sdhci_host *host;
+	unsigned long flags;
 
 	host = mmc_priv(mmc);
 
 	if (!host->sram_addr)
 		return;
 
-	if (atomic_dec_and_test(&host->usage_cnt)) {
+	spin_lock_irqsave(&host->dekker_lock, flags);
+	BUG_ON(host->usage_cnt == 0);
+	host->usage_cnt--;
+	if (host->usage_cnt == 0) {
 		writel(DEKKER_OWNER_SCU,
 				host->sram_addr + DEKKER_EMMC_OWNER_OFFSET);
 		writel(0, host->sram_addr + DEKKER_IA_REQ_OFFSET);
@@ -1511,6 +1527,7 @@ static void sdhci_release_ownership(struct mmc_host *mmc)
 			readl(host->sram_addr + DEKKER_IA_REQ_OFFSET),
 			readl(host->sram_addr + DEKKER_SCU_REQ_OFFSET));
 	}
+	spin_unlock_irqrestore(&host->dekker_lock, flags);
 }
 
 /*****************************************************************************\
@@ -1528,9 +1545,9 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 
 	host = mmc_priv(mmc);
 
-	sdhci_acquire_ownership(host->mmc);
-
 	sdhci_runtime_pm_get(host);
+
+	sdhci_acquire_ownership(host->mmc);
 
 	spin_lock_irqsave(&host->lock, flags);
 
@@ -1798,11 +1815,11 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 {
 	struct sdhci_host *host = mmc_priv(mmc);
 
-	sdhci_acquire_ownership(mmc);
 	sdhci_runtime_pm_get(host);
+	sdhci_acquire_ownership(mmc);
 	sdhci_do_set_ios(host, ios);
-	sdhci_runtime_pm_put(host);
 	sdhci_release_ownership(mmc);
+	sdhci_runtime_pm_put(host);
 }
 
 static int sdhci_do_get_cd(struct sdhci_host *host)
@@ -2397,9 +2414,9 @@ static void sdhci_tasklet_finish(unsigned long param)
 	mmiowb();
 	spin_unlock_irqrestore(&host->lock, flags);
 
+	sdhci_release_ownership(host->mmc);
 	mmc_request_done(host->mmc, mrq);
 	sdhci_runtime_pm_put(host);
-	sdhci_release_ownership(host->mmc);
 }
 
 static void dump_rte_apic_reg(struct sdhci_host *host, void __iomem *idx_addr)
