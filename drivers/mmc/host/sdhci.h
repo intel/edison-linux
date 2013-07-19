@@ -89,6 +89,7 @@
 #define  SDHCI_POWER_180	0x0A
 #define  SDHCI_POWER_300	0x0C
 #define  SDHCI_POWER_330	0x0E
+#define	 SDHCI_HW_RESET		0x10
 
 #define SDHCI_BLOCK_GAP_CONTROL	0x2A
 
