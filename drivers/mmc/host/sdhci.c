@@ -1883,9 +1883,11 @@ static void sdhci_hw_reset(struct mmc_host *mmc)
 	struct sdhci_host *host = mmc_priv(mmc);
 
 	if (host->ops && host->ops->hw_reset) {
+		sdhci_runtime_pm_get(host);
 		sdhci_acquire_ownership(mmc);
 		host->ops->hw_reset(host);
 		sdhci_release_ownership(mmc);
+		sdhci_runtime_pm_put(host);
 	}
 }
 

@@ -1538,6 +1538,7 @@ static void sdhci_pci_hw_reset(struct sdhci_host *host)
 {
 	struct sdhci_pci_slot *slot = sdhci_priv(host);
 	int rst_n_gpio = slot->rst_n_gpio;
+	u8 pwr;
 
 	if (gpio_is_valid(rst_n_gpio)) {
 		gpio_set_value_cansleep(rst_n_gpio, 0);
