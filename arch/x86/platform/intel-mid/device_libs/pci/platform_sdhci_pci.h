@@ -18,5 +18,8 @@
 #define SDIO_INDEX	3
 
 int sdhci_pdata_set_quirks(unsigned int quirks);
+int sdhci_pdata_set_embedded_control(void (*fnp)
+			(void *dev_id, void (*virtual_cd)
+			(void *dev_id, int card_present)));
 #endif
 
