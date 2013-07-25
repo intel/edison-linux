@@ -26,6 +26,12 @@
 #include <linux/pm_runtime.h>
 #include <linux/mmc/sdhci-pci-data.h>
 
+#include <asm/intel_mid_rpmsg.h>
+
+#if defined(CONFIG_X86_MDFLD)
+#include <linux/intel_mid_pm.h>
+#endif
+
 #include "sdhci.h"
 
 /*
@@ -259,6 +265,46 @@ static inline void sdhci_pci_remove_own_cd(struct sdhci_pci_slot *slot)
 }
 
 #endif
+
+#define MFD_SDHCI_DEKKER_BASE  0xffff7fb0
+static void mfd_emmc_mutex_register(struct sdhci_pci_slot *slot)
+{
+	u32 mutex_var_addr;
+#ifdef CONFIG_INTEL_SCU_IPC
+	int err;
+
+	err = rpmsg_send_generic_command(IPC_EMMC_MUTEX_CMD, 0,
+			NULL, 0, &mutex_var_addr, 1);
+	if (err) {
+		dev_err(&slot->chip->pdev->dev, "IPC error: %d\n", err);
+		dev_info(&slot->chip->pdev->dev, "Specify mutex address\n");
+		/*
+		 * Since we failed to get mutex sram address, specify it
+		 */
+		mutex_var_addr = MFD_SDHCI_DEKKER_BASE;
+	}
+#else
+	mutex_var_addr = MFD_SDHCI_DEKKER_BASE;
+#endif
+
+	/* 3 housekeeping mutex variables, 12 bytes length */
+	slot->host->sram_addr = ioremap_nocache(mutex_var_addr,
+			3 * sizeof(u32));
+	if (!slot->host->sram_addr)
+		dev_err(&slot->chip->pdev->dev, "ioremap failed!\n");
+	else {
+		dev_info(&slot->chip->pdev->dev, "mapped addr: %p\n",
+				slot->host->sram_addr);
+		dev_info(&slot->chip->pdev->dev,
+		"current eMMC owner: %d, IA req: %d, SCU req: %d\n",
+				readl(slot->host->sram_addr +
+					DEKKER_EMMC_OWNER_OFFSET),
+				readl(slot->host->sram_addr +
+					DEKKER_IA_REQ_OFFSET),
+				readl(slot->host->sram_addr +
+					DEKKER_SCU_REQ_OFFSET));
+	}
+}
 
 static int mfd_emmc_probe_slot(struct sdhci_pci_slot *slot)
 {

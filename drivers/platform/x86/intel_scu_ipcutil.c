@@ -28,6 +28,7 @@
 #include <linux/io.h>
 #include <linux/rpmsg.h>
 #include <asm/intel_scu_ipc.h>
+#include <asm/intel_scu_pmic.h>
 #include <asm/intel_scu_ipcutil.h>
 #include <asm/intel-mid.h>
 #include <asm/intel_mid_rpmsg.h>
@@ -660,6 +661,18 @@ static long scu_ipc_ioctl(struct file *fp, unsigned int cmd,
 				1,
 				offsetof(struct scu_ipc_osnib, alarm));
 
+		break;
+	}
+	case INTEL_SCU_IPC_READ_VBATTCRIT:
+	{
+		u32 value = 0;
+
+		pr_info("cmd = INTEL_SCU_IPC_READ_VBATTCRIT");
+		ret = intel_scu_ipc_read_mip((u8 *)&value, 4, 0x318, 1);
+		if (ret < 0)
+			return ret;
+		pr_info("VBATTCRIT VALUE = %x\n", value);
+		ret = copy_to_user(argp, &value, 4);
 		break;
 	}
 	case INTEL_SCU_IPC_FW_REVISION_GET:
