@@ -38,8 +38,9 @@
 
 #include <asm-generic/rtc.h>
 #include <asm/intel_scu_ipc.h>
-#include <asm/mrst.h>
-#include <asm/mrst-vrtc.h>
+#include <asm/intel-mid.h>
+#include <asm/intel_mid_vrtc.h>
+#include <asm/intel_mid_rpmsg.h>
 
 struct mrst_rtc {
 	struct rtc_device	*rtc;
@@ -137,7 +138,8 @@ static int mrst_set_time(struct device *dev, struct rtc_time *time)
 
 	spin_unlock_irqrestore(&rtc_lock, flags);
 
-	ret = intel_scu_ipc_simple_command(IPCMSG_VRTC, IPC_CMD_VRTC_SETTIME);
+	ret = rpmsg_send_generic_simple_command(IPCMSG_VRTC,
+				IPC_CMD_VRTC_SETTIME);
 	return ret;
 }
 
@@ -237,7 +239,8 @@ static int mrst_set_alarm(struct device *dev, struct rtc_wkalrm *t)
 
 	spin_unlock_irq(&rtc_lock);
 
-	ret = intel_scu_ipc_simple_command(IPCMSG_VRTC, IPC_CMD_VRTC_SETALARM);
+	ret = rpmsg_send_generic_simple_command(IPCMSG_VRTC,
+				IPC_CMD_VRTC_SETALARM);
 	if (ret)
 		return ret;
 

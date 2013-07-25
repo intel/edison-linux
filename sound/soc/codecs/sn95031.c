@@ -30,7 +30,7 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 
-#include <asm/intel_scu_ipc.h>
+#include <asm/intel_scu_pmic.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
