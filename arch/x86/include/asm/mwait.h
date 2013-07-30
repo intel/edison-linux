@@ -13,4 +13,10 @@
 
 #define MWAIT_ECX_INTERRUPT_BREAK	0x1
 
+#ifdef CONFIG_ATOM_SOC_POWER
+#define MWAIT_MAX_NUM_CSTATES		10
+#else
+#define MWAIT_MAX_NUM_CSTATES		8
+#endif
+
 #endif /* _ASM_X86_MWAIT_H */

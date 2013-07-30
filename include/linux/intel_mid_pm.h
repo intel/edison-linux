@@ -83,7 +83,7 @@ static inline int platform_is(u8 model)
 /* Since entry latency is substantial
  * put exit_latency = entry+exit latency
  */
-#ifdef CONFIG_X86_MRFLD
+#ifdef CONFIG_REMOVEME_INTEL_ATOM_MRFLD_POWER
 #define CSTATE_EXIT_LATENCY_S0i1 1200
 #define CSTATE_EXIT_LATENCY_S0i2 2000
 #define CSTATE_EXIT_LATENCY_S0i3 10000
@@ -121,7 +121,7 @@ enum s3_parts {
 #define	SET_LPAUDIO			4
 #define	SET_AOAC_S0i2			7
 
-#ifdef CONFIG_X86_MRFLD
+#ifdef CONFIG_REMOVEME_INTEL_ATOM_MRFLD_POWER
 #define MID_S0I1_STATE         0x60
 #define MID_S0I2_STATE         0x62
 #define MID_LPMP3_STATE        0x62

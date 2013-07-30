@@ -68,7 +68,7 @@ struct lss_definition {
 	char *subsystem;
 };
 
-#ifdef CONFIG_INTEL_REMOVEME_ATOM_MRFLD_POWER
+#ifdef CONFIG_REMOVEME_INTEL_ATOM_MRFLD_POWER
 #define PUNIT_CR_CORE_C1_RES_MSR	0x660
 #define PUNIT_CR_CORE_C4_RES_MSR	0x3fc
 #define PUNIT_CR_CORE_C6_RES_MSR	0x3fd
