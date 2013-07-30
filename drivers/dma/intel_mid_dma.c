@@ -260,6 +260,24 @@ static void dmac1_unmask_periphral_intr(struct intel_mid_dma_chan *midc)
 	return;
 }
 
+/*
+ * Some consumer may need to know how many bytes have been
+ * really transfered for one specific dma channel
+ */
+inline dma_addr_t intel_dma_get_src_addr(struct dma_chan *chan)
+{
+	struct intel_mid_dma_chan	*midc = to_intel_mid_dma_chan(chan);
+	return readl(midc->ch_regs + SAR);
+}
+EXPORT_SYMBOL(intel_dma_get_src_addr);
+
+inline dma_addr_t intel_dma_get_dst_addr(struct dma_chan *chan)
+{
+	struct intel_mid_dma_chan	*midc = to_intel_mid_dma_chan(chan);
+	return readl(midc->ch_regs + DAR);
+}
+EXPORT_SYMBOL(intel_dma_get_dst_addr);
+
 /**
  * enable_dma_interrupt -	enable the periphral interrupt
  * @midc: dma channel for which enable interrupt is required
