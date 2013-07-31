@@ -87,6 +87,8 @@ struct dw_spi_dma_ops {
 	int (*dma_init)(struct dw_spi *dws);
 	void (*dma_exit)(struct dw_spi *dws);
 	int (*dma_transfer)(struct dw_spi *dws, int cs_change);
+	int (*dma_suspend)(struct dw_spi *dws);
+	int (*dma_resume)(struct dw_spi *dws);
 };
 
 struct dw_spi {
