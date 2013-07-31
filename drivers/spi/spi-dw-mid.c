@@ -201,10 +201,41 @@ static int mid_spi_dma_transfer(struct dw_spi *dws, int cs_change)
 	return 0;
 }
 
+static int mid_spi_dma_suspend(struct dw_spi *dws)
+{
+	struct dma_chan *txchan, *rxchan;
+
+	txchan = dws->txchan;
+	rxchan = dws->rxchan;
+
+	txchan->device->device_control(txchan, DMA_TERMINATE_ALL, 0);
+	rxchan->device->device_control(rxchan, DMA_TERMINATE_ALL, 0);
+
+	txchan->device->device_control(txchan, DMA_PAUSE, 0);
+	rxchan->device->device_control(rxchan, DMA_PAUSE, 0);
+
+	return 0;
+}
+
+static int mid_spi_dma_resume(struct dw_spi *dws)
+{
+	struct dma_chan *txchan, *rxchan;
+
+	txchan = dws->txchan;
+	rxchan = dws->rxchan;
+
+	txchan->device->device_control(txchan, DMA_RESUME, 0);
+	rxchan->device->device_control(rxchan, DMA_RESUME, 0);
+
+	return 0;
+}
+
 static struct dw_spi_dma_ops mid_dma_ops = {
 	.dma_init	= mid_spi_dma_init,
 	.dma_exit	= mid_spi_dma_exit,
 	.dma_transfer	= mid_spi_dma_transfer,
+	.dma_suspend	= mid_spi_dma_suspend,
+	.dma_resume	= mid_spi_dma_resume,
 };
 #endif
 

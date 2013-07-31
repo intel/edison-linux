@@ -934,8 +934,13 @@ int dw_spi_suspend_host(struct dw_spi *dws)
 	ret = dw_spi_stop_queue(dws);
 	if (ret)
 		return ret;
+
 	spi_enable_chip(dws, 0);
 	spi_set_clk(dws, 0);
+
+	if (dws->dma_inited)
+		dws->dma_ops->dma_suspend(dws);
+
 	return ret;
 }
 EXPORT_SYMBOL_GPL(dw_spi_suspend_host);
@@ -944,10 +949,14 @@ int dw_spi_resume_host(struct dw_spi *dws)
 {
 	int ret;
 
+	if (dws->dma_inited)
+		dws->dma_ops->dma_resume(dws);
+
 	dw_spi_hw_init(dws);
 	ret = dw_spi_start_queue(dws);
 	if (ret)
 		dev_err(&dws->master->dev, "fail to start queue (%d)\n", ret);
+
 	return ret;
 }
 EXPORT_SYMBOL_GPL(dw_spi_resume_host);
