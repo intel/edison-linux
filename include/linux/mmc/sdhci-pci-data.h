@@ -9,6 +9,7 @@ struct sdhci_pci_data {
 	int		rst_n_gpio; /* Set to -EINVAL if unused */
 	int		cd_gpio;    /* Set to -EINVAL if unused */
 	int		quirks;
+	int		quirks2;
 	int		platform_quirks; /* Platform related quirks */
 	int		(*setup)(struct sdhci_pci_data *data);
 	void		(*cleanup)(struct sdhci_pci_data *data);
