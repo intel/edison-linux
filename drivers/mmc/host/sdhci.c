@@ -1391,11 +1391,11 @@ static int sdhci_set_power(struct sdhci_host *host, unsigned short power)
  * save some unused expenses.
  * @mmc: mmc host
  *
-* @return return value:
-* 0 - Acquried the ownership successfully. The last owner is IA
-* 1 - Acquried the ownership succesffully. The last owenr is SCU
-* -EBUSY - failed to acquire ownership within the timeout period
-	*/
+ * @return return value:
+ * 0 - Acquried the ownership successfully. The last owner is IA
+ * 1 - Acquried the ownership successfully. The last owenr is SCU
+ * -EBUSY - failed to acquire ownership within the timeout period
+ */
 static int sdhci_do_acquire_ownership(struct mmc_host *mmc)
 {
 	struct sdhci_host *host;
@@ -3917,6 +3917,7 @@ int sdhci_add_host(struct sdhci_host *host)
 	}
 
 #ifdef CONFIG_REGULATOR
+	sdhci_try_get_regulator(host);
 	/*
 	 * Voltage range check makes sense only if regulator reports
 	 * any voltage value.
