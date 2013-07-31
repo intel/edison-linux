@@ -2772,6 +2772,21 @@ again:
 	}
 
 	if (intmask & SDHCI_INT_CMD_MASK) {
+		/*
+		 * If encounter command conflict interrupts,
+		 * before clearing it, delay 64 clocks, otherwise the interrupts
+		 * will be generated again.
+		 * This is just experience. SDHC spec doesn't
+		 * say the command conflict interrupts will be generated
+		 * again without a delay before clearing them.
+		 */
+		if ((intmask & SDHCI_INT_CMD_CONFLICT) ==
+				SDHCI_INT_CMD_CONFLICT) {
+			if (host->clock)
+				udelay(64 * 1000000 / host->clock);
+			else
+				udelay(500);
+		}
 		sdhci_writel(host, intmask & SDHCI_INT_CMD_MASK,
 			SDHCI_INT_STATUS);
 		sdhci_cmd_irq(host, intmask & SDHCI_INT_CMD_MASK);
