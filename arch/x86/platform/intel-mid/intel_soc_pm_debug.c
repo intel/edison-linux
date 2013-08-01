@@ -19,7 +19,7 @@
  */
 #include <linux/time.h>
 #include <asm/intel_mid_rpmsg.h>
-#include <asm/mwait.h>
+#include <linux/cpuidle.h>
 #include "intel_soc_pm_debug.h"
 #include <asm-generic/io-64-nonatomic-hi-lo.h>
 
@@ -1978,7 +1978,7 @@ static int cstate_ignore_add_show(struct seq_file *s, void *unused)
 {
 	int i;
 	seq_printf(s, "CSTATES IGNORED: ");
-	for (i = 0; i < MWAIT_MAX_NUM_CSTATES; i++)
+	for (i = 0; i < CPUIDLE_STATE_MAX; i++)
 		if ((mid_pmu_cxt->cstate_ignore & (1 << i)))
 			seq_printf(s, "%d, ", i+1);
 
@@ -2022,7 +2022,7 @@ static ssize_t cstate_ignore_add_write(struct file *file,
 		return -EINVAL;
 
 	if (cstate == MAX_CSTATES_POSSIBLE) {
-		mid_pmu_cxt->cstate_ignore = ((1 << MWAIT_MAX_NUM_CSTATES) - 1);
+		mid_pmu_cxt->cstate_ignore = ((1 << CPUIDLE_STATE_MAX) - 1);
 		/* Ignore C2, C3, C4, C5 states */
 		mid_pmu_cxt->cstate_ignore |= (1 << 1);
 		mid_pmu_cxt->cstate_ignore |= (1 << 2);
@@ -2032,7 +2032,7 @@ static ssize_t cstate_ignore_add_write(struct file *file,
 		pm_qos_update_request(mid_pmu_cxt->cstate_qos,
 					CSTATE_EXIT_LATENCY_C1 - 1);
 	} else {
-		u32 cstate_exit_latency[MWAIT_MAX_NUM_CSTATES+1];
+		u32 cstate_exit_latency[CPUIDLE_STATE_MAX+1];
 		u32 local_cstate_allowed;
 		int max_cstate_allowed;
 
@@ -2065,7 +2065,7 @@ static ssize_t cstate_ignore_add_write(struct file *file,
 		local_cstate_allowed = ~mid_pmu_cxt->cstate_ignore;
 
 		/* restrict to max c-states */
-		local_cstate_allowed &= ((1<<MWAIT_MAX_NUM_CSTATES)-1);
+		local_cstate_allowed &= ((1<<CPUIDLE_STATE_MAX)-1);
 
 		/* If no states allowed will return 0 */
 		max_cstate_allowed = fls(local_cstate_allowed);
@@ -2093,7 +2093,7 @@ static int cstate_ignore_remove_show(struct seq_file *s, void *unused)
 {
 	int i;
 	seq_printf(s, "CSTATES ALLOWED: ");
-	for (i = 0; i < MWAIT_MAX_NUM_CSTATES; i++)
+	for (i = 0; i < CPUIDLE_STATE_MAX; i++)
 		if (!(mid_pmu_cxt->cstate_ignore & (1 << i)))
 			seq_printf(s, "%d, ", i+1);
 
@@ -2139,7 +2139,7 @@ static ssize_t cstate_ignore_remove_write(struct file *file,
 
 	if (cstate == MAX_CSTATES_POSSIBLE) {
 		mid_pmu_cxt->cstate_ignore =
-				~((1 << MWAIT_MAX_NUM_CSTATES) - 1);
+				~((1 << CPUIDLE_STATE_MAX) - 1);
 		/* Ignore C2, C3, C4, C5 states */
 		mid_pmu_cxt->cstate_ignore |= (1 << 1);
 		mid_pmu_cxt->cstate_ignore |= (1 << 2);
@@ -2149,7 +2149,7 @@ static ssize_t cstate_ignore_remove_write(struct file *file,
 		pm_qos_update_request(mid_pmu_cxt->cstate_qos,
 						PM_QOS_DEFAULT_VALUE);
 	} else {
-		u32 cstate_exit_latency[MWAIT_MAX_NUM_CSTATES+1];
+		u32 cstate_exit_latency[CPUIDLE_STATE_MAX+1];
 		u32 local_cstate_allowed;
 		int max_cstate_allowed;
 
@@ -2181,7 +2181,7 @@ static ssize_t cstate_ignore_remove_write(struct file *file,
 
 		local_cstate_allowed = ~mid_pmu_cxt->cstate_ignore;
 		/* restrict to max c-states */
-		local_cstate_allowed &= ((1<<MWAIT_MAX_NUM_CSTATES)-1);
+		local_cstate_allowed &= ((1<<CPUIDLE_STATE_MAX)-1);
 
 		/* If no states allowed will return 0 */
 		max_cstate_allowed = fls(local_cstate_allowed);
@@ -2254,7 +2254,7 @@ static const struct file_operations s3_ctrl_ops = {
 
 unsigned int pmu_get_new_cstate(unsigned int cstate, int *index)
 {
-	static int cstate_index_table[MWAIT_MAX_NUM_CSTATES] = {
+	static int cstate_index_table[CPUIDLE_STATE_MAX] = {
 					1, 1, 1, 1, 1, 2, 3, 4, 5, 6};
 	unsigned int new_cstate = cstate;
 	u32 local_cstate = (u32)(cstate);
@@ -2270,7 +2270,7 @@ unsigned int pmu_get_new_cstate(unsigned int cstate, int *index)
 
 		/* get next low cstate allowed */
 		cstate_mask	= (u32)((1 << local_cstate)-1);
-		local_cstate_allowed	&= ((1<<MWAIT_MAX_NUM_CSTATES)-1);
+		local_cstate_allowed	&= ((1<<CPUIDLE_STATE_MAX)-1);
 		local_cstate_allowed	&= cstate_mask;
 		new_cstate	= fls(local_cstate_allowed);
 
@@ -2419,7 +2419,7 @@ void pmu_stats_init(void)
 		/* If s0ix is disabled then restrict to C6 */
 		if (!enable_s0ix) {
 			mid_pmu_cxt->cstate_ignore =
-				~((1 << MWAIT_MAX_NUM_CSTATES) - 1);
+				~((1 << CPUIDLE_STATE_MAX) - 1);
 
 			/* Ignore C2, C3, C4, C5 states */
 			mid_pmu_cxt->cstate_ignore |= (1 << 1);
