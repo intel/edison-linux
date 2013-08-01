@@ -20,7 +20,16 @@
 enum hsu_core {
 	hsu_pnw,
 	hsu_clv,
-	hsu_tgr,
+	hsu_tng,
+	hsu_vlv2,
+};
+
+enum hsu_pid {
+	hsu_pid_def = 0,
+	hsu_pid_rhb = 0,
+	hsu_pid_vtb_pro = 1,
+	hsu_pid_vtb_eng = 2,
+	hsu_pid_max,
 };
 
 struct hsu_port_pin_cfg {
@@ -39,5 +48,4 @@ struct hsu_port_pin_cfg {
 	irq_handler_t wake_isr;
 };
 
-extern int hsu_dev_platform_data(void) __attribute__((weak));
 #endif
