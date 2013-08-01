@@ -1,7 +1,7 @@
 /*
  * sfi_cpufreq.c - sfi Processor P-States Driver
  *
- *
+ * (C) 2010-2011 Intel Corporation
  *
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *
