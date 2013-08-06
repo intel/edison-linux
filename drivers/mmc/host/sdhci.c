@@ -283,6 +283,9 @@ static void sdhci_activate_led(struct sdhci_host *host)
 {
 	u8 ctrl;
 
+	if (!(host->mmc->caps2 & MMC_CAP2_LED_SUPPORT))
+		return;
+
 	ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
 	ctrl |= SDHCI_CTRL_LED;
 	sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
@@ -291,6 +294,9 @@ static void sdhci_activate_led(struct sdhci_host *host)
 static void sdhci_deactivate_led(struct sdhci_host *host)
 {
 	u8 ctrl;
+
+	if (!(host->mmc->caps2 & MMC_CAP2_LED_SUPPORT))
+		return;
 
 	ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
 	ctrl &= ~SDHCI_CTRL_LED;
@@ -303,6 +309,9 @@ static void sdhci_led_control(struct led_classdev *led,
 {
 	struct sdhci_host *host = container_of(led, struct sdhci_host, led);
 	unsigned long flags;
+
+	if (!(host->mmc->caps2 & MMC_CAP2_LED_SUPPORT))
+		return;
 
 	spin_lock_irqsave(&host->lock, flags);
 
@@ -4381,18 +4390,20 @@ int sdhci_add_host(struct sdhci_host *host)
 #endif
 
 #ifdef SDHCI_USE_LEDS_CLASS
-	snprintf(host->led_name, sizeof(host->led_name),
-		"%s::", mmc_hostname(mmc));
-	host->led.name = host->led_name;
-	host->led.brightness = LED_OFF;
-	host->led.default_trigger = mmc_hostname(mmc);
-	host->led.brightness_set = sdhci_led_control;
+	if (mmc->caps2 & MMC_CAP2_LED_SUPPORT) {
+		snprintf(host->led_name, sizeof(host->led_name),
+				"%s::", mmc_hostname(mmc));
+		host->led.name = host->led_name;
+		host->led.brightness = LED_OFF;
+		host->led.default_trigger = mmc_hostname(mmc);
+		host->led.brightness_set = sdhci_led_control;
 
-	ret = led_classdev_register(mmc_dev(mmc), &host->led);
-	if (ret) {
-		pr_err("%s: Failed to register LED device: %d\n",
-		       mmc_hostname(mmc), ret);
-		goto reset;
+		ret = led_classdev_register(mmc_dev(mmc), &host->led);
+		if (ret) {
+			pr_err("%s: Failed to register LED device: %d\n",
+					mmc_hostname(mmc), ret);
+			goto reset;
+		}
 	}
 #endif
 
@@ -4413,9 +4424,11 @@ int sdhci_add_host(struct sdhci_host *host)
 
 #ifdef SDHCI_USE_LEDS_CLASS
 reset:
-	sdhci_reset(host, SDHCI_RESET_ALL);
-	sdhci_mask_irqs(host, SDHCI_INT_ALL_MASK);
-	free_irq(host->irq, host);
+	if (mmc->caps2 & MMC_CAP2_LED_SUPPORT) {
+		sdhci_reset(host, SDHCI_RESET_ALL);
+		sdhci_mask_irqs(host, SDHCI_INT_ALL_MASK);
+		free_irq(host->irq, host);
+	}
 	sdhci_release_ownership(mmc);
 #endif
 untasklet:
@@ -4452,7 +4465,8 @@ void sdhci_remove_host(struct sdhci_host *host, int dead)
 	mmc_remove_host(host->mmc);
 
 #ifdef SDHCI_USE_LEDS_CLASS
-	led_classdev_unregister(&host->led);
+	if (host->mmc->caps2 & MMC_CAP2_LED_SUPPORT)
+		led_classdev_unregister(&host->led);
 #endif
 
 	if (!dead)
