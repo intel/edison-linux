@@ -914,8 +914,17 @@ static int intel_idle_cpuidle_driver_init(void)
 		mwait_substate = MWAIT_HINT2SUBSTATE(mwait_hint);
 
 		/* does the state exist in CPUID.MWAIT? */
-		num_substates = (mwait_substates >> ((mwait_cstate + 1) * 4))
+
+		/* FIXME: Do not check number of substates for any states above C6
+		 * as these are not real C states supported by the CPU, they
+		 * are emulated c states for s0ix support.
+		*/
+		if ((cstate + 1) < 6) {
+			num_substates = (mwait_substates >> ((mwait_cstate + 1) * 4))
 					& MWAIT_SUBSTATE_MASK;
+			if (num_substates == 0)
+				continue;
+		}
 
 #if !defined(CONFIG_ATOM_SOC_POWER)
 		if (boot_cpu_data.x86_model != 0x37) {
@@ -975,8 +984,17 @@ static int intel_idle_cpu_init(int cpu)
 		mwait_substate = MWAIT_HINT2SUBSTATE(mwait_hint);
 
 		/* does the state exist in CPUID.MWAIT? */
-		num_substates = (mwait_substates >> ((mwait_cstate + 1) * 4))
+
+		/* FIXME: Do not check number of substates for any states above C6
+		 * as these are not real C states supported by the CPU, they
+		 * are emulated c states for s0ix support.
+		 */
+		if ((cstate + 1) < 6) {
+			num_substates = (mwait_substates >> ((mwait_cstate + 1) * 4))
 					& MWAIT_SUBSTATE_MASK;
+			if (num_substates == 0)
+				continue;
+		}
 
 #if !defined(CONFIG_ATOM_SOC_POWER)
 		if (boot_cpu_data.x86_model != 0x37) {
