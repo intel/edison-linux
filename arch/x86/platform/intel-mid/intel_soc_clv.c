@@ -72,6 +72,7 @@ static bool clv_pmu_enter(int s0ix_state)
 		s0ix_value = get_s0ix_val_set_pm_ssc(s0ix_state);
 
 	/* issue a command to SCU */
+	pmu_set_interrupt_enable();
 	writel(s0ix_value, &mid_pmu_cxt->pmu_reg->pm_cmd);
 
 	do {

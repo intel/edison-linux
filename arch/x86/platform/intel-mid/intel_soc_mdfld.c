@@ -53,6 +53,7 @@ static bool mfld_pmu_enter(int s0ix_state)
 	clear_c6offload_bit();
 
 	/* issue a command to SCU */
+	pmu_set_interrupt_enable();
 	writel(s0ix_value, &mid_pmu_cxt->pmu_reg->pm_cmd);
 
 	pmu_log_command(s0ix_value, NULL);
