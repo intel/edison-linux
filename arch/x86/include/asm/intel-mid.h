@@ -28,6 +28,7 @@ static inline int get_gpio_by_name(const char *name) { return -1; }
 extern int intel_mid_pci_init(void);
 extern void intel_delayed_device_register(void *dev,
 			void (*delayed_callback)(void *dev_desc));
+extern void install_irq_resource(struct platform_device *pdev, int irq);
 extern void intel_scu_device_register(struct platform_device *pdev);
 extern struct devs_id *get_device_id(u8 type, char *name);
 extern int __init sfi_parse_mrtc(struct sfi_table_header *table);

@@ -822,6 +822,12 @@ config SENSORS_LM95245
 	  This driver can also be built as a module.  If so, the module
 	  will be called lm95245.
 
+config MSIC_GPADC
+	tristate "MSIC GPADC driver for Intel Medfield platform"
+	depends on INTEL_SCU_IPC
+	help
+	  Say Y here to enable MSIC GPADC driver on Intel Medfield Platform
+
 config SENSORS_MAX1111
 	tristate "Maxim MAX1111 Serial 8-bit ADC chip and compatibles"
 	depends on SPI_MASTER
