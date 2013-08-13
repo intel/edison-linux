@@ -30,10 +30,6 @@
 #include <asm/intel_scu_flis.h>
 #include <asm/intel_scu_pmic.h>
 
-#if defined(CONFIG_X86_MDFLD)
-#include <linux/intel_mid_pm.h>
-#endif
-
 #include "sdhci.h"
 
 /* Settle down values copied from broadcom reference design. */
@@ -1679,34 +1675,25 @@ static int sdhci_gpio_buf_check(struct sdhci_host *host, unsigned int clk)
 #if defined(CONFIG_X86_MDFLD)
 static int sdhci_pci_power_up_host(struct sdhci_host *host)
 {
-	int ret;
-	bool atomic_context;
+	int ret = -ENOSYS;
+	struct sdhci_pci_slot *slot = sdhci_priv(host);
 
+	if (slot->data && slot->data->power_up)
+		ret = slot->data->power_up(host);
 	/*
-	 * Since pmu_set_emmc_to_d0i0_atomic function can
-	 * only be used in atomic context, before call this
-	 * function, do a check first and make sure this function
-	 * is used in atomic context.
+	 * If there is no power_up callbacks in platform data,
+	 * return -ENOSYS;
 	 */
-	atomic_context = (!preemptible() || in_atomic_preempt_off());
-
-	if (!atomic_context) {
-		pr_err("%s: not in atomic context!\n", __func__);
-		return -EPERM;
-	}
-
-	ret = pmu_set_emmc_to_d0i0_atomic();
-	if (ret) {
-		pr_err("%s: power up host failed\n", __func__);
+	if (ret)
 		return ret;
-	}
 
 	/*
 	 * after power up host, let's have a little test
 	 */
-	if (sdhci_readl(host, SDHCI_PRESENT_STATE) ==
+
+	if (sdhci_readl(host, SDHCI_HOST_VERSION) ==
 			0xffffffff) {
-		pr_err("%s: but power up failed\n",
+		pr_err("%s: power up sdhci host failed\n",
 				__func__);
 		return -EPERM;
 	}
@@ -1715,9 +1702,6 @@ static int sdhci_pci_power_up_host(struct sdhci_host *host)
 
 	return 0;
 }
-#else
-#define sdhci_pci_power_up_host        NULL
-#endif
 
 static const struct sdhci_ops sdhci_pci_ops = {
 	.enable_dma	= sdhci_pci_enable_dma,
