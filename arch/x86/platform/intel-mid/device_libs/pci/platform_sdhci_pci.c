@@ -19,8 +19,43 @@
 #include <linux/delay.h>
 #include <asm/intel_scu_ipc.h>
 #include <linux/hardirq.h>
+#include <linux/intel_mid_pm.h>
+#include <linux/hardirq.h>
 
 #include "platform_sdhci_pci.h"
+
+#ifdef CONFIG_ATOM_SOC_POWER
+static int panic_mode_emmc0_power_up(void *data)
+{
+	int ret;
+	bool atomic_context;
+	/*
+	 * Since pmu_set_emmc_to_d0i0_atomic function can
+	 * only be used in atomic context, before call this
+	 * function, do a check first and make sure this function
+	 * is used in atomic context.
+	 */
+	atomic_context = (!preemptible() || in_atomic_preempt_off());
+
+	if (!atomic_context) {
+		pr_err("%s: not in atomic context!\n", __func__);
+		return -EPERM;
+	}
+
+	ret = pmu_set_emmc_to_d0i0_atomic();
+	if (ret) {
+		pr_err("%s: power up host failed with err %d\n",
+				__func__, ret);
+	}
+
+	return ret;
+}
+#else
+static int panic_mode_emmc0_power_up(void *data)
+{
+	return 0;
+}
+#endif
 
 /* MFLD platform data */
 static struct sdhci_pci_data mfld_sdhci_pci_data[] = {
@@ -31,6 +66,7 @@ static struct sdhci_pci_data mfld_sdhci_pci_data[] = {
 			.cd_gpio = -EINVAL,
 			.setup = 0,
 			.cleanup = 0,
+			.power_up = panic_mode_emmc0_power_up,
 	},
 	[EMMC1_INDEX] = {
 			.pdev = NULL,
@@ -67,6 +103,7 @@ static struct sdhci_pci_data clv_sdhci_pci_data[] = {
 			.cd_gpio = -EINVAL,
 			.setup = 0,
 			.cleanup = 0,
+			.power_up = panic_mode_emmc0_power_up,
 	},
 	[EMMC1_INDEX] = {
 			.pdev = NULL,
@@ -105,6 +142,7 @@ static struct sdhci_pci_data mrfl_sdhci_pci_data[] = {
 			.platform_quirks = 0,
 			.setup = 0,
 			.cleanup = 0,
+			.power_up = panic_mode_emmc0_power_up,
 	},
 	[EMMC1_INDEX] = {
 			.pdev = NULL,
