@@ -296,6 +296,42 @@ static inline void pmu_clear_pending_interrupt(void)
 	writel(temp, &mid_pmu_cxt->pmu_reg->pm_ics);
 }
 
+void pmu_set_interrupt_enable(void)
+{
+	u32 temp;
+	union pmu_pm_ics result;
+
+	/* read the pm interrupt status register */
+	temp = readl(&mid_pmu_cxt->pmu_reg->pm_ics);
+	result.pmu_pm_ics_value = temp;
+
+	/* Set the interrupt enable bit */
+	result.pmu_pm_ics_parts.int_enable = 1;
+
+	temp = result.pmu_pm_ics_value;
+
+	/* write into the PM_ICS register */
+	writel(temp, &mid_pmu_cxt->pmu_reg->pm_ics);
+}
+
+static inline void pmu_clear_interrupt_enable(void)
+{
+	u32 temp;
+	union pmu_pm_ics result;
+
+	/* read the pm interrupt status register */
+	temp = readl(&mid_pmu_cxt->pmu_reg->pm_ics);
+	result.pmu_pm_ics_value = temp;
+
+	/* Clear the interrupt enable bit */
+	result.pmu_pm_ics_parts.int_enable = 0;
+
+	temp = result.pmu_pm_ics_value;
+
+	/* write into the PM_ICS register */
+	writel(temp, &mid_pmu_cxt->pmu_reg->pm_ics);
+}
+
 static inline int pmu_read_interrupt_status(void)
 {
 	u32 temp;
@@ -445,6 +481,9 @@ static irqreturn_t pmu_sc_irq(int irq, void *ignored)
 
 	ret = IRQ_HANDLED;
 ret_no_clear:
+	/* clear interrupt enable bit */
+	pmu_clear_interrupt_enable();
+
 	return ret;
 }
 
@@ -1510,7 +1549,6 @@ pci_power_t pmu_pci_choose_state(struct pci_dev *pdev)
 int pmu_issue_interactive_command(struct pmu_ss_states *pm_ssc, bool ioc,
 					bool d3_cold)
 {
-	u32 tmp;
 	u32 command;
 
 	if (_pmu2_wait_not_busy()) {
@@ -1524,9 +1562,8 @@ int pmu_issue_interactive_command(struct pmu_ss_states *pm_ssc, bool ioc,
 	 * command is set
 	 */
 	/* Enable the hardware interrupt */
-	tmp = readl(&mid_pmu_cxt->pmu_reg->pm_ics);
-	tmp |= 0x100;/* Enable interrupts */
-	writel(tmp, &mid_pmu_cxt->pmu_reg->pm_ics);
+	if (ioc)
+		pmu_set_interrupt_enable();
 
 	/* Configure the sub systems for pmu2 */
 	pmu_write_subsys_config(pm_ssc);

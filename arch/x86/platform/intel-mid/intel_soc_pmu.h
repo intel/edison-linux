@@ -408,6 +408,7 @@ extern int set_extended_cstate_mode(const char *val, struct kernel_param *kp);
 extern int get_extended_cstate_mode(char *buffer, struct kernel_param *kp);
 extern int byt_pmu_nc_set_power_state(int islands, int state_type, int reg);
 extern int byt_pmu_nc_get_power_state(int islands, int reg);
+extern void pmu_set_interrupt_enable(void);
 
 #ifdef LOG_PMU_EVENTS
 extern void pmu_log_pmu_irq(int status);
