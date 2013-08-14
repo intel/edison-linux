@@ -292,7 +292,7 @@ static int dwc_otg_get_chrg_status(struct usb_phy *x, void *data)
 
 	spin_lock_irqsave(&otg->lock, flags);
 	cap->chrg_type = otg->charging_cap.chrg_type;
-	cap->chrg_evt = otg->charging_cap.chrg_evt;
+	cap->chrg_state = otg->charging_cap.chrg_state;
 	cap->ma = otg->charging_cap.ma;
 	spin_unlock_irqrestore(&otg->lock, flags);
 
@@ -344,7 +344,8 @@ static enum dwc_otg_state do_wait_vbus_raise(struct dwc_otg2 *otg)
 	if (!ret) {
 		if (is_self_powered_b_device(otg)) {
 			spin_lock_irqsave(&otg->lock, flags);
-			otg->charging_cap.chrg_type = B_DEVICE;
+			otg->charging_cap.chrg_type =
+				POWER_SUPPLY_CHARGER_TYPE_B_DEVICE;
 			spin_unlock_irqrestore(&otg->lock, flags);
 
 			return DWC_STATE_A_HOST;
@@ -469,7 +470,11 @@ static enum dwc_otg_state do_charger_detection(struct dwc_otg2 *otg)
 	case CHRG_SE1:
 		ma = 1500;
 		break;
+<<<<<<< HEAD
+	case POWER_SUPPLY_CHARGER_TYPE_USB_SDP:
+=======
 	case CHRG_SDP:
+>>>>>>> dde13b2... Revert: [PORT FROM K34]dwc-otg: replace new structure defined in EM head files.
 		/* Notify SDP current is 100ma before enumeration. */
 		ma = 100;
 		break;
@@ -480,15 +485,23 @@ static enum dwc_otg_state do_charger_detection(struct dwc_otg2 *otg)
 
 	spin_lock_irqsave(&otg->lock, flags);
 	otg->charging_cap.chrg_type = charger;
-	otg->charging_cap.ma = ma;
+	otg->charging_cap.mA = ma;
 	spin_unlock_irqrestore(&otg->lock, flags);
 
 	switch (charger) {
+<<<<<<< HEAD
+	case POWER_SUPPLY_CHARGER_TYPE_ACA_DOCK:
+	case POWER_SUPPLY_CHARGER_TYPE_USB_DCP:
+	case POWER_SUPPLY_CHARGER_TYPE_USB_CDP:
+	case POWER_SUPPLY_CHARGER_TYPE_USB_SDP:
+	case POWER_SUPPLY_CHARGER_TYPE_SE1:
+=======
 	case CHRG_ACA_DOCK:
 	case CHRG_DCP:
 	case CHRG_CDP:
 	case CHRG_SDP:
 	case CHRG_SE1:
+>>>>>>> dde13b2... Revert: [PORT FROM K34]dwc-otg: replace new structure defined in EM head files.
 		if (dwc_otg_notify_charger_type(otg,
 					OTG_CHR_STATE_CONNECTED) < 0)
 			otg_err(otg, "Notify battery type failed!\n");
@@ -510,9 +523,9 @@ static enum dwc_otg_state do_connector_id_status(struct dwc_otg2 *otg)
 
 	otg_dbg(otg, "\n");
 	spin_lock_irqsave(&otg->lock, flags);
-	otg->charging_cap.chrg_type = POWER_SUPPLY_CHARGER_TYPE_NONE;
+	otg->charging_cap.chrg_type = CHRG_UNKNOWN;
 	otg->charging_cap.ma = 0;
-	otg->charging_cap.chrg_evt = POWER_SUPPLY_CHARGER_EVENT_DISCONNECT;
+	otg->charging_cap.chrg_state = OTG_CHR_STATE_DISCONNECTED;
 	spin_unlock_irqrestore(&otg->lock, flags);
 
 	otg_mask = OEVT_CONN_ID_STS_CHNG_EVNT |
@@ -564,17 +577,7 @@ static enum dwc_otg_state do_a_host(struct dwc_otg2 *otg)
 	int id = RID_UNKNOWN;
 	unsigned long flags;
 
-	/* If Battery low and connected charger is not ACA-DOCK.
-	 * Then stop trying to start host mode. */
-	if ((otg->usb2_phy.vbus_state == VBUS_DISABLED) &&
-			(otg->charging_cap.chrg_type !=
-			POWER_SUPPLY_CHARGER_TYPE_ACA_DOCK)) {
-		otg_uevent_trigger(&otg->usb2_phy);
-		return DWC_STATE_B_IDLE;
-	}
-
-	if (otg->charging_cap.chrg_type !=
-			POWER_SUPPLY_CHARGER_TYPE_ACA_DOCK) {
+	if (otg->charging_cap.chrg_type != CHRG_ACA_DOCK) {
 		dwc_otg_enable_vbus(otg, 1);
 
 		/* meant receive vbus valid event*/
@@ -593,12 +596,11 @@ static enum dwc_otg_state do_a_host(struct dwc_otg2 *otg)
 
 	otg_events = 0;
 	user_events = 0;
-	otg_mask = 0;
-	user_mask = 0;
 
+	user_mask = USER_A_BUS_DROP |
+				USER_ID_B_CHANGE_EVENT;
 	otg_mask = OEVT_CONN_ID_STS_CHNG_EVNT |
 			OEVT_A_DEV_SESS_END_DET_EVNT;
-	user_mask =	USER_ID_B_CHANGE_EVENT;
 
 	rc = sleep_until_event(otg,
 			otg_mask, user_mask,
@@ -609,7 +611,8 @@ static enum dwc_otg_state do_a_host(struct dwc_otg2 *otg)
 	}
 
 	/* Higher priority first */
-	if (otg_events & OEVT_A_DEV_SESS_END_DET_EVNT) {
+	if (otg_events & OEVT_A_DEV_SESS_END_DET_EVNT ||
+			user_events & USER_A_BUS_DROP) {
 		otg_dbg(otg, "OEVT_A_DEV_SESS_END_DET_EVNT\n");
 
 		/* ACA-Dock plug out */
@@ -1003,6 +1006,19 @@ static struct usb_phy_io_ops dwc_otg_io_ops = {
 	.write = ulpi_write,
 };
 
+static void dwc_a_bus_drop(struct usb_phy *x)
+{
+	struct dwc_otg2 *otg = the_transceiver;
+	unsigned long flags;
+
+	if (otg->usb2_phy.vbus_state == VBUS_DISABLED) {
+		spin_lock_irqsave(&otg->lock, flags);
+		otg->user_events |= USER_A_BUS_DROP;
+		dwc3_wakeup_otg_thread(otg);
+		spin_unlock_irqrestore(&otg->lock, flags);
+	}
+}
+
 static struct dwc_otg2 *dwc3_otg_alloc(struct device *dev)
 {
 	struct dwc_otg2 *otg = NULL;
@@ -1042,6 +1058,8 @@ static struct dwc_otg2 *dwc3_otg_alloc(struct device *dev)
 	otg->state = DWC_STATE_B_IDLE;
 	spin_lock_init(&otg->lock);
 	init_waitqueue_head(&otg->main_wq);
+	otg->usb2_phy.a_bus_drop = dwc_a_bus_drop;
+	otg->usb2_phy.vbus_state = VBUS_ENABLED;
 
 	/* Register otg notifier to monitor ID and VBus change events */
 	otg->nb.notifier_call = dwc_otg_handle_notification;
