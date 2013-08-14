@@ -520,7 +520,7 @@ static int dwc3_intel_set_power(struct usb_phy *_otg,
 	spin_unlock_irqrestore(&otg->lock, flags);
 
 	dwc3_intel_notify_charger_type(otg,
-			OTG_CHR_STATE_CONNECTED);
+			POWER_SUPPLY_CHARGER_EVENT_CONNECT);
 
 		/* mA is zero mean D+/D- opened cable.
 		 * If SMIP set, then notify 500mA.
@@ -543,17 +543,13 @@ static int dwc3_intel_set_power(struct usb_phy *_otg,
 
 int dwc3_intel_enable_vbus(struct dwc_otg2 *otg, int enable)
 {
-	struct otg_bc_cap cap;
 	int ret = 0;
 	u8 ovrwr;
 
-	if (enable) {
-		cap.chrg_state = OTG_CHR_STATE_HOST;
+	if (enable)
 		ovrwr = 0x40;
-	} else {
-		cap.chrg_state = OTG_CHR_STATE_DISCONNECTED;
+	else
 		ovrwr = 0x00;
-	}
 
 		return 0;
 	}

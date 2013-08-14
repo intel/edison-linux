@@ -23,6 +23,7 @@
 #include <linux/usb.h>
 #include <linux/device.h>
 #include <linux/compiler.h>
+#include <linux/power_supply.h>
 #include <linux/usb/gadget.h>
 #include <linux/usb/hcd.h>
 #include <linux/usb/ulpi.h>
@@ -255,42 +256,12 @@ struct dwc_device_par {
 #define ADPEVTEN_ADP_PRB_EVNT_EN		0x10000000
 #define ADPEVTEN_ADP_PRB_EVNT_EN_SHIFT		28
 
-
-/* charger defined in BC 1.2 */
-enum usb_charger_type {
-	CHRG_UNKNOWN,
-	CHRG_SDP,	/* Standard Downstream Port */
-	CHRG_CDP,	/* Charging Downstream Port */
-	CHRG_DCP,	/* Dedicated Charging Port */
-	CHRG_ACA,	/* Accessory Charger Adapter */
-	CHRG_ACA_DOCK,	/* Accessory Charger Adapter - Dock */
-	CHRG_ACA_A,	/* Accessory Charger Adapter - RID_A */
-	CHRG_ACA_B,	/* Accessory Charger Adapter - RID_B */
-	CHRG_ACA_C,	/* Accessory Charger Adapter - RID_C */
-	CHRG_SE1,	/* SE1 (Apple)*/
-	CHRG_MHL,	/* Moblie High-Definition Link */
-	B_DEVICE	/* Normal B Device */
-};
-
 #define RID_A		0x01
 #define RID_B		0x02
 #define RID_C		0x03
 #define RID_FLOAT	0x04
 #define RID_GND		0x05
 #define RID_UNKNOWN	0x00
-
-enum usb_charger_state {
-	OTG_CHR_STATE_CONNECTED,		/* charger is connected */
-	OTG_CHR_STATE_DISCONNECTED,	/* USB port is disconnected */
-	OTG_CHR_STATE_SUSPENDED,		/* PORT goes to suspend */
-	OTG_CHR_STATE_HOST,			/* USB in host mode */
-};
-
-struct otg_bc_cap {
-	enum usb_charger_type   chrg_type;
-	enum usb_charger_state      chrg_state;
-	unsigned int            ma;
-};
 
 /** The states for the OTG driver */
 enum dwc_otg_state {
@@ -368,7 +339,7 @@ struct dwc_otg2 {
 	struct platform_device *gadget;
 
 	/* Charger detection */
-	struct otg_bc_cap charging_cap;
+	struct power_supply_cable_props charging_cap;
 	struct notifier_block nb;
 
 	/* Interfaces between host/device driver */
@@ -432,8 +403,9 @@ struct dwc3_otg_hw_ops {
 	int (*b_idle)(struct dwc_otg2 *otg);
 	int (*do_charging)(struct dwc_otg2 *otg);
 	int (*notify_charger_type)(struct dwc_otg2 *otg,
-			enum usb_charger_state state);
-	enum usb_charger_type (*get_charger_type)(struct dwc_otg2 *otg);
+			enum power_supply_charger_event event);
+	enum power_supply_charger_cable_type
+		(*get_charger_type)(struct dwc_otg2 *otg);
 	int (*enable_vbus)(struct dwc_otg2 *otg, int enable);
 	int (*get_id)(struct dwc_otg2 *otg);
 };
