@@ -17,5 +17,6 @@
 #define SD_INDEX	2
 #define SDIO_INDEX	3
 
+int sdhci_pdata_set_quirks(unsigned int quirks);
 #endif
 
