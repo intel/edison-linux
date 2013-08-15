@@ -131,12 +131,17 @@ static int check_event(struct dwc_otg2 *otg,
 {
 	get_and_clear_events(otg, otg_mask, user_mask,
 			otg_events, user_events);
-	if ((*otg_events & otg_mask) ||
-			(*user_events & user_mask)) {
-		otg_dbg(otg, "Event occurred:");
-		otg_dbg(otg, "otg_events=%x, otg_mask=%x,",
+
+	otg_dbg(otg, "Event occurred:");
+
+	if (otg_events && (*otg_events & otg_mask)) {
+		otg_dbg(otg, "otg_events=0x%x, otg_mask=0x%x",
 				*otg_events, otg_mask);
-		otg_dbg(otg, "user_events=%x, user_mask=%x",
+		return 1;
+	}
+
+	if (user_events && (*user_events & user_mask)) {
+		otg_dbg(otg, "user_events=0x%x, user_mask=0x%x",
 				*user_events, user_mask);
 		return 1;
 	}
