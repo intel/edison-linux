@@ -458,10 +458,6 @@ static enum dwc_otg_state do_charger_detection(struct dwc_otg2 *otg)
 	case POWER_SUPPLY_CHARGER_TYPE_SE1:
 		ma = 1500;
 		break;
-	case POWER_SUPPLY_CHARGER_TYPE_USB_SDP:
-		/* Notify SDP current is 100ma before enumeration. */
-		ma = 100;
-		break;
 	default:
 		otg_err(otg, "Charger type is not valid to notify battery\n");
 		return -EINVAL;
@@ -476,12 +472,13 @@ static enum dwc_otg_state do_charger_detection(struct dwc_otg2 *otg)
 	case POWER_SUPPLY_CHARGER_TYPE_ACA_DOCK:
 	case POWER_SUPPLY_CHARGER_TYPE_USB_DCP:
 	case POWER_SUPPLY_CHARGER_TYPE_USB_CDP:
-	case POWER_SUPPLY_CHARGER_TYPE_USB_SDP:
 	case POWER_SUPPLY_CHARGER_TYPE_SE1:
 		if (dwc_otg_notify_charger_type(otg,
 					POWER_SUPPLY_CHARGER_EVENT_CONNECT) < 0)
 			otg_err(otg, "Notify battery type failed!\n");
 		break;
+	case POWER_SUPPLY_CHARGER_TYPE_USB_SDP:
+	/* SDP is complicate, it will be handle in set_power */
 	default:
 		break;
 	}

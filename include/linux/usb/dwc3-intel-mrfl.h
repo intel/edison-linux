@@ -24,6 +24,7 @@
 
 struct intel_dwc_otg_pdata {
 	int is_hvp;
+	int charging_compliance;
 };
 
 #define TUSB1211_VENDOR_ID_LO					0x00
