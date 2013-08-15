@@ -164,6 +164,7 @@ static int sleep_until_event(struct dwc_otg2 *otg,
 {
 	int rc = 0;
 
+	pm_runtime_put_autosuspend(otg->dev);
 	/* Wait until it occurs, or timeout, or interrupt. */
 	if (timeout) {
 		otg_dbg(otg, "Waiting for event (timeout=%d)...\n", timeout);
@@ -176,6 +177,7 @@ static int sleep_until_event(struct dwc_otg2 *otg,
 				check_event(otg, otg_mask,
 					user_mask));
 	}
+	pm_runtime_get_sync(otg->dev);
 
 	/* Disable the events */
 	otg_write(otg, OEVTEN, 0);
@@ -739,6 +741,8 @@ int otg_main_thread(void *data)
 	allow_signal(SIGKILL);
 	allow_signal(SIGUSR1);
 
+	pm_runtime_get_sync(otg->dev);
+
 	/* Allow the thread to be frozen */
 	set_freezable();
 
@@ -799,6 +803,7 @@ int otg_main_thread(void *data)
 		otg->state = next;
 	}
 
+	pm_runtime_get_sync(otg->dev);
 	otg->main_thread = NULL;
 	otg_dbg(otg, "OTG main thread exiting....\n");
 
@@ -1272,6 +1277,11 @@ static int dwc_otg_probe(struct pci_dev *pdev,
 			goto err;
 	}
 
+	pm_runtime_set_autosuspend_delay(&pdev->dev, 100);
+	pm_runtime_use_autosuspend(&pdev->dev);
+	pm_runtime_allow(&pdev->dev);
+	pm_runtime_put_autosuspend(&pdev->dev);
+
 	return 0;
 
 err:
@@ -1291,6 +1301,9 @@ static void dwc_otg_remove(struct pci_dev *pdev)
 	if (otg->host)
 		platform_device_unregister(otg->host);
 
+	pm_runtime_forbid(&pdev->dev);
+	pm_runtime_set_suspended(&pdev->dev);
+
 	kfree(platform_par);
 	iounmap(otg->usb2_phy.io_priv);
 
@@ -1307,6 +1320,61 @@ static void dwc_otg_remove(struct pci_dev *pdev)
 
 	the_transceiver = NULL;
 }
+
+static void dwc_otg_shutdown(struct pci_dev *pdev)
+{
+	struct dwc_otg2 *otg = the_transceiver;
+
+	/* stop main thread, ignore notification events */
+	stop_main_thread(otg);
+
+	pci_disable_device(pdev);
+}
+
+static int dwc_otg_runtime_idle(struct device *dev)
+{
+	if (dwc3_otg_pdata->idle)
+		return dwc3_otg_pdata->idle(the_transceiver);
+
+	return 0;
+}
+
+static int dwc_otg_runtime_suspend(struct device *dev)
+{
+	if (dwc3_otg_pdata->suspend)
+		return dwc3_otg_pdata->suspend(the_transceiver);
+
+	return 0;
+}
+
+static int dwc_otg_runtime_resume(struct device *dev)
+{
+	if (dwc3_otg_pdata->resume)
+		return dwc3_otg_pdata->resume(the_transceiver);
+	return 0;
+}
+
+static int dwc_otg_suspend(struct device *dev)
+{
+	if (dwc3_otg_pdata->suspend)
+		return dwc3_otg_pdata->suspend(the_transceiver);
+	return 0;
+}
+
+static int dwc_otg_resume(struct device *dev)
+{
+	if (dwc3_otg_pdata->resume)
+		return dwc3_otg_pdata->resume(the_transceiver);
+	return 0;
+}
+
+static const struct dev_pm_ops dwc_usb_otg_pm_ops = {
+	.runtime_suspend = dwc_otg_runtime_suspend,
+	.runtime_resume	= dwc_otg_runtime_resume,
+	.runtime_idle = dwc_otg_runtime_idle,
+	.suspend = dwc_otg_suspend,
+	.resume	= dwc_otg_resume
+};
 
 static DEFINE_PCI_DEVICE_TABLE(pci_ids) = {
 	{ PCI_DEVICE_CLASS(((PCI_CLASS_SERIAL_USB << 8) | 0x20), ~0),
@@ -1325,8 +1393,10 @@ static struct pci_driver dwc_otg_pci_driver = {
 	.id_table =	pci_ids,
 	.probe =	dwc_otg_probe,
 	.remove =	dwc_otg_remove,
+	.shutdown = dwc_otg_shutdown,
 	.driver = {
 		.name = (char *) driver_name,
+		.pm = &dwc_usb_otg_pm_ops,
 		.owner = THIS_MODULE,
 	},
 };

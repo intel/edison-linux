@@ -408,6 +408,10 @@ struct dwc3_otg_hw_ops {
 		(*get_charger_type)(struct dwc_otg2 *otg);
 	int (*enable_vbus)(struct dwc_otg2 *otg, int enable);
 	int (*get_id)(struct dwc_otg2 *otg);
+
+	int (*idle)(struct dwc_otg2 *otg);
+	int (*suspend)(struct dwc_otg2 *otg);
+	int (*resume)(struct dwc_otg2 *otg);
 };
 
 void dwc3_wakeup_otg_thread(struct dwc_otg2 *otg);
