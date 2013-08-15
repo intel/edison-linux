@@ -60,48 +60,17 @@ static int is_hybridvp(struct dwc_otg2 *otg)
 	return data->is_hvp;
 }
 
-static enum usb_charger_type aca_check(struct dwc_otg2 *otg)
+static void usb2phy_eye_optimization(struct dwc_otg2 *otg)
 {
-	u8 rarbrc;
-	enum usb_charger_type type = CHRG_UNKNOWN;
-	int ret;
+	struct usb_phy *phy;
 
-	ret = intel_scu_ipc_update_register(PMIC_USBIDCTRL,
-			USBIDCTRL_ACA_DETEN_D1,
-			USBIDCTRL_ACA_DETEN_D1);
-	if (ret)
-		otg_err(otg, "Fail to enable ACA&ID detection logic\n");
+	phy = usb_get_phy(USB_PHY_TYPE_USB2);
+	if (!phy)
+		return;
 
-	/* Wait >66.1ms (for TCHGD_SERX_DEB) */
-	msleep(66);
-
-	/* Read decoded RID value */
-	ret = intel_scu_ipc_ioread8(PMIC_USBIDSTS, &rarbrc);
-	if (ret)
-		otg_err(otg, "Fail to read decoded RID value\n");
-	rarbrc &= USBIDSTS_ID_RARBRC_STS(3);
-	rarbrc >>= 1;
-
-	/* If ID_RARBRC_STS==01: ACA-Dock detected
-	 * If ID_RARBRC_STS==00: MHL detected
-	 */
-	if (rarbrc == 1) {
-		/* ACA-Dock */
-		type = CHRG_ACA_DOCK;
-	} else if (!rarbrc) {
-		/* MHL */
-		type = CHRG_MHL;
-	}
-
-	ret = intel_scu_ipc_update_register(PMIC_USBIDCTRL,
-			USBIDCTRL_ACA_DETEN_D1,
-			0);
-	if (ret)
-		otg_err(otg, "Fail to enable ACA&ID detection logic\n");
-
-	return type;
-}
-
+	/* Set 0x7f for better quality in eye diagram
+	 * It means ZHSDRV = 0b11 and IHSTX = 0b1111*/
+	usb_phy_io_write(phy, 0x7f, TUSB1211_VENDOR_SPECIFIC1_SET);
 
 	usb_put_phy(phy);
 }
@@ -537,7 +506,7 @@ int dwc3_intel_enable_vbus(struct dwc_otg2 *otg, int enable)
 int dwc3_intel_enable_vbus(struct dwc_otg2 *otg, int enable)
 {
 	atomic_notifier_call_chain(&otg->usb2_phy.notifier,
-			USB_EVENT_DRIVE_VBUS, &cap);
+			USB_EVENT_DRIVE_VBUS, &enable);
 
 	return 0;
 }
