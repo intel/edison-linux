@@ -1470,6 +1470,9 @@ static void mmc_power_up(struct mmc_host *host)
 
 	mmc_host_clk_hold(host);
 
+	if (host->ops->set_dev_power)
+		host->ops->set_dev_power(host, true);
+
 	/* If ocr is set, we use it */
 	if (host->ocr)
 		bit = ffs(host->ocr) - 1;
@@ -1535,6 +1538,9 @@ void mmc_power_off(struct mmc_host *host)
 	host->ios.bus_width = MMC_BUS_WIDTH_1;
 	host->ios.timing = MMC_TIMING_LEGACY;
 	mmc_set_ios(host);
+
+	if (host->ops->set_dev_power)
+		host->ops->set_dev_power(host, false);
 
 	/*
 	 * Some configurations, such as the 802.11 SDIO card in the OLPC

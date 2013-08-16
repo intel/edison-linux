@@ -27,6 +27,8 @@
 #include <linux/mmc/sdhci-pci-data.h>
 
 #include <asm/intel_mid_rpmsg.h>
+#include <asm/intel_scu_flis.h>
+#include <asm/intel_scu_pmic.h>
 
 #include "sdhci.h"
 
@@ -57,6 +59,17 @@
 
 #define MAX_SLOTS			8
 
+/* CLV SD card power resource */
+
+#define VCCSDIO_ADDR		0xd5
+#define VCCSDIO_OFF		0x4
+#define VCCSDIO_NORMAL		0x7
+#define ENCTRL0_ISOLATE		0x55555557
+#define ENCTRL1_ISOLATE		0x5555
+#define STORAGESTIO_FLISNUM	0x8
+#define ENCTRL0_OFF		0x10
+#define ENCTRL1_OFF		0x11
+
 struct sdhci_pci_chip;
 struct sdhci_pci_slot;
 
@@ -83,6 +96,8 @@ struct sdhci_pci_slot {
 	int			rst_n_gpio;
 	int			cd_gpio;
 	int			cd_irq;
+	bool			dev_power;
+	struct mutex		power_lock;
 };
 
 struct sdhci_pci_chip {
@@ -95,6 +110,9 @@ struct sdhci_pci_chip {
 
 	int			num_slots;	/* Slots on controller */
 	struct sdhci_pci_slot	*slots[MAX_SLOTS]; /* Pointers to host slots */
+
+	unsigned int		enctrl0_orig;
+	unsigned int		enctrl1_orig;
 };
 
 
@@ -320,6 +338,164 @@ static int mfd_sdio_probe_slot(struct sdhci_pci_slot *slot)
 	return 0;
 }
 
+#ifdef CONFIG_INTEL_SCU_FLIS
+/*
+ * Save the current power and shim status, if they are on, turn them off.
+ */
+static int ctp_sd_card_power_save(struct sdhci_pci_slot *slot)
+{
+	int err;
+	u16 addr;
+	u8 data;
+	struct sdhci_pci_chip *chip;
+
+	if (!slot->dev_power)
+		return 0;
+
+	chip = slot->chip;
+	err = intel_scu_ipc_read_shim(&chip->enctrl0_orig,
+			STORAGESTIO_FLISNUM, ENCTRL0_OFF);
+	if (err) {
+		pr_err("SDHCI device %04X: ENCTRL0 read failed, err %d\n",
+				chip->pdev->device, err);
+		chip->enctrl0_orig = ENCTRL0_ISOLATE;
+		chip->enctrl1_orig = ENCTRL1_ISOLATE;
+		/*
+		 * stop to shut down VCCSDIO, since we cannot recover
+		 * it.
+		 * this should not block system entering S3
+		 */
+		return 0;
+	}
+	err = intel_scu_ipc_read_shim(&chip->enctrl1_orig,
+			STORAGESTIO_FLISNUM, ENCTRL1_OFF);
+	if (err) {
+		pr_err("SDHCI device %04X: ENCTRL1 read failed, err %d\n",
+				chip->pdev->device, err);
+		chip->enctrl0_orig = ENCTRL0_ISOLATE;
+		chip->enctrl1_orig = ENCTRL1_ISOLATE;
+		/*
+		 * stop to shut down VCCSDIO, since we cannot recover
+		 * it.
+		 * this should not block system entering S3
+		 */
+		return 0;
+	}
+
+	/* isolate shim */
+	err = intel_scu_ipc_write_shim(ENCTRL0_ISOLATE,
+			STORAGESTIO_FLISNUM, ENCTRL0_OFF);
+	if (err) {
+		pr_err("SDHCI device %04X: ENCTRL0 ISOLATE failed, err %d\n",
+				chip->pdev->device, err);
+		/*
+		 * stop to shut down VCCSDIO. Without isolate shim, the power
+		 * may have leak if turn off VCCSDIO.
+		 * during S3 resuming, shim and VCCSDIO will be recofigured
+		 * this should not block system entering S3
+		 */
+		return 0;
+	}
+
+	err = intel_scu_ipc_write_shim(ENCTRL1_ISOLATE,
+			STORAGESTIO_FLISNUM, ENCTRL1_OFF);
+	if (err) {
+		pr_err("SDHCI device %04X: ENCTRL1 ISOLATE failed, err %d\n",
+				chip->pdev->device, err);
+		/*
+		 * stop to shut down VCCSDIO. Without isolate shim, the power
+		 * may have leak if turn off VCCSDIO.
+		 * during S3 resuming, shim and VCCSDIO will be recofigured
+		 * this should not block system entering S3
+		 */
+		return 0;
+	}
+
+	addr = VCCSDIO_ADDR;
+	data = VCCSDIO_OFF;
+	err = intel_scu_ipc_writev(&addr, &data, 1);
+	if (err) {
+		pr_err("SDHCI device %04X: VCCSDIO turn off failed, err %d\n",
+				chip->pdev->device, err);
+		/*
+		 * during S3 resuming, VCCSDIO will be recofigured
+		 * this should not block system entering S3.
+		 */
+	}
+
+	slot->dev_power = false;
+	return 0;
+}
+
+/*
+ * Restore the power and shim if they are original on.
+ */
+static int ctp_sd_card_power_restore(struct sdhci_pci_slot *slot)
+{
+	int err;
+	u16 addr;
+	u8 data;
+	struct sdhci_pci_chip *chip;
+
+	if (slot->dev_power)
+		return 0;
+
+	chip = slot->chip;
+
+	addr = VCCSDIO_ADDR;
+	data = VCCSDIO_NORMAL;
+	err = intel_scu_ipc_writev(&addr, &data, 1);
+	if (err) {
+		pr_err("SDHCI device %04X: VCCSDIO turn on failed, err %d\n",
+				chip->pdev->device, err);
+		/*
+		 * VCCSDIO trun on failed. This may impact the SD card
+		 * init and the read/write functions. We just report a
+		 * warning, and go on to have a try. Anyway, SD driver
+		 * can encounter error if powering up is failed
+		 */
+		WARN_ON(err);
+	}
+
+	if (chip->enctrl0_orig == ENCTRL0_ISOLATE &&
+			chip->enctrl1_orig == ENCTRL1_ISOLATE)
+		/* means we needn't to reconfigure the shim */
+		return 0;
+
+	/* reconnect shim */
+	err = intel_scu_ipc_write_shim(chip->enctrl0_orig,
+			STORAGESTIO_FLISNUM, ENCTRL0_OFF);
+
+	if (err) {
+		pr_err("SDHCI device %04X: ENCTRL0 CONNECT shim failed, err %d\n",
+				chip->pdev->device, err);
+		/* keep on setting enctrl1, but report a waring */
+		WARN_ON(err);
+	}
+
+	err = intel_scu_ipc_write_shim(chip->enctrl1_orig,
+			STORAGESTIO_FLISNUM, ENCTRL1_OFF);
+	if (err) {
+		pr_err("SDHCI device %04X: ENCTRL1 CONNECT shim failed, err %d\n",
+				chip->pdev->device, err);
+		/* leave this error to driver, but report a warning */
+		WARN_ON(err);
+	}
+
+	slot->dev_power = true;
+	return 0;
+}
+#else
+static int ctp_sd_card_power_save(struct sdhci_pci_slot *slot)
+{
+	return 0;
+}
+static int ctp_sd_card_power_restore(struct sdhci_pci_slot *slot)
+{
+	return 0;
+}
+#endif
+
 static const struct sdhci_pci_fixes sdhci_intel_mrst_hc0 = {
 	.quirks		= SDHCI_QUIRK_BROKEN_ADMA | SDHCI_QUIRK_NO_HISPD_BIT,
 	.probe_slot	= mrst_hc_probe_slot,
@@ -330,9 +506,45 @@ static const struct sdhci_pci_fixes sdhci_intel_mrst_hc1_hc2 = {
 	.probe		= mrst_hc_probe,
 };
 
+static int ctp_sd_probe_slot(struct sdhci_pci_slot *slot)
+{
+#ifdef CONFIG_INTEL_SCU_IPC
+	int err;
+	u16 addr;
+#endif
+	u8 data = VCCSDIO_OFF;
+
+	if (!slot || !slot->chip || !slot->chip->pdev)
+		return -ENODEV;
+
+	if (slot->chip->pdev->device != PCI_DEVICE_ID_INTEL_CLV_SDIO0)
+		return 0;
+
+	mutex_init(&slot->power_lock);
+
+	slot->host->flags |= SDHCI_POWER_CTRL_DEV;
+
+#ifdef CONFIG_INTEL_SCU_IPC
+	addr = VCCSDIO_ADDR;
+	err = intel_scu_ipc_readv(&addr, &data, 1);
+	if (err) {
+		/* suppose dev_power is true */
+		slot->dev_power = true;
+		return 0;
+	}
+#endif
+	if (data == VCCSDIO_NORMAL)
+		slot->dev_power = true;
+	else
+		slot->dev_power = false;
+
+	return 0;
+}
+
 static const struct sdhci_pci_fixes sdhci_intel_mfd_sd = {
 	.quirks		= SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC,
 	.allow_runtime_pm = true,
+	.probe_slot	= ctp_sd_probe_slot,
 };
 
 static const struct sdhci_pci_fixes sdhci_intel_mfd_sdio = {
@@ -1941,11 +2153,30 @@ static void sdhci_pci_remove(struct pci_dev *pdev)
 	pci_disable_device(pdev);
 }
 
+static void sdhci_pci_shutdown(struct pci_dev *pdev)
+{
+	struct sdhci_pci_chip *chip;
+	int i;
+
+	chip = pci_get_drvdata(pdev);
+
+	if (chip && chip->pdev &&
+		chip->pdev->device == PCI_DEVICE_ID_INTEL_CLV_SDIO0) {
+		for (i = 0; i < chip->num_slots; i++) {
+			if (chip->slots[i]->host->flags & SDHCI_POWER_CTRL_DEV)
+				ctp_sd_card_power_save(chip->slots[i]);
+		}
+	}
+
+	return;
+}
+
 static struct pci_driver sdhci_driver = {
 	.name =		"sdhci-pci",
 	.id_table =	pci_ids,
 	.probe =	sdhci_pci_probe,
 	.remove =	sdhci_pci_remove,
+	.shutdown =	sdhci_pci_shutdown,
 	.driver =	{
 		.pm =   &sdhci_pci_pm_ops
 	},
