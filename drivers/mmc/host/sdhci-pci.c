@@ -2318,15 +2318,26 @@ static void sdhci_pci_shutdown(struct pci_dev *pdev)
 
 	chip = pci_get_drvdata(pdev);
 
-	if (chip && chip->pdev &&
-		chip->pdev->device == PCI_DEVICE_ID_INTEL_CLV_SDIO0) {
+	if (!chip || !chip->pdev)
+		return;
+
+	switch (chip->pdev->device) {
+	case PCI_DEVICE_ID_INTEL_CLV_SDIO0:
 		for (i = 0; i < chip->num_slots; i++) {
 			if (chip->slots[i]->host->flags & SDHCI_POWER_CTRL_DEV)
 				ctp_sd_card_power_save(chip->slots[i]);
 		}
+		break;
+	case PCI_DEVICE_ID_INTEL_MRFL_MMC:
+		if (chip->allow_runtime_pm) {
+			pm_runtime_get_sync(&pdev->dev);
+			pm_runtime_disable(&pdev->dev);
+			pm_runtime_put_noidle(&pdev->dev);
+		}
+		break;
+	default:
+		break;
 	}
-
-	return;
 }
 
 static struct pci_driver sdhci_driver = {
