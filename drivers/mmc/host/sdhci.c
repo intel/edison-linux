@@ -3393,7 +3393,7 @@ static int sdhci_mfld_panic_acquire_ownership(struct sdhci_host *host)
 	unsigned long t1, t2;
 
 	if (!host->sram_addr)
-		return 0;
+		return DEKKER_OWNER_IA;
 
 	/* If IA has already hold the eMMC mutex, then just exit */
 	if (readl(host->sram_addr + DEKKER_IA_REQ_OFFSET))
@@ -3438,7 +3438,8 @@ static int sdhci_mfld_panic_acquire_ownership(struct sdhci_host *host)
 			readl(host->sram_addr + DEKKER_IA_REQ_OFFSET),
 			readl(host->sram_addr + DEKKER_SCU_REQ_OFFSET));
 
-	return 0;
+	return (readl(host->sram_addr + DEKKER_EMMC_OWNER_OFFSET) ==
+		DEKKER_OWNER_IA) ? DEKKER_OWNER_SCU : DEKKER_OWNER_IA;
 timeout:
 
 	pr_warn("%s: Timeout to hold eMMC mutex\n", __func__);
@@ -3467,14 +3468,9 @@ static int sdhci_mfld_panic_power_on(struct mmc_panic_host *panic_host)
 			if (ret)
 				return ret;
 		}
+		sdhci_panic_reinit_host(panic_host);
+		host->runtime_suspended = false;
 	}
-	host->runtime_suspended = false;
-
-	/*
-	 * re-init host controller in case SCU FW has changed something
-	 */
-
-	sdhci_panic_reinit_host(panic_host);
 
 	return 0;
 }
@@ -3490,10 +3486,19 @@ static int sdhci_mfld_panic_hold_mutex(struct mmc_panic_host *panic_host)
 	host = panic_host->priv;
 
 	ret = sdhci_mfld_panic_acquire_ownership(host);
-	if (ret)
-		return ret;
 
-	return sdhci_mfld_panic_power_on(panic_host);
+	if (ret == DEKKER_OWNER_SCU) {
+		if (host->ops->power_up_host) {
+			ret = host->ops->power_up_host(host);
+			if (ret)
+				return ret;
+		}
+		sdhci_panic_reinit_host(panic_host);
+		return 0;
+	} else if (ret == DEKKER_OWNER_IA)
+		return sdhci_mfld_panic_power_on(panic_host);
+
+	return ret;
 }
 
 static void sdhci_mfld_panic_release_mutex(struct mmc_panic_host *panic_host)
