@@ -98,6 +98,8 @@ struct dwc_device_par {
 #define GUSB2PHYACC0_VCTRL(v)  ((v & 0xFF) << 8)
 #define GUSB2PHYACC0_REGDATA(v)  (v & 0xFF)
 #define GUSB2PHYACC0_REGDATA_MASK  0xFF
+#define DATACON_TIMEOUT		750
+#define DATACON_INTERVAL	10
 
 #define GUSB3PIPECTL0                           0xc2c0
 #define GUSB3PIPECTL_SUS_EN                     0x20000
@@ -120,8 +122,6 @@ struct dwc_device_par {
 #define GCTL_PRT_CAP_DIR_OTG 3
 #define GCTL_GBL_HIBERNATION_EN 0x2
 #define GCTL_CORESOFTRESET (1 << 11)
-#define GCTL_PWRDNSCALE(x) (x << 19)
-#define GCTL_PWRDNSCALE_MASK (0x1fff << 19)
 
 #define OCFG					0xcc00
 #define OCFG_SRP_CAP				0x01
@@ -405,7 +405,6 @@ struct dwc_otg2 {
 
 #define VBUS_TIMEOUT	300
 #define PCI_DEVICE_ID_DWC 0x119E
-#define PCI_DEVICE_ID_DWC_VLV 0x0F37
 
 enum dwc3_otg_mode {
 	DWC3_DEVICE_ONLY,
