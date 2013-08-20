@@ -687,9 +687,14 @@ static void hsu_platform_clk(enum intel_mid_cpu_type cpu_type)
 		if (clk_src & (1 << 16))
 			/* source SCU fabric 100M */
 			clock = clock / ((clk_div & 0x7) + 1);
-		else
-			/* source OSC clock 19.2M */
-			clock = 19200;
+		else {
+			if (clk_src & (1 << 31))
+				/* source OSCX2 38.4M */
+				clock = 38400;
+			else
+				/* source OSC clock 19.2M */
+				clock = 19200;
+		}
 
 		iounmap(clkctl);
 		iounmap(clksc);
