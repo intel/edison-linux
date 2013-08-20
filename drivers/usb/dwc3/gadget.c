@@ -1847,6 +1847,28 @@ static int dwc3_init_for_enumeration(struct dwc3 *dwc)
 	int			ret = 0;
 	u32			reg;
 
+	irq = platform_get_irq(to_platform_device(dwc->dev), 0);
+	ret = request_threaded_irq(irq, dwc3_interrupt, dwc3_thread_interrupt,
+			IRQF_SHARED, "dwc3", dwc);
+	if (ret) {
+		dev_err(dwc->dev, "failed to request irq #%d --> %d\n",
+				irq, ret);
+		goto err0;
+	}
+
+	spin_lock_irqsave(&dwc->lock, flags);
+
+	if (dwc->gadget_driver) {
+		dev_err(dwc->dev, "%s is already bound to %s\n",
+				dwc->gadget.name,
+				dwc->gadget_driver->driver.name);
+		ret = -EBUSY;
+		goto err1;
+	}
+
+	dwc->gadget_driver	= driver;
+
+>>>>>>> 18cc6d8... [BACKPORT]usb: dwc3: gadget: get rid of IRQF_ONESHOT
 	reg = dwc3_readl(dwc->regs, DWC3_DCFG);
 	reg &= ~(DWC3_DCFG_SPEED_MASK);
 
@@ -3077,12 +3099,6 @@ static irqreturn_t dwc3_process_event_buf(struct dwc3 *dwc, u32 buf)
 
 	evt->count = count;
 	evt->flags |= DWC3_EVENT_PENDING;
-
-	/* WORKAROUND: Add 4 us delay workaround to A-unit issue in A0 stepping.
-	 * Can be removed after B0.
-	 */
-	if (dwc->is_otg && dwc->revision == DWC3_REVISION_210A)
-		udelay(4);
 
 	/* Mask interrupt */
 	reg = dwc3_readl(dwc->regs, DWC3_GEVNTSIZ(buf));
