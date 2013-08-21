@@ -40,6 +40,19 @@ config USB_DWC3_DUAL_ROLE
 
 endchoice
 
+comment "Platform Glue Driver Support"
+
+config USB_DWC3_PCI
+	tristate "PCIe-based Platforms"
+	depends on PCI
+	default USB_DWC3
+	help
+	  If you're using the DesignWare Core IP with a PCIe, please say
+	  'Y' or 'M' here.
+
+	  One such PCIe-based platform is Synopsys' PCIe HAPS model of
+	  this IP.
+
 config USB_DWC3_OTG
 	tristate "DWC3 OTG mode support"
 	depends on USB && PCI
@@ -90,6 +103,8 @@ config USB_DWC3_HOST_INTEL
 	  It is should be enable with DWC3 INTEL driver. Because Intel platform
 	  use different design with standard USB_DWC3_HOST. So if you want to
 	  enable host mode on Intel platform, then you have to enable this config.
+
+comment "Debugging features"
 
 config USB_DWC3_DEBUG
 	bool "Enable Debugging Messages"

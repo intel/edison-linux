@@ -23,7 +23,32 @@
 static int otg_id = -1;
 static int enable_usb_phy(struct dwc_otg2 *otg, bool on_off);
 static int dwc3_intel_notify_charger_type(struct dwc_otg2 *otg,
-		enum usb_charger_state state);
+		enum power_supply_charger_event event);
+static struct power_supply_cable_props cap_record;
+static int shady_cove_get_id(struct dwc_otg2 *otg);
+
+static int charger_detect_enable(struct dwc_otg2 *otg)
+{
+	struct intel_dwc_otg_pdata *data;
+
+	if (!otg || !otg->otg_data)
+		return 0;
+
+	data = (struct intel_dwc_otg_pdata *)otg->otg_data;
+
+	return data->charger_detect_enable;
+}
+
+static int is_basin_cove(struct dwc_otg2 *otg)
+{
+	struct intel_dwc_otg_pdata *data;
+	if (!otg || !otg->otg_data)
+		return -EINVAL;
+
+	data = (struct intel_dwc_otg_pdata *)otg->otg_data;
+
+	return data->pmic_type == BASIN_COVE;
+}
 
 static int is_hybridvp(struct dwc_otg2 *otg)
 {
@@ -36,11 +61,69 @@ static int is_hybridvp(struct dwc_otg2 *otg)
 	return data->is_hvp;
 }
 
-static enum usb_charger_type aca_check(struct dwc_otg2 *otg)
+static void usb2phy_eye_optimization(struct dwc_otg2 *otg)
+{
+	struct usb_phy *phy;
+
+	phy = usb_get_phy(USB_PHY_TYPE_USB2);
+	if (!phy)
+		return;
+
+	/* Set 0x7f for better quality in eye diagram
+	 * It means ZHSDRV = 0b11 and IHSTX = 0b1111*/
+	usb_phy_io_write(phy, 0x7f, TUSB1211_VENDOR_SPECIFIC1_SET);
+
+	usb_put_phy(phy);
+}
+
+
+/* As we use SW mode to do charger detection, need to notify HW
+ * the result SW get, charging port or not */
+static int dwc_otg_charger_hwdet(bool enable)
+{
+	int				retval;
+	struct usb_phy *phy;
+	struct dwc_otg2 *otg = dwc3_get_otg();
+
+	/* Just return if charger detection is not enabled */
+	if (!charger_detect_enable(otg))
+		return 0;
+
+	phy = usb_get_phy(USB_PHY_TYPE_USB2);
+	if (!phy)
+		return -ENODEV;
+
+	if (enable) {
+		retval = usb_phy_io_write(phy, PWCTRL_HWDETECT,
+				TUSB1211_POWER_CONTROL_SET);
+		if (retval)
+			return retval;
+		otg_dbg(otg, "set HWDETECT\n");
+	} else {
+		retval = usb_phy_io_write(phy, PWCTRL_HWDETECT,
+				TUSB1211_POWER_CONTROL_CLR);
+		if (retval)
+			return retval;
+		otg_dbg(otg, "clear HWDETECT\n");
+	}
+	usb_put_phy(phy);
+
+	return 0;
+}
+
+static enum power_supply_charger_cable_type
+			basin_cove_aca_check(struct dwc_otg2 *otg)
 {
 	u8 rarbrc;
-	enum usb_charger_type type = CHRG_UNKNOWN;
 	int ret;
+	enum power_supply_charger_cable_type type =
+		POWER_SUPPLY_CHARGER_TYPE_NONE;
+
+	ret = intel_scu_ipc_update_register(PMIC_USBIDCTRL,
+			USBIDCTRL_ACA_DETEN_D1,
+			USBIDCTRL_ACA_DETEN_D1);
+	if (ret)
+		otg_err(otg, "Fail to enable ACA&ID detection logic\n");
 
 	/* Wait >66.1ms (for TCHGD_SERX_DEB) */
 	msleep(66);
@@ -50,19 +133,54 @@ static enum usb_charger_type aca_check(struct dwc_otg2 *otg)
 	if (ret)
 		otg_err(otg, "Fail to read decoded RID value\n");
 	rarbrc &= USBIDSTS_ID_RARBRC_STS(3);
+	rarbrc >>= 1;
 
 	/* If ID_RARBRC_STS==01: ACA-Dock detected
 	 * If ID_RARBRC_STS==00: MHL detected
 	 */
 	if (rarbrc == 1) {
 		/* ACA-Dock */
-		type = CHRG_ACA_DOCK;
+		type = POWER_SUPPLY_CHARGER_TYPE_ACA_DOCK;
 	} else if (!rarbrc) {
 		/* MHL */
-		type = CHRG_MHL;
+		type = POWER_SUPPLY_CHARGER_TYPE_MHL;
 	}
 
+	ret = intel_scu_ipc_update_register(PMIC_USBIDCTRL,
+			USBIDCTRL_ACA_DETEN_D1,
+			0);
+	if (ret)
+		otg_err(otg, "Fail to enable ACA&ID detection logic\n");
+
 	return type;
+}
+
+static enum power_supply_charger_cable_type
+		shady_cove_aca_check(struct dwc_otg2 *otg)
+{
+
+	if (!otg)
+		return POWER_SUPPLY_CHARGER_TYPE_NONE;
+
+	switch (shady_cove_get_id(otg)) {
+	case RID_A:
+		return POWER_SUPPLY_CHARGER_TYPE_ACA_DOCK;
+	case RID_B:
+		return POWER_SUPPLY_CHARGER_TYPE_ACA_B;
+	case RID_C:
+		return POWER_SUPPLY_CHARGER_TYPE_ACA_C;
+	default:
+		return POWER_SUPPLY_CHARGER_TYPE_NONE;
+	}
+}
+
+static enum power_supply_charger_cable_type
+		dwc3_intel_aca_check(struct dwc_otg2 *otg)
+{
+	if (is_basin_cove(otg))
+		return basin_cove_aca_check(otg);
+	else
+		return shady_cove_aca_check(otg);
 }
 
 static ssize_t store_otg_id(struct device *_dev,
@@ -130,6 +248,19 @@ show_otg_id(struct device *_dev, struct device_attribute *attr, char *buf)
 static DEVICE_ATTR(otg_id, S_IRUGO|S_IWUSR|S_IWGRP,
 			show_otg_id, store_otg_id);
 
+static void dwc_a_bus_drop(struct usb_phy *x)
+{
+	struct dwc_otg2 *otg = dwc3_get_otg();
+	unsigned long flags;
+
+	if (otg->usb2_phy.vbus_state == VBUS_DISABLED) {
+		spin_lock_irqsave(&otg->lock, flags);
+		otg->user_events |= USER_A_BUS_DROP;
+		dwc3_wakeup_otg_thread(otg);
+		spin_unlock_irqrestore(&otg->lock, flags);
+	}
+}
+
 static void set_sus_phy(struct dwc_otg2 *otg, int bit)
 {
 	u32 data = 0;
@@ -154,6 +285,10 @@ int dwc3_intel_platform_init(struct dwc_otg2 *otg)
 {
 	u32 gctl;
 	int retval;
+
+	/* Init a_bus_drop callback */
+	otg->usb2_phy.a_bus_drop = dwc_a_bus_drop;
+	otg->usb2_phy.vbus_state = VBUS_ENABLED;
 
 	otg_info(otg, "De-assert USBRST# to enable PHY\n");
 	retval = intel_scu_ipc_iowrite8(PMIC_USBPHYCTRL,
@@ -183,6 +318,18 @@ int dwc3_intel_platform_init(struct dwc_otg2 *otg)
 	return 0;
 }
 
+/* Disable auto-resume feature for USB2 PHY. This is one
+ * silicon workaround. It will cause fabric timeout error
+ * for LS case after resume from hibernation */
+static void disable_phy_auto_resume(struct dwc_otg2 *otg)
+{
+	u32 data = 0;
+
+	data = otg_read(otg, GUSB2PHYCFG0);
+	data &= ~GUSB2PHYCFG_ULPI_AUTO_RESUME;
+	otg_write(otg, GUSB2PHYCFG0, data);
+}
+
 /* This function will control VUSBPHY to power gate/ungate USBPHY */
 static int enable_usb_phy(struct dwc_otg2 *otg, bool on_off)
 {
@@ -205,10 +352,10 @@ static int enable_usb_phy(struct dwc_otg2 *otg, bool on_off)
 	return 0;
 }
 
-int dwc3_intel_get_id(struct dwc_otg2 *otg)
+int basin_cove_get_id(struct dwc_otg2 *otg)
 {
 	int ret, id = RID_UNKNOWN;
-	u8 idsts;
+	u8 idsts, pmic_id;
 
 	ret = intel_scu_ipc_update_register(PMIC_USBIDCTRL,
 			USBIDCTRL_ACA_DETEN_D1 | PMIC_USBPHYCTRL_D0,
@@ -226,24 +373,147 @@ int dwc3_intel_get_id(struct dwc_otg2 *otg)
 
 	if (idsts & USBIDSTS_ID_FLOAT_STS)
 		id = RID_FLOAT;
-	else if (idsts & USBIDSTS_ID_GND)
-		id = RID_GND;
 	else if (idsts & USBIDSTS_ID_RARBRC_STS(1))
 		id = RID_A;
 	else if (idsts & USBIDSTS_ID_RARBRC_STS(2))
 		id = RID_B;
 	else if (idsts & USBIDSTS_ID_RARBRC_STS(3))
 		id = RID_C;
+	else {
+		/* PMIC A0 reports ID_GND = 0 for RID_GND but PMIC B0 reports
+		*  ID_GND = 1 for RID_GND
+		*/
+		ret = intel_scu_ipc_ioread8(0x00, &pmic_id);
+		if (ret) {
+			otg_err(otg, "Fail to read PMIC ID register\n");
+		} else if (((pmic_id & VENDOR_ID_MASK) == BASIN_COVE_PMIC_ID) &&
+			((pmic_id & PMIC_MAJOR_REV) == PMIC_A0_MAJOR_REV)) {
+				if (idsts & USBIDSTS_ID_GND)
+					id = RID_GND;
+		} else {
+			if (!(idsts & USBIDSTS_ID_GND))
+				id = RID_GND;
+		}
+	}
+
+	ret = intel_scu_ipc_update_register(PMIC_USBIDCTRL,
+			USBIDCTRL_ACA_DETEN_D1 | PMIC_USBPHYCTRL_D0,
+			0);
+	if (ret)
+		otg_err(otg, "Fail to enable ACA&ID detection logic\n");
 
 	return id;
+}
+
+int shady_cove_get_id(struct dwc_otg2 *otg)
+{
+	int ret, count = 0, id = RID_UNKNOWN;
+	u8 val, id_l, id_h, cursrc, schgrirq1;
+	unsigned long rlsb, rid;
+	unsigned long rlsb_array[] = {
+	0, 260480, 130240, 65120,
+	32560, 16280, 8140, 4070, 2035};
+
+	ret = intel_scu_ipc_ioread8(PMIC_SCHGRIRQ1, &schgrirq1);
+	if (ret) {
+		otg_err(otg, "Fail to read id\n");
+		return id;
+	}
+
+	/* PMIC_SCHGRIRQ1_SUSBIDDET bit definition:
+	 * 0 = RID_A/B/C ; 1 = RID_GND ; 2 = RID_FLOAT */
+	if (schgrirq1 & PMIC_SCHGRIRQ1_SUSBIDDET(2))
+		return RID_FLOAT;
+	else if (schgrirq1 & PMIC_SCHGRIRQ1_SUSBIDDET(1))
+		return RID_GND;
+
+	/* Initiate a USBID resistance check. */
+	ret = intel_scu_ipc_update_register(PMIC_GPADCREQ_REG,
+			PMIC_GPADCREQ_ADC_USBID,
+			PMIC_GPADCREQ_ADC_USBID);
+	if (ret) {
+		otg_err(otg, "Fail to enable USBID resistance\n");
+		goto done;
+	}
+
+	/* Poll whether ADC conversion is finished. */
+	while (1) {
+		count++;
+
+		if (count > 9) {
+			otg_err(otg, "ADC conversion timeout!\n");
+			goto done;
+		}
+		mdelay(1);
+
+		ret = intel_scu_ipc_ioread8(PMIC_ADCIRQ_REG, &val);
+		if (ret) {
+			otg_err(otg, "Fail to read decoded RID value\n");
+			goto done;
+		}
+
+		if (val & PMIC_ADCIRQ_USBID)
+			break;
+	}
+
+	/* Read ADC value lower 8 bits. */
+	ret = intel_scu_ipc_ioread8(PMIC_USBIDRSLTL, &id_l);
+	if (ret) {
+		otg_err(otg, "IPC read PMIC_USBIDRSLTL failed!\n");
+		goto done;
+	}
+	id_l &= PMIC_USBIDRSLTL_USBID_L_MASK;
+
+	/* Read ADC value upper 4 bits.
+	 * Read Current source value 4 bits.*/
+	ret = intel_scu_ipc_ioread8(PMIC_USBIDRSLTH, &id_h);
+	if (ret) {
+		otg_err(otg, "IPC read PMIC_USBIDRSLTL failed!\n");
+		goto done;
+	}
+	cursrc = id_h & PMIC_USBIDRSLTH_USBID_CURSRC_MASK;
+	id_h &= PMIC_USBIDRSLTH_USBID_H_MASK;
+
+	/* @RLSb_array[USBID_CURSRC] = {NULL, 260.48,
+	 * 130.24, 65.12, 32.56, 16.28, 8.14, 4.07, 2.035};
+	 * RLSb = 2.035 * power(2,8-USBID_CURSRC);
+	 * RID = ((USBID_H << 8) + (USBID_L)) * RLSb;*/
+	cursrc >>= 4;
+
+	/* Due to linux kernel can't support float calculate.
+	 * So we multiple 1000 for calculate */
+	rlsb = rlsb_array[cursrc];
+	rid = ((id_h << 8) + (id_l)) * rlsb;
+
+	/* If RID value is within:
+	 * 111.5k to 136.4kΩ: ACA-A/ACA-Dock detected
+	 * 61.2k to 74.8kΩ: ACA-B detected
+	 * 32.85k to 40.15kΩ: ACA-C detected
+	 * else: Unknown detected */
+	do_div(rid, 1000UL);
+
+	if ((rid > 111500) && (rid < 136400))
+		return RID_A;
+	else if ((rid > 61200) && (rid < 74800))
+		return RID_B;
+	else if ((rid > 32850) && (rid < 40150))
+		return RID_C;
+
+done:
+	return RID_UNKNOWN;
+}
+
+int dwc3_intel_get_id(struct dwc_otg2 *otg)
+{
+	if (is_basin_cove(otg))
+		return basin_cove_get_id(otg);
+	else
+		return shady_cove_get_id(otg);
 }
 
 int dwc3_intel_b_idle(struct dwc_otg2 *otg)
 {
 	u32 gctl, tmp;
-
-	if (!is_hybridvp(otg))
-		enable_usb_phy(otg, false);
 
 	/* Disable hibernation mode by default */
 	gctl = otg_read(otg, GCTL);
@@ -269,7 +539,11 @@ int dwc3_intel_b_idle(struct dwc_otg2 *otg)
 	gctl |= GCTL_PRT_CAP_DIR_DEV << GCTL_PRT_CAP_DIR_SHIFT;
 	otg_write(otg, GCTL, gctl);
 
-	enable_usb_phy(otg, true);
+	if (!is_hybridvp(otg)) {
+		dwc_otg_charger_hwdet(false);
+		enable_usb_phy(otg, false);
+	}
+
 	mdelay(100);
 
 	return 0;
@@ -280,30 +554,85 @@ static int dwc3_intel_set_power(struct usb_phy *_otg,
 {
 	unsigned long flags;
 	struct dwc_otg2 *otg = dwc3_get_otg();
+	struct power_supply_cable_props cap;
+	struct intel_dwc_otg_pdata *data;
 
-	if (!otg)
+	data = (struct intel_dwc_otg_pdata *)otg->otg_data;
+
+	if (otg->charging_cap.chrg_type ==
+			POWER_SUPPLY_CHARGER_TYPE_USB_CDP)
 		return 0;
-
-	/* force 896ma to 900ma
-	 * Beucause the power just can be set as an
-	 * integer multiple of 8 in usb configuration descriptor
-	 */
-	if (ma == 896)
-		ma = 900;
-
-	if ((ma != 100) &&
-		(ma != 150) &&
-		(ma != 500) &&
-		(ma != 900)) {
-		otg_err(otg, "Device driver set invalid SDP current value!\n");
+	else if (otg->charging_cap.chrg_type !=
+			POWER_SUPPLY_CHARGER_TYPE_USB_SDP) {
+		otg_err(otg, "%s: currently, chrg type is not SDP!\n",
+				__func__);
 		return -EINVAL;
 	}
 
-	if (otg->charging_cap.chrg_type == CHRG_CDP)
+	if (ma == OTG_DEVICE_SUSPEND) {
+		spin_lock_irqsave(&otg->lock, flags);
+		cap.chrg_type = otg->charging_cap.chrg_type;
+		cap.ma = otg->charging_cap.ma;
+		cap.chrg_evt = POWER_SUPPLY_CHARGER_EVENT_SUSPEND;
+		spin_unlock_irqrestore(&otg->lock, flags);
+
+		/* mA is zero mean D+/D- opened cable.
+		 * If SMIP set, then notify 500mA.
+		 * Otherwise, notify 0mA.
+		*/
+		if (!cap.ma) {
+			if (data->charging_compliance) {
+				cap.ma = 500;
+				cap.chrg_evt =
+					POWER_SUPPLY_CHARGER_EVENT_CONNECT;
+			}
+		/* For standard SDP, if SMIP set, then ignore suspend */
+		} else if (data->charging_compliance)
+			return 0;
+		/* Stander SDP(cap.mA != 0) and SMIP not set.
+		 * Should send 0mA with SUSPEND event
+		 */
+		else
+			cap.ma = 0;
+
+		atomic_notifier_call_chain(&otg->usb2_phy.notifier,
+				USB_EVENT_CHARGER, &cap);
+		otg_dbg(otg, "Notify EM");
+		otg_dbg(otg, "POWER_SUPPLY_CHARGER_EVENT_SUSPEND\n");
+
 		return 0;
-	else if (otg->charging_cap.chrg_type != CHRG_SDP) {
-		otg_err(otg, "%s: currently, chrg type is not SDP!\n",
-				__func__);
+	} else if (ma == OTG_DEVICE_RESUME) {
+		otg_dbg(otg, "Notify EM");
+		otg_dbg(otg, "POWER_SUPPLY_CHARGER_EVENT_CONNECT\n");
+		dwc3_intel_notify_charger_type(otg,
+				POWER_SUPPLY_CHARGER_EVENT_CONNECT);
+
+		return 0;
+	}
+
+	/* For SMIP set case, only need to report 500/900mA */
+	if (data->charging_compliance) {
+		if ((ma != OTG_USB2_500MA) &&
+				(ma != OTG_USB3_900MA))
+			return 0;
+	}
+
+	/* Covert macro to integer number*/
+	switch (ma) {
+	case OTG_USB2_100MA:
+		ma = 100;
+		break;
+	case OTG_USB3_150MA:
+		ma = 150;
+		break;
+	case OTG_USB2_500MA:
+		ma = 500;
+		break;
+	case OTG_USB3_900MA:
+		ma = 900;
+		break;
+	default:
+		otg_err(otg, "Device driver set invalid SDP current value!\n");
 		return -EINVAL;
 	}
 
@@ -312,7 +641,7 @@ static int dwc3_intel_set_power(struct usb_phy *_otg,
 	spin_unlock_irqrestore(&otg->lock, flags);
 
 	dwc3_intel_notify_charger_type(otg,
-			OTG_CHR_STATE_CONNECTED);
+			POWER_SUPPLY_CHARGER_EVENT_CONNECT);
 
 	return 0;
 }
@@ -320,25 +649,33 @@ static int dwc3_intel_set_power(struct usb_phy *_otg,
 int dwc3_intel_enable_vbus(struct dwc_otg2 *otg, int enable)
 {
 	atomic_notifier_call_chain(&otg->usb2_phy.notifier,
-			USB_EVENT_DRIVE_VBUS, &cap);
+			USB_EVENT_DRIVE_VBUS, &enable);
 
 	return 0;
 }
 
 static int dwc3_intel_notify_charger_type(struct dwc_otg2 *otg,
-		enum usb_charger_state state)
+		enum power_supply_charger_event event)
 {
-	struct otg_bc_cap cap;
+	struct power_supply_cable_props cap;
 	int ret = 0;
 	unsigned long flags;
 
-	if (state > OTG_CHR_STATE_HOST) {
-		otg_err(otg, "%s: Invalid usb_charger_state!\n", __func__);
+	if (!charger_detect_enable(otg) &&
+		(otg->charging_cap.chrg_type !=
+		POWER_SUPPLY_CHARGER_TYPE_USB_SDP))
+		return 0;
+
+	if (event > POWER_SUPPLY_CHARGER_EVENT_DISCONNECT) {
+		otg_err(otg,
+		"%s: Invalid power_supply_charger_event!\n", __func__);
 		return -EINVAL;
 	}
 
-	if ((otg->charging_cap.chrg_type ==  CHRG_SDP) &&
-			((otg->charging_cap.ma != 100) &&
+	if ((otg->charging_cap.chrg_type ==
+			POWER_SUPPLY_CHARGER_TYPE_USB_SDP) &&
+			((otg->charging_cap.ma != 0) &&
+			 (otg->charging_cap.ma != 100) &&
 			 (otg->charging_cap.ma != 150) &&
 			 (otg->charging_cap.ma != 500) &&
 			 (otg->charging_cap.ma != 900))) {
@@ -349,7 +686,7 @@ static int dwc3_intel_notify_charger_type(struct dwc_otg2 *otg,
 	spin_lock_irqsave(&otg->lock, flags);
 	cap.chrg_type = otg->charging_cap.chrg_type;
 	cap.ma = otg->charging_cap.ma;
-	cap.chrg_state = state;
+	cap.chrg_evt = event;
 	spin_unlock_irqrestore(&otg->lock, flags);
 
 	atomic_notifier_call_chain(&otg->usb2_phy.notifier, USB_EVENT_CHARGER,
@@ -358,37 +695,74 @@ static int dwc3_intel_notify_charger_type(struct dwc_otg2 *otg,
 	return ret;
 }
 
-enum usb_charger_type dwc3_intel_get_charger_type(struct dwc_otg2 *otg)
+static void dwc3_phy_soft_reset(struct dwc_otg2 *otg)
 {
+	u32 val;
+
+	val = otg_read(otg, GCTL);
+	val |= GCTL_CORESOFTRESET;
+	otg_write(otg, GCTL, val);
+
+	val = otg_read(otg, GUSB3PIPECTL0);
+	val |= GUSB3PIPECTL_PHYSOFTRST;
+	otg_write(otg, GUSB3PIPECTL0, val);
+
+	val = otg_read(otg, GUSB2PHYCFG0);
+	val |= GUSB2PHYCFG_PHYSOFTRST;
+	otg_write(otg, GUSB2PHYCFG0, val);
+
+	msleep(50);
+
+	val = otg_read(otg, GUSB3PIPECTL0);
+	val &= ~GUSB3PIPECTL_PHYSOFTRST;
+	otg_write(otg, GUSB3PIPECTL0, val);
+
+	val = otg_read(otg, GUSB2PHYCFG0);
+	val &= ~GUSB2PHYCFG_PHYSOFTRST;
+	otg_write(otg, GUSB2PHYCFG0, val);
+
+	msleep(100);
+
+	val = otg_read(otg, GCTL);
+	val &= ~GCTL_CORESOFTRESET;
+	otg_write(otg, GCTL, val);
+}
+
+static enum power_supply_charger_cable_type
+			dwc3_intel_get_charger_type(struct dwc_otg2 *otg)
+{
+	int ret;
+	struct usb_phy *phy;
 	u8 val, vdat_det, chgd_serx_dm;
 	unsigned long timeout, interval;
-	int ret;
-	enum usb_charger_type type = CHRG_UNKNOWN;
-	struct usb_phy *phy;
+	enum power_supply_charger_cable_type type =
+		POWER_SUPPLY_CHARGER_TYPE_NONE;
+
+	if (!charger_detect_enable(otg))
+		return cap_record.chrg_type;
 
 	phy = usb_get_phy(USB_PHY_TYPE_USB2);
 	if (!phy) {
 		otg_err(otg, "Get USB2 PHY failed\n");
-		return CHRG_UNKNOWN;
+		return POWER_SUPPLY_CHARGER_TYPE_NONE;
 	}
 
 	/* PHY Enable:
 	 * Power on PHY
 	 */
 	enable_usb_phy(otg, true);
+	dwc3_phy_soft_reset(otg);
 
-	/* Wait 10ms (~5ms before PHY de-asserts DIR,
-	 * XXus for initial Link reg sync-up).*/
-	msleep(20);
-
-	/* Enable ACA:
-	 * Enable ACA & ID detection logic.
-	 */
-	ret = intel_scu_ipc_update_register(PMIC_USBIDCTRL,
-			USBIDCTRL_ACA_DETEN_D1 | PMIC_USBPHYCTRL_D0,
-			USBIDCTRL_ACA_DETEN_D1 | PMIC_USBPHYCTRL_D0);
-	if (ret)
-		otg_err(otg, "Fail to enable ACA&ID detection logic\n");
+	if (is_basin_cove(otg)) {
+		/* Enable ACA:
+		 * Enable ACA & ID detection logic.
+		 */
+		ret = intel_scu_ipc_update_register(PMIC_USBIDCTRL,
+				USBIDCTRL_ACA_DETEN_D1 | PMIC_USBPHYCTRL_D0,
+				USBIDCTRL_ACA_DETEN_D1 | PMIC_USBPHYCTRL_D0);
+		if (ret)
+			otg_err(otg, "Fail to enable ACA&ID detection logic\n");
+	}
 
 	/* DCD Enable: Change OPMODE to 01 (Non-driving),
 	 * TermSel to 0, &
@@ -444,12 +818,8 @@ enum usb_charger_type dwc3_intel_get_charger_type(struct dwc_otg2 *otg)
 	 * Check ID pin state.
 	 */
 	val = dwc3_intel_get_id(otg);
-	if (val)
-		otg_err(otg, "Fail to enable ACA&ID detection logic\n");
-
-	val &= USBIDSTS_ID_FLOAT_STS;
-	if (!val) {
-		type = aca_check(otg);
+	if (val != RID_FLOAT) {
+		type = dwc3_intel_aca_check(otg);
 		goto cleanup;
 	}
 
@@ -467,7 +837,7 @@ enum usb_charger_type dwc3_intel_get_charger_type(struct dwc_otg2 *otg)
 	 * Else: goto 'Pri Det Enable'.
 	 */
 	if (val == 3) {
-		type = CHRG_SE1;
+		type = POWER_SUPPLY_CHARGER_TYPE_SE1;
 		goto cleanup;
 	}
 
@@ -501,7 +871,7 @@ enum usb_charger_type dwc3_intel_get_charger_type(struct dwc_otg2 *otg)
 	 * If VDAT_DET==1 && CHGD_SERX_DM==0: CDP/DCP
 	 */
 	if (vdat_det == 0 || chgd_serx_dm == 1)
-		type = CHRG_SDP;
+		type = POWER_SUPPLY_CHARGER_TYPE_USB_SDP;
 
 	/* Disable VDPSRC. */
 	usb_phy_io_write(phy, PWCTRL_DP_VSRC_EN, TUSB1211_POWER_CONTROL_CLR);
@@ -509,7 +879,7 @@ enum usb_charger_type dwc3_intel_get_charger_type(struct dwc_otg2 *otg)
 	/* If SDP, goto “Cleanup”.
 	 * Else, goto “Sec Det Enable”
 	 */
-	if (type == CHRG_SDP)
+	if (type == POWER_SUPPLY_CHARGER_TYPE_USB_SDP)
 		goto cleanup;
 
 	/* Sec Det Enable:
@@ -539,9 +909,9 @@ enum usb_charger_type dwc3_intel_get_charger_type(struct dwc_otg2 *otg)
 	 * If VDAT_DET==1: DCP detected.
 	 */
 	if (!val)
-		type = CHRG_CDP;
+		type = POWER_SUPPLY_CHARGER_TYPE_USB_CDP;
 	else
-		type = CHRG_DCP;
+		type = POWER_SUPPLY_CHARGER_TYPE_USB_DCP;
 
 	/* Disable VDMSRC. */
 	usb_phy_io_write(phy, PWCTRL_DP_VSRC_EN, TUSB1211_POWER_CONTROL_CLR);
@@ -552,27 +922,43 @@ enum usb_charger_type dwc3_intel_get_charger_type(struct dwc_otg2 *otg)
 cleanup:
 
 	/* If DCP detected, assert VDPSRC. */
-	if (type == CHRG_DCP)
+	if (type == POWER_SUPPLY_CHARGER_TYPE_USB_DCP)
 		usb_phy_io_write(phy, PWCTRL_SW_CONTROL | PWCTRL_DP_VSRC_EN,
 				TUSB1211_POWER_CONTROL_SET);
 
 	usb_put_phy(phy);
 
-	return type;
+	switch (type) {
+	case POWER_SUPPLY_CHARGER_TYPE_ACA_DOCK:
+	case POWER_SUPPLY_CHARGER_TYPE_ACA_A:
+	case POWER_SUPPLY_CHARGER_TYPE_ACA_B:
+	case POWER_SUPPLY_CHARGER_TYPE_ACA_C:
+	case POWER_SUPPLY_CHARGER_TYPE_USB_DCP:
+	case POWER_SUPPLY_CHARGER_TYPE_USB_CDP:
+	case POWER_SUPPLY_CHARGER_TYPE_SE1:
+		dwc_otg_charger_hwdet(true);
+		break;
+	default:
+		break;
+	};
 
+	return type;
 }
 
 static int dwc3_intel_handle_notification(struct notifier_block *nb,
 		unsigned long event, void *data)
 {
+	int state;
+	unsigned long flags, valid_chrg_type;
 	struct dwc_otg2 *otg = dwc3_get_otg();
-	int state, val;
-	unsigned long flags;
+	struct power_supply_cable_props *cap;
 
 	if (!otg)
 		return NOTIFY_BAD;
 
-	val = *(int *)data;
+	valid_chrg_type = POWER_SUPPLY_CHARGER_TYPE_USB_SDP |
+		POWER_SUPPLY_CHARGER_TYPE_USB_CDP |
+		POWER_SUPPLY_CHARGER_TYPE_ACA_DOCK;
 
 	spin_lock_irqsave(&otg->lock, flags);
 	switch (event) {
@@ -581,16 +967,50 @@ static int dwc3_intel_handle_notification(struct notifier_block *nb,
 		state = NOTIFY_OK;
 		break;
 	case USB_EVENT_VBUS:
-		if (val)
+		if (*(int *)data) {
 			otg->otg_events |= OEVT_B_DEV_SES_VLD_DET_EVNT;
-		else
+			otg->otg_events &= ~OEVT_A_DEV_SESS_END_DET_EVNT;
+		} else {
 			otg->otg_events |= OEVT_A_DEV_SESS_END_DET_EVNT;
+			otg->otg_events &= ~OEVT_B_DEV_SES_VLD_DET_EVNT;
+		}
+		state = NOTIFY_OK;
+		break;
+	case USB_EVENT_CHARGER:
+		if (charger_detect_enable(otg)) {
+			state = NOTIFY_DONE;
+			goto done;
+		}
+		cap = (struct power_supply_cable_props *)data;
+		if (!(cap->chrg_type & valid_chrg_type)) {
+			otg_err(otg, "Invalid charger type!\n");
+			state = NOTIFY_BAD;
+		}
+		if (cap->chrg_evt == POWER_SUPPLY_CHARGER_EVENT_CONNECT) {
+			otg->otg_events |= OEVT_B_DEV_SES_VLD_DET_EVNT;
+			otg->otg_events &= ~OEVT_A_DEV_SESS_END_DET_EVNT;
+
+			cap_record.chrg_type = cap->chrg_type;
+			cap_record.ma = cap->ma;
+			cap_record.chrg_evt = cap->chrg_evt;
+		} else if (cap->chrg_evt ==
+				POWER_SUPPLY_CHARGER_EVENT_DISCONNECT) {
+			otg->otg_events |= OEVT_A_DEV_SESS_END_DET_EVNT;
+			otg->otg_events &= ~OEVT_B_DEV_SES_VLD_DET_EVNT;
+
+			cap_record.chrg_type = POWER_SUPPLY_CHARGER_TYPE_NONE;
+			cap_record.ma = 0;
+			cap_record.chrg_evt =
+				POWER_SUPPLY_CHARGER_EVENT_DISCONNECT;
+		}
 		state = NOTIFY_OK;
 		break;
 	default:
 		otg_dbg(otg, "DWC OTG Notify unknow notify message\n");
 		state = NOTIFY_DONE;
 	}
+
+done:
 	dwc3_wakeup_otg_thread(otg);
 	spin_unlock_irqrestore(&otg->lock, flags);
 
@@ -600,15 +1020,81 @@ static int dwc3_intel_handle_notification(struct notifier_block *nb,
 
 int dwc3_intel_prepare_start_host(struct dwc_otg2 *otg)
 {
-	if (!is_hybridvp(otg))
+	if (!is_hybridvp(otg)) {
 		enable_usb_phy(otg, true);
+		usb2phy_eye_optimization(otg);
+		disable_phy_auto_resume(otg);
+	}
+
 	return 0;
 }
 
 int dwc3_intel_prepare_start_peripheral(struct dwc_otg2 *otg)
 {
-	if (!is_hybridvp(otg))
+	if (!is_hybridvp(otg)) {
 		enable_usb_phy(otg, true);
+		usb2phy_eye_optimization(otg);
+		disable_phy_auto_resume(otg);
+	}
+
+	return 0;
+}
+
+int dwc3_intel_suspend(struct dwc_otg2 *otg)
+{
+	struct pci_dev *pci_dev;
+	pci_power_t state = PCI_D3cold;
+
+	if (!otg)
+		return 0;
+
+	pci_dev = to_pci_dev(otg->dev);
+
+	if (otg->state == DWC_STATE_B_PERIPHERAL ||
+			otg->state == DWC_STATE_A_HOST)
+		state = PCI_D3hot;
+
+	set_sus_phy(otg, 1);
+
+	if (pci_save_state(pci_dev)) {
+		otg_err(otg, "pci_save_state failed!\n");
+		return -EIO;
+	}
+
+	pci_disable_device(pci_dev);
+	pci_set_power_state(pci_dev, state);
+
+	return 0;
+}
+
+int dwc3_intel_resume(struct dwc_otg2 *otg)
+{
+	struct pci_dev *pci_dev;
+
+	if (!otg)
+		return 0;
+
+	pci_dev = to_pci_dev(otg->dev);
+
+	/* From synopsys spec 12.2.11.
+	 * Software cannot access memory-mapped I/O space
+	 * for 10ms. Delay 5 ms here should be enough. Too
+	 * long a delay causes hibernation exit failure.
+	 */
+	mdelay(5);
+
+	pci_restore_state(pci_dev);
+	if (pci_enable_device(pci_dev) < 0) {
+		otg_err(otg, "pci_enable_device failed.\n");
+		return -EIO;
+	}
+
+	set_sus_phy(otg, 0);
+
+	/* Delay 1ms waiting PHY clock debounce.
+	 * Without this debounce, will met fabric error randomly.
+	 **/
+	mdelay(1);
 
 	return 0;
 }
@@ -625,6 +1111,10 @@ struct dwc3_otg_hw_ops dwc3_intel_otg_pdata = {
 	.otg_notifier_handler = dwc3_intel_handle_notification,
 	.prepare_start_peripheral = dwc3_intel_prepare_start_peripheral,
 	.prepare_start_host = dwc3_intel_prepare_start_host,
+	.notify_charger_type = dwc3_intel_notify_charger_type,
+
+	.suspend = dwc3_intel_suspend,
+	.resume = dwc3_intel_resume,
 };
 
 static int __init dwc3_intel_init(void)

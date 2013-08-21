@@ -495,6 +495,12 @@ enum dwc3_link_state {
 	DWC3_LINK_STATE_MASK		= 0x0f,
 };
 
+enum dwc3_pm_state {
+	PM_DISCONNECTED = 0,
+	PM_ACTIVE,
+	PM_SUSPENDED,
+};
+
 /* TRB Length, PCM and Status */
 #define DWC3_TRB_SIZE_MASK	(0x00ffffff)
 #define DWC3_TRB_SIZE_LENGTH(n)	((n) & DWC3_TRB_SIZE_MASK)
@@ -748,6 +754,8 @@ struct dwc3 {
 	struct dwc3_hwparams	hwparams;
 	struct dentry		*root;
 	struct debugfs_regset32	*regset;
+	enum dwc3_pm_state	pm_state;
+	u8			is_otg;
 
 	u8			test_mode;
 	u8			test_mode_nr;
