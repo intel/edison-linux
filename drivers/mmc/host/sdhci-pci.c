@@ -670,7 +670,8 @@ static int intel_mrfl_mmc_probe_slot(struct sdhci_pci_slot *slot)
 	if (PCI_FUNC(slot->chip->pdev->devfn) == INTEL_MRFL_EMMC_0)
 		sdhci_alloc_panic_host(slot->host);
 
-	slot->host->mmc->caps2 |= MMC_CAP2_INIT_CARD_SYNC;
+	slot->host->mmc->caps2 |= MMC_CAP2_INIT_CARD_SYNC |
+		MMC_CAP2_POLL_R1B_BUSY;
 
 	if (slot->data->platform_quirks & PLFM_QUIRK_NO_HIGH_SPEED) {
 		slot->host->quirks2 |= SDHCI_QUIRK2_DISABLE_HIGH_SPEED;
