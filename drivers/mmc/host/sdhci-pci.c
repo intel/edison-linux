@@ -99,6 +99,7 @@ struct sdhci_pci_slot {
 	int			cd_irq;
 	bool			dev_power;
 	struct mutex		power_lock;
+	bool			dma_enabled;
 };
 
 struct sdhci_pci_chip {
@@ -1489,6 +1490,9 @@ static int sdhci_pci_enable_dma(struct sdhci_host *host)
 	int ret;
 
 	slot = sdhci_priv(host);
+	if (slot->dma_enabled)
+		return 0;
+
 	pdev = slot->chip->pdev;
 
 	if (((pdev->class & 0xFFFF00) == (PCI_CLASS_SYSTEM_SDHCI << 8)) &&
@@ -1503,6 +1507,8 @@ static int sdhci_pci_enable_dma(struct sdhci_host *host)
 		return ret;
 
 	pci_set_master(pdev);
+
+	slot->dma_enabled = true;
 
 	return 0;
 }
@@ -1753,6 +1759,7 @@ static int sdhci_pci_suspend(struct device *dev)
 			sdhci_enable_irq_wakeups(slot->host);
 
 		pm_flags |= slot_pm_flags;
+		slot->dma_enabled = false;
 	}
 
 	if (chip->fixes && chip->fixes->suspend) {
