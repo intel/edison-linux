@@ -12,6 +12,15 @@
 #ifndef _PLATFORM_MSIC_THERMAL_H_
 #define _PLATFORM_MSIC_THERMAL_H_
 
+#define MSIC_THERM_DEV_NAME "msic_thermal"
+
 extern void __init *msic_thermal_platform_data(void *info)
 			__attribute__((weak));
+enum {
+	mfld_thermal,
+	ctp_thermal,
+	lex_thermal,
+	vb_thermal,
+};
+
 #endif

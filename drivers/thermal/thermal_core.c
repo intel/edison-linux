@@ -707,6 +707,82 @@ passive_show(struct device *dev, struct device_attribute *attr,
 }
 
 static ssize_t
+slope_store(struct device *dev, struct device_attribute *attr,
+		    const char *buf, size_t count)
+{
+	int ret;
+	long slope;
+	struct thermal_zone_device *tz = to_thermal_zone(dev);
+
+	if (!tz->ops->set_slope)
+		return -EPERM;
+
+	if (kstrtol(buf, 10, &slope))
+		return -EINVAL;
+
+	ret = tz->ops->set_slope(tz, slope);
+	if (ret)
+		return ret;
+
+	return count;
+}
+
+static ssize_t
+slope_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	int ret;
+	long slope;
+	struct thermal_zone_device *tz = to_thermal_zone(dev);
+
+	if (!tz->ops->get_slope)
+		return -EINVAL;
+
+	ret = tz->ops->get_slope(tz, &slope);
+	if (ret)
+		return ret;
+
+	return sprintf(buf, "%ld\n", slope);
+}
+
+static ssize_t
+intercept_store(struct device *dev, struct device_attribute *attr,
+		    const char *buf, size_t count)
+{
+	int ret;
+	long intercept;
+	struct thermal_zone_device *tz = to_thermal_zone(dev);
+
+	if (!tz->ops->set_intercept)
+		return -EPERM;
+
+	if (kstrtol(buf, 10, &intercept))
+		return -EINVAL;
+
+	ret = tz->ops->set_intercept(tz, intercept);
+	if (ret)
+		return ret;
+
+	return count;
+}
+
+static ssize_t
+intercept_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	int ret;
+	long intercept;
+	struct thermal_zone_device *tz = to_thermal_zone(dev);
+
+	if (!tz->ops->get_intercept)
+		return -EINVAL;
+
+	ret = tz->ops->get_intercept(tz, &intercept);
+	if (ret)
+		return ret;
+
+	return sprintf(buf, "%ld\n", intercept);
+}
+
+static ssize_t
 policy_store(struct device *dev, struct device_attribute *attr,
 		    const char *buf, size_t count)
 {
@@ -765,6 +841,9 @@ static DEVICE_ATTR(type, 0444, type_show, NULL);
 static DEVICE_ATTR(temp, 0444, temp_show, NULL);
 static DEVICE_ATTR(mode, 0644, mode_show, mode_store);
 static DEVICE_ATTR(passive, S_IRUGO | S_IWUSR, passive_show, passive_store);
+static DEVICE_ATTR(slope, S_IRUGO | S_IWUSR, slope_show, slope_store);
+static DEVICE_ATTR(intercept,
+		S_IRUGO | S_IWUSR, intercept_show, intercept_store);
 static DEVICE_ATTR(policy, S_IRUGO | S_IWUSR, policy_show, policy_store);
 
 /* sys I/F for cooling device */

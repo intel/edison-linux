@@ -125,6 +125,10 @@ struct thermal_zone_device_ops {
 			      unsigned long *);
 	int (*set_trip_hyst) (struct thermal_zone_device *, int,
 			      unsigned long);
+	int (*get_slope) (struct thermal_zone_device *, long *);
+	int (*set_slope) (struct thermal_zone_device *, long);
+	int (*get_intercept) (struct thermal_zone_device *, long *);
+	int (*set_intercept) (struct thermal_zone_device *, long);
 	int (*get_crit_temp) (struct thermal_zone_device *, unsigned long *);
 	int (*set_emul_temp) (struct thermal_zone_device *, unsigned long);
 	int (*get_trend) (struct thermal_zone_device *, int,
