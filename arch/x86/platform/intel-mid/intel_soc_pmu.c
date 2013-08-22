@@ -468,7 +468,7 @@ static irqreturn_t pmu_sc_irq(int irq, void *ignored)
 		break;
 	case TRIGGERERR:
 		pmu_dump_logs();
-		BUG();
+		WARN(1, "%s: TRIGGERERR caused, but proceeding...\n", __func__);
 		break;
 	}
 
