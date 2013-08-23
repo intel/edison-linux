@@ -790,6 +790,7 @@ struct dwc3 {
 	struct debugfs_regset32	*regset;
 	enum dwc3_pm_state	pm_state;
 	u8			is_otg;
+	u8			soft_connected;
 
 	u8			test_mode;
 	u8			test_mode_nr;
