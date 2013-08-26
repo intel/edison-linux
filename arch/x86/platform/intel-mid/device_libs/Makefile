@@ -22,7 +22,16 @@ obj-$(subst m,y,$(CONFIG_GPIO_PCA953X)) += platform_tca6416.o
 obj-$(subst m,y,$(CONFIG_SERIAL_MRST_MAX3110)) += platform_max3111.o
 # MISC Devices
 obj-$(subst m,y,$(CONFIG_KEYBOARD_GPIO)) += platform_gpio_keys.o
+# ADC
+obj-$(subst m,y,$(CONFIG_MSIC_GPADC))	+= platform_msic_adc.o
+obj-$(subst m,y,$(CONFIG_IIO_BASINCOVE_GPADC))	+= platform_bcove_adc.o
 # UART Devices
 obj-$(subst m,y,$(CONFIG_SERIAL_MFD_HSU_EXT)) += platform_hsu.o
 # SD Devices
 obj-$(subst m,y,$(CONFIG_WILINK_PLATFORM_DATA)) += platform_wl12xx.o
+#I2C Devices
+ifdef CONFIG_BATTERY_MAX17042
+obj-$(subst m,y,$(CONFIG_BATTERY_MAX17042)) += platform_max17042.o
+else
+obj-$(subst m,y,$(CONFIG_BATTERY_MAX17050)) += platform_max17042.o
+endif
