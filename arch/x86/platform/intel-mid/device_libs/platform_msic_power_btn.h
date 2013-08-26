@@ -12,6 +12,8 @@
 #ifndef _PLATFORM_MSIC_POWER_BTN_H_
 #define _PLATFORM_MSIC_POWER_BTN_H_
 
+#define INTEL_MID_POWERBTN_DEV_NAME "mid_powerbtn"
+
 extern void __init *msic_power_btn_platform_data(void *info)
-				__attribute__((weak));
+		__attribute__((weak));
 #endif

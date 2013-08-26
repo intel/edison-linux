@@ -102,6 +102,10 @@ struct devs_id __initconst device_ids[] = {
 	{"i2c_disp_brig", SFI_DEV_TYPE_I2C, 0, &tc35876x_platform_data, NULL},
 
 	/* MSIC subdevices */
+	{"msic_adc", SFI_DEV_TYPE_IPC, 1, &msic_adc_platform_data,
+						&ipc_device_handler},
+	{"bcove_power_btn", SFI_DEV_TYPE_IPC, 1, &msic_power_btn_platform_data,
+					&ipc_device_handler},
 	{"msic_battery", SFI_DEV_TYPE_IPC, 1, &msic_battery_platform_data,
 					&ipc_device_handler},
 	{"msic_gpio", SFI_DEV_TYPE_IPC, 1, &msic_gpio_platform_data,

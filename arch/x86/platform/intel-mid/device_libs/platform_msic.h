@@ -12,6 +12,8 @@
 #ifndef _PLATFORM_MSIC_H_
 #define _PLATFORM_MSIC_H_
 
+#include <linux/mfd/intel_msic.h>
+
 extern struct intel_msic_platform_data msic_pdata;
 
 extern void *msic_generic_platform_data(void *info,
