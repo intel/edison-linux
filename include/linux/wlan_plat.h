@@ -23,6 +23,7 @@ struct wifi_platform_data {
 	int (*get_mac_addr)(unsigned char *buf);
 	void *(*get_country_code)(char *ccode);
 	char *nvram_id;
+	bool use_fast_irq;
 };
 
 #endif

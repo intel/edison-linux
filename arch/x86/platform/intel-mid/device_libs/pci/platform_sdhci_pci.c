@@ -65,7 +65,7 @@ static int panic_mode_emmc0_power_up(void *data)
 static unsigned int sdhci_pdata_quirks = SDHCI_QUIRK2_ADVERTISE_2V0_FORCE_1V8
 		| SDHCI_QUIRK2_ENABLE_MMC_PM_IGNORE_PM_NOTIFY;
 
-int sdhci_pdata_set_quirks(unsigned int quirks)
+int sdhci_pdata_set_quirks(const unsigned int quirks)
 {
 	sdhci_pdata_quirks = quirks;
 	return 0;
