@@ -16,7 +16,7 @@
 #include <linux/dma-mapping.h>
 
 #ifdef CONFIG_USB_DWC3_OTG
-#include <linux/usb/dwc3-intel-mrfl.h>
+#include <linux/usb/dwc3-intel-mid.h>
 static struct intel_dwc_otg_pdata dwc_otg_pdata;
 static struct intel_dwc_otg_pdata *get_otg_platform_data(struct pci_dev *pdev)
 {

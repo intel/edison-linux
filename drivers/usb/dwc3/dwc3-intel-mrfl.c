@@ -14,7 +14,7 @@
 #include <linux/usb.h>
 #include <linux/usb/hcd.h>
 #include <linux/usb/gadget.h>
-#include <linux/usb/dwc3-intel-mrfl.h>
+#include <linux/usb/dwc3-intel-mid.h>
 #include <asm/intel_scu_pmic.h>
 #include "otg.h"
 
