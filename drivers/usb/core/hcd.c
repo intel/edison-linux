@@ -2136,6 +2136,11 @@ static void hcd_resume_work(struct work_struct *work)
 	usb_lock_device(udev);
 	usb_remote_wakeup(udev);
 	usb_unlock_device(udev);
+	if (HCD_IRQ_DISABLED(hcd)) {
+		/* We can now process IRQs so enable IRQ */
+		clear_bit(HCD_FLAG_IRQ_DISABLED, &hcd->flags);
+		enable_irq(hcd->irq);
+	}
 }
 
 /**
@@ -2223,9 +2228,23 @@ irqreturn_t usb_hcd_irq (int irq, void *__hcd)
 	 */
 	local_irq_save(flags);
 
-	if (unlikely(HCD_DEAD(hcd) || !HCD_HW_ACCESSIBLE(hcd)))
+	if (unlikely(HCD_DEAD(hcd)))
 		rc = IRQ_NONE;
-	else if (hcd->driver->irq(hcd) == IRQ_NONE)
+	else if (unlikely(!HCD_HW_ACCESSIBLE(hcd))) {
+		if (hcd->has_wakeup_irq) {
+			/*
+			 * We got a wakeup interrupt while the controller was
+			 * suspending or suspended. We can't handle it now, so
+			 * disable the IRQ and resume the root hub (and hence
+			 * the controller too).
+			 */
+			disable_irq_nosync(hcd->irq);
+			set_bit(HCD_FLAG_IRQ_DISABLED, &hcd->flags);
+			usb_hcd_resume_root_hub(hcd);
+			rc = IRQ_HANDLED;
+		} else
+			rc = IRQ_NONE;
+	} else if (hcd->driver->irq(hcd) == IRQ_NONE)
 		rc = IRQ_NONE;
 	else
 		rc = IRQ_HANDLED;
