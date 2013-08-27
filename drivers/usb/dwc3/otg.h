@@ -86,6 +86,7 @@ struct dwc_device_par {
 #define GUSB2PHYCFG0				0xc200
 #define GUSB2PHYCFG_SUS_PHY                     0x40
 #define GUSB2PHYCFG_PHYSOFTRST (1 << 31)
+#define GUSB2PHYCFG_ULPI_AUTO_RESUME (1 << 15)
 
 #define EXTEND_ULPI_REGISTER_ACCESS_MASK	0xC0
 #define GUSB2PHYACC0	0xc280
