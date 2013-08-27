@@ -162,6 +162,7 @@ static int sleep_until_event(struct dwc_otg2 *otg,
 {
 	int rc = 0;
 
+	pm_runtime_mark_last_busy(otg->dev);
 	pm_runtime_put_autosuspend(otg->dev);
 	/* Wait until it occurs, or timeout, or interrupt. */
 	if (timeout) {
@@ -488,7 +489,6 @@ static enum dwc_otg_state do_connector_id_status(struct dwc_otg2 *otg)
 	unsigned long flags;
 	u32 events = 0, user_events = 0;
 	u32 otg_mask = 0, user_mask = 0;
-	enum dwc_otg_state state = DWC_STATE_INVALID;
 
 	otg_dbg(otg, "\n");
 	spin_lock_irqsave(&otg->lock, flags);
@@ -790,7 +790,8 @@ int otg_main_thread(void *data)
 		otg->state = next;
 	}
 
-	pm_runtime_get_sync(otg->dev);
+	pm_runtime_mark_last_busy(otg->dev);
+	pm_runtime_put_autosuspend(otg->dev);
 	otg->main_thread = NULL;
 	otg_dbg(otg, "OTG main thread exiting....\n");
 
@@ -1267,6 +1268,7 @@ static int dwc_otg_probe(struct pci_dev *pdev,
 	pm_runtime_set_autosuspend_delay(&pdev->dev, 100);
 	pm_runtime_use_autosuspend(&pdev->dev);
 	pm_runtime_allow(&pdev->dev);
+	pm_runtime_mark_last_busy(otg->dev);
 	pm_runtime_put_autosuspend(&pdev->dev);
 
 	return 0;
