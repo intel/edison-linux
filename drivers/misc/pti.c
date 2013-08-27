@@ -141,11 +141,6 @@ MODULE_PARM_DESC(stm_enabled, "set to 1 to enable stm");
  */
 static DEFINE_MUTEX(alloclock);
 
-static const struct pci_device_id pci_ids[] = {
-		{PCI_DEVICE(PCI_VENDOR_ID_INTEL, 0x82B)},
-		{0}
-};
-
 static struct tty_driver *pti_tty_driver;
 static struct pti_dev *drv_data;
 
@@ -866,7 +861,6 @@ static int pti_pci_probe(struct pci_dev *pdev,
 {
 	unsigned int a;
 	int retval = -EINVAL;
-	int pci_bar = 1;
 
 	dev_dbg(&pdev->dev, "%s %s(%d): PTI PCI ID %04x:%04x\n", __FILE__,
 			__func__, __LINE__, pdev->vendor, pdev->device);
@@ -896,9 +890,13 @@ static int pti_pci_probe(struct pci_dev *pdev,
 			__func__, __LINE__);
 		goto err_disable_pci;
 	}
-	drv_data->pti_addr = pci_resource_start(pdev, pci_bar);
 
-	retval = pci_request_region(pdev, pci_bar, dev_name(&pdev->dev));
+	drv_data->pti_dev_info = (struct pti_device_info *)ent->driver_data;
+
+	drv_data->pti_addr = pci_resource_start(pdev, GET_PCI_BAR(drv_data));
+
+	retval = pci_request_region(pdev, GET_PCI_BAR(drv_data),
+				    dev_name(&pdev->dev));
 	if (retval != 0) {
 		dev_err(&pdev->dev,
 			"%s(%d): pci_request_region() returned error %d\n",
@@ -936,7 +934,7 @@ static int pti_pci_probe(struct pci_dev *pdev,
 
 	return 0;
 err_rel_reg:
-	pci_release_region(pdev, pci_bar);
+	pci_release_region(pdev, GET_PCI_BAR(drv_data));
 err_free_dd:
 	kfree(drv_data);
 err_disable_pci:
@@ -969,9 +967,9 @@ static void pti_pci_remove(struct pci_dev *pdev)
 		stm_dev_clean(pdev, &drv_data->stm);
 #endif
 	iounmap(drv_data->pti_ioaddr);
+	pci_release_region(pdev, GET_PCI_BAR(drv_data));
 	pci_set_drvdata(pdev, NULL);
 	kfree(drv_data);
-	pci_release_region(pdev, 1);
 	pci_disable_device(pdev);
 
 	misc_deregister(&pti_char_driver);
