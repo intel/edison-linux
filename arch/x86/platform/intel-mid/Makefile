@@ -10,7 +10,7 @@ obj-y += device_libs/
 
 # SoC specific files
 obj-$(CONFIG_X86_INTEL_MID) += mfld.o mrfl.o
-obj-$(CONFIG_X86_WANT_INTEL_MID) += vlv2.o
+obj-$(CONFIG_X86_WANT_INTEL_MID) += vlv2.o intel_mid_pcihelpers.o
 obj-$(CONFIG_X86_INTEL_MID) += intel_mid_scu.o
 
 >>>>>>> 6a9f567... intel_mid: Added intel mid scu remoteproc init code.
