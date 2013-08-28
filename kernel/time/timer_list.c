@@ -20,13 +20,6 @@
 
 #include <asm/uaccess.h>
 
-
-struct timer_list_iter {
-	int cpu;
-	bool second_pass;
-	u64 now;
-};
-
 typedef void (*print_fn_t)(struct seq_file *m, unsigned int *classes);
 
 DECLARE_PER_CPU(struct hrtimer_cpu_base, hrtimer_bases);
@@ -254,14 +247,6 @@ static void timer_list_show_tickdevices_header(struct seq_file *m)
 }
 #endif
 
-static inline void timer_list_header(struct seq_file *m, u64 now)
-{
-	SEQ_printf(m, "Timer List Version: v0.7\n");
-	SEQ_printf(m, "HRTIMER_MAX_CLOCK_BASES: %d\n", HRTIMER_MAX_CLOCK_BASES);
-	SEQ_printf(m, "now at %Ld nsecs\n", (unsigned long long)now);
-	SEQ_printf(m, "\n");
-}
-
 static int timer_list_show(struct seq_file *m, void *v)
 {
 	struct timer_list_iter *iter = v;
@@ -284,18 +269,19 @@ void sysrq_timer_list_show(void)
 	u64 now = ktime_to_ns(ktime_get());
 	int cpu;
 
-	timer_list_header(NULL, now);
+	SEQ_printf(m, "Timer List Version: v0.7\n");
+	SEQ_printf(m, "HRTIMER_MAX_CLOCK_BASES: %d\n", HRTIMER_MAX_CLOCK_BASES);
+	SEQ_printf(m, "now at %Ld nsecs\n", (unsigned long long)now);
+	SEQ_printf(m, "\n");
 
 	for_each_online_cpu(cpu)
-		print_cpu(NULL, cpu, now);
+		print_cpu(m, cpu, now);
 
 #ifdef CONFIG_GENERIC_CLOCKEVENTS
-	timer_list_show_tickdevices_header(NULL);
+	timer_list_show_tickdevices_header(m);
 	for_each_online_cpu(cpu)
-		print_tickdevice(NULL, tick_get_device(cpu), cpu);
+		print_tickdevice(m, tick_get_device(cpu), cpu);
 #endif
-	return;
-}
 
 static void *move_iter(struct timer_list_iter *iter, loff_t offset)
 {
@@ -334,28 +320,21 @@ static void *timer_list_next(struct seq_file *file, void *v, loff_t *offset)
 	return move_iter(iter, 1);
 }
 
-static void timer_list_stop(struct seq_file *seq, void *v)
+void sysrq_timer_list_show(void)
 {
+	timer_list_show(NULL, NULL);
 }
-
-static const struct seq_operations timer_list_sops = {
-	.start = timer_list_start,
-	.next = timer_list_next,
-	.stop = timer_list_stop,
-	.show = timer_list_show,
-};
 
 static int timer_list_open(struct inode *inode, struct file *filp)
 {
-	return seq_open_private(filp, &timer_list_sops,
-			sizeof(struct timer_list_iter));
+	return single_open(filp, timer_list_show, NULL);
 }
 
 static const struct file_operations timer_list_fops = {
 	.open		= timer_list_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
-	.release	= seq_release_private,
+	.release	= single_release,
 };
 
 static int __init init_timer_list_procfs(void)
