@@ -11,6 +11,8 @@
 #ifndef _ASM_X86_INTEL_MID_H
 #define _ASM_X86_INTEL_MID_H
 
+#include <linux/types.h>
+#include <linux/init.h>
 #include <linux/sfi.h>
 #include <linux/pci.h>
 #include <linux/platform_device.h>
