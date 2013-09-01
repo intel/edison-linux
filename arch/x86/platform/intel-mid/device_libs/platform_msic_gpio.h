@@ -12,5 +12,7 @@
 #ifndef _PLATFORM_MSIC_GPIO_H_
 #define _PLATFORM_MSIC_GPIO_H_
 
+#define MSIC_GPIO_DEVICE_NAME "msic_gpio"
+
 extern void __init *msic_gpio_platform_data(void *info) __attribute__((weak));
 #endif
