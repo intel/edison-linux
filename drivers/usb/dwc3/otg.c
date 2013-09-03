@@ -1,3 +1,60 @@
+/*
+ * otg.c - Designware USB3 DRD Controller OTG driver
+ *
+ * Authors: Wang Yu <yu.y.wang@intel.com>
+ *		Synopsys inc
+ *
+ * Description:
+ *
+ * This driver is developed base on dwc_otg3.c which provided by
+ * Synopsys company. Yu removed some unused features from it,
+ * for example: HNP/SRP/ADP support. Because haven't use these features
+ * so far. And add charger detection support into the state machine.
+ * Support SDP/CDP/DCP/Micro-ACA/ACA-Dock and SE1 USB charger type.
+ *
+ * Beside that, make all hardware dependence as arguments, which need
+ * vendor to implemented by themselves. For example: VBus drive, USB ID
+ * pin value and so on.
+ *
+ * To enable this OTG driver, user have to call dwc3_otg_register API to
+ * regiter one dwc3_otg_hw_ops object which include all hardware
+ * dependent code.
+ *
+ * License:
+ * Below declaration is copy from Synopsys DWC3 SW 2.10a released README.txt.
+ *
+ * IMPORTANT:
+ *
+ * Synopsys SS USB3 Linux Driver Software and documentation (hereinafter,
+ * "Software") is an Unsupported proprietary work of Synopsys, Inc. unless
+ * otherwise expressly agreed to in writing between Synopsys and you.
+ *
+ * The Software IS NOT an item of Licensed Software or Licensed Product under
+ * any End User Software License Agreement or Agreement for Licensed Product
+ * with Synopsys or any supplement thereto. You are permitted to use and
+ * redistribute this Software in source and binary forms, with or without
+ * modification, provided that redistributions of source code must retain this
+ * notice. You may not view, use, disclose, copy or distribute this file or
+ * any information contained herein except pursuant to this license grant from
+ * Synopsys. If you do not agree with this notice, including the disclaimer
+ * below, then you are not authorized to use the Software.
+ *
+ * THIS SOFTWARE IS BEING DISTRIBUTED BY SYNOPSYS SOLELY ON AN "AS IS" BASIS
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE HEREBY DISCLAIMED. IN NO EVENT SHALL SYNOPSYS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+ * DAMAGE.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/pci.h>
@@ -1444,7 +1501,7 @@ static void __exit dwc_otg_exit(void)
 }
 module_exit(dwc_otg_exit);
 
-MODULE_AUTHOR("Wang Yu <yu.y.wang@intel.com>");
-MODULE_DESCRIPTION("DWC3 OTG-PCI Driver");
+MODULE_AUTHOR("Synopsys, Inc and Wang Yu <yu.y.wang@intel.com>");
+MODULE_DESCRIPTION("DWC3 OTG Driver");
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_VERSION("1.0");
