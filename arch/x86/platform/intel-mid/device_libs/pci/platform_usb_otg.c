@@ -15,58 +15,15 @@
 #include <asm/intel_scu_ipc.h>
 #include <linux/dma-mapping.h>
 
-#ifdef CONFIG_USB_DWC_OTG_XCEIV
-#include <linux/usb/dwc_otg3.h>
-
-static bool dwc_otg_get_usbspecoverride(void)
-{
-	void __iomem *usb_comp_iomap;
-	bool usb_spec_override;
-
-	/* Read MISCFLAGS byte from offset 0x717 */
-	usb_comp_iomap = ioremap_nocache(0xFFFCE717, 4);
-	/* MISCFLAGS.BIT[6] indicates USB spec override */
-	usb_spec_override = ioread8(usb_comp_iomap) & 0x40;
-	iounmap(usb_comp_iomap);
-
-	return usb_spec_override;
-}
-
-
+#ifdef CONFIG_USB_DWC3_OTG
+#include <linux/usb/dwc3-intel-mrfl.h>
 static struct intel_dwc_otg_pdata dwc_otg_pdata;
 static struct intel_dwc_otg_pdata *get_otg_platform_data(struct pci_dev *pdev)
 {
 	switch (pdev->device) {
-	case PCI_DEVICE_ID_INTEL_MRFLD_OTG:
+	case PCI_DEVICE_ID_INTEL_MRFL_DWC3_OTG:
 		if (intel_mid_identify_sim() == INTEL_MID_CPU_SIMULATION_HVP)
 			dwc_otg_pdata.is_hvp = 1;
-
-		dwc_otg_pdata.charging_compliance =
-			dwc_otg_get_usbspecoverride();
-
-		/* The dwc3 hibernation mode with D3hot can't be work.
-		 * So enable SW workaround for it until silicon fix.
-		 */
-		return &dwc_otg_pdata;
-	case PCI_DEVICE_ID_INTEL_BYT_OTG:
-		dwc_otg_pdata.is_hvp = 1;
-		dwc_otg_pdata.no_device_mode = 0;
-		dwc_otg_pdata.no_host_mode = 1;
-		dwc_otg_pdata.is_byt = 1;
-
-		/* FIXME: Hardcode now, but need to use ACPI table for GPIO */
-		if (INTEL_MID_BOARD(3, TABLET, BYT, BLK, PRO, RVP3) ||
-			INTEL_MID_BOARD(3, TABLET, BYT, BLK, ENG, RVP3)) {
-			pr_info("This is BYT RVP\n");
-			dwc_otg_pdata.gpio_cs = 156;
-			dwc_otg_pdata.gpio_reset = 144;
-		} else if (INTEL_MID_BOARD(3, TABLET, BYT, BLK, PRO, 10PR11) ||
-			INTEL_MID_BOARD(3, TABLET, BYT, BLK, ENG, 10PR11)) {
-			pr_info("This is BYT FFRD10 PRx\n");
-			dwc_otg_pdata.gpio_cs = 54;
-			dwc_otg_pdata.gpio_reset = 144;
-		}
-
 		return &dwc_otg_pdata;
 	default:
 		break;
@@ -74,7 +31,6 @@ static struct intel_dwc_otg_pdata *get_otg_platform_data(struct pci_dev *pdev)
 
 	return NULL;
 }
-
 #endif
 
 #ifdef CONFIG_USB_PENWELL_OTG
@@ -133,7 +89,7 @@ DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_MFD_OTG,
 			otg_pci_early_quirks);
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_CLV_OTG,
 			otg_pci_early_quirks);
-DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_MRFLD_OTG,
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_MRFL_DWC3_OTG,
 			otg_pci_early_quirks);
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_BYT_OTG,
 			otg_pci_early_quirks);
