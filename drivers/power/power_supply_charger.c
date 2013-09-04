@@ -253,7 +253,7 @@ static void init_charger_cables(struct charger_cable *cable_lst, int count)
 		}
 	}
 
-	if (!otg_get_chr_status(otg_xceiver, &cap))
+	if (!otg_get_chrg_status(otg_xceiver, &cap))
 		process_cable_props(&cap);
 
 }
