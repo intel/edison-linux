@@ -98,8 +98,6 @@ struct dwc_device_par {
 #define GUSB2PHYACC0_VCTRL(v)  ((v & 0xFF) << 8)
 #define GUSB2PHYACC0_REGDATA(v)  (v & 0xFF)
 #define GUSB2PHYACC0_REGDATA_MASK  0xFF
-#define DATACON_TIMEOUT		750
-#define DATACON_INTERVAL	10
 
 #define GUSB3PIPECTL0                           0xc2c0
 #define GUSB3PIPECTL_SUS_EN                     0x20000
