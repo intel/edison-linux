@@ -36,6 +36,14 @@
 #define VWARN_EN_MASK		B3
 #define ICCMAXVCC_EN_MASK	B6
 
+#define MVWARN1_MASK		B0
+#define MVWARN2_MASK		B1
+#define MVCRIT_MASK		B2
+
+#define MVCRIT			B2
+#define MVWARN2			B1
+#define MVWARN1			B0
+
 #define ICCMAXVCC_EN		(1 << 6)
 #define VWARN_EN		(1 << 3)
 #define VCRIT_SHUTDOWN		(1 << 4)
