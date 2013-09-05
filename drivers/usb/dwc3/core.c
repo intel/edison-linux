@@ -256,7 +256,8 @@ static void dwc3_event_buffers_cleanup(struct dwc3 *dwc)
 		dwc3_writel(dwc->regs, DWC3_GEVNTADRLO(n), 0);
 		dwc3_writel(dwc->regs, DWC3_GEVNTADRHI(n), 0);
 		dwc3_writel(dwc->regs, DWC3_GEVNTSIZ(n), 0);
-		dwc3_writel(dwc->regs, DWC3_GEVNTCOUNT(n), 0);
+		dwc3_writel(dwc->regs, DWC3_GEVNTCOUNT(n),
+			dwc3_readl(dwc->regs, DWC3_GEVNTCOUNT(n)));
 	}
 }
 
