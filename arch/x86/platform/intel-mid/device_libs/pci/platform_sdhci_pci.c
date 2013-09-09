@@ -439,12 +439,8 @@ static struct sdhci_pci_data *get_sdhci_platform_data(struct pci_dev *pdev)
 			break;
 		case 2:
 			pdata = &mrfl_sdhci_pci_data[SD_INDEX];
-			/* REVERTME: disable SD card temporarily for bring up
-			 * revert this change once GPIO driver is updated
-			 * with Merrifield specific changes
-			 * if (intel_mid_identify_sim() ==
+			if (intel_mid_identify_sim() ==
 					INTEL_MID_CPU_SIMULATION_HVP)
-			 */
 				pdata->platform_quirks |=
 					PLFM_QUIRK_NO_HOST_CTRL_HW;
 			break;
