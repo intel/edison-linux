@@ -183,6 +183,8 @@ extern void mrfld_early_console_init(void);
 extern struct console early_hsu_console;
 extern void hsu_early_console_init(const char *);
 
+extern struct console early_pti_console;
+
 extern void intel_scu_devices_create(void);
 extern void intel_scu_devices_destroy(void);
 
