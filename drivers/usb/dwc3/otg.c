@@ -793,9 +793,6 @@ int otg_main_thread(void *data)
 	/* Allow the thread to be frozen */
 	set_freezable();
 
-	/* Set device mode as default for EM driver WA */
-	otg->user_events |= USER_ID_B_CHANGE_EVENT;
-
 	otg_dbg(otg, "Thread running\n");
 	while (otg->state != DWC_STATE_TERMINATED) {
 		int next = DWC_STATE_B_IDLE;
