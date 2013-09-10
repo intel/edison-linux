@@ -58,6 +58,9 @@
 #include "device_libs/platform_msic_thermal.h"
 #include "device_libs/platform_msic_adc.h"
 #include "device_libs/platform_bcove_adc.h"
+#include <asm/platform_mrfld_audio.h>
+#include <asm/platform_ctp_audio.h>
+#include "device_libs/platform_mrfl_thermal.h"
 
 /*
  * I2C devices
@@ -126,6 +129,8 @@ struct devs_id __initconst device_ids[] = {
 	{"msic_thermal", SFI_DEV_TYPE_IPC, 1, &msic_thermal_platform_data,
 					&ipc_device_handler},
 	{"bcove_adc", SFI_DEV_TYPE_IPC, 1, &bcove_adc_platform_data,
+					&ipc_device_handler},
+	{"bcove_thrm", SFI_DEV_TYPE_IPC, 1, &mrfl_thermal_platform_data,
 					&ipc_device_handler},
 
 	/* I2C devices */
