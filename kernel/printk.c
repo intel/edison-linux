@@ -363,6 +363,13 @@ static void log_store(int facility, int level,
 	log_next_seq++;
 }
 
+/* Clears the ring-buffer */
+void log_buf_clear(void)
+{
+	clear_seq = log_next_seq;
+	clear_idx = log_next_idx;
+}
+
 #ifdef CONFIG_SECURITY_DMESG_RESTRICT
 int dmesg_restrict = 1;
 #else
