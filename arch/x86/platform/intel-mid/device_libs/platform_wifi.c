@@ -75,7 +75,9 @@ void __init *wifi_platform_data(void *info)
 	pr_err("Using WiFi platform data\n");
 
 	/* Set vendor specific SDIO quirks */
+#ifdef CONFIG_MMC_SDHCI_PCI
 	sdhci_pdata_set_quirks(sdhci_quirk);
+#endif
 
 #ifndef CONFIG_ACPI
 	/* We are SFI here, register platform device */
