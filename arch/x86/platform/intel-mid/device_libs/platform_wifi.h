@@ -15,6 +15,6 @@
 #define WIFI_SFI_GPIO_IRQ_NAME "WLAN-interrupt"
 #define WIFI_SFI_GPIO_ENABLE_NAME "WLAN-enable"
 
-extern void __init *wifi_platform_data(void *info);
+extern void __init *wifi_platform_data(void *info) __attribute__((weak));
 
 #endif

@@ -270,8 +270,7 @@ config WIFI_CONTROL_FUNC
 	  Enables Power/Reset/Carddetect function abstraction
 
 config WIFI_PLATFORM_DATA
-	bool
-	default y
+	bool "Enable WiFi platform data"
 	---help---
 	 Enables platform_wifi
 
