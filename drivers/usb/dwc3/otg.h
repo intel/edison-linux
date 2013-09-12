@@ -403,6 +403,7 @@ struct dwc_otg2 {
 
 #define VBUS_TIMEOUT	300
 #define PCI_DEVICE_ID_DWC 0x119E
+#define PCI_DEVICE_ID_DWC_VLV 0x0F37
 
 enum dwc3_otg_mode {
 	DWC3_DEVICE_ONLY,
