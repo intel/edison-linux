@@ -63,9 +63,3 @@ config BRCMDBG
 	depends on BRCMSMAC || BRCMFMAC
 	---help---
 	  Selecting this enables additional code for debug purposes.
-
-config BCM43XX_PLATFORM_DATA
-	bool
-	default y
-	---help---
-	 Enables platform_bcm43xx
