@@ -470,6 +470,9 @@ static int xhci_dwc_drv_probe(struct platform_device *pdev)
 
 	usb_put_phy(usb_phy);
 
+	/* Enable wakeup irq */
+	hcd->has_wakeup_irq = 1;
+
 	platform_set_drvdata(pdev, hcd);
 	pm_runtime_enable(hcd->self.controller);
 
