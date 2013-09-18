@@ -128,6 +128,8 @@ struct sdhci_host {
 	/* XXX: SCU/X86 mutex variables base address in shared SRAM */
 	void __iomem *sram_addr;        /* Shared SRAM address */
 
+	void __iomem *rte_addr;	/* IOAPIC RTE register address */
+
 #define DEKKER_EMMC_OWNER_OFFSET        0
 #define DEKKER_IA_REQ_OFFSET            0x04
 #define DEKKER_SCU_REQ_OFFSET           0x08
