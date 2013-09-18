@@ -670,6 +670,9 @@ static int intel_mrfl_mmc_probe_slot(struct sdhci_pci_slot *slot)
 	if (PCI_FUNC(slot->chip->pdev->devfn) == INTEL_MRFL_EMMC_0)
 		sdhci_alloc_panic_host(slot->host);
 
+	if (PCI_FUNC(slot->chip->pdev->devfn) == INTEL_MRFL_EMMC_0)
+		mrfl_ioapic_rte_reg_addr_map(slot);
+
 	slot->host->mmc->caps2 |= MMC_CAP2_INIT_CARD_SYNC |
 		MMC_CAP2_POLL_R1B_BUSY;
 

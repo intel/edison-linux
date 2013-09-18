@@ -2402,6 +2402,20 @@ static void sdhci_tasklet_finish(unsigned long param)
 	sdhci_release_ownership(host->mmc);
 }
 
+static void dump_rte_apic_reg(struct sdhci_host *host, void __iomem *idx_addr)
+{
+	unsigned int rte_lo, rte_hi;
+
+	writeb(0x10 + 2 * host->irq, idx_addr);
+	rte_lo = readl(host->rte_addr + 0x10);
+
+	writeb(0x10 + 2 * host->irq + 1, idx_addr);
+	rte_hi = readl(host->rte_addr + 0x10);
+
+	pr_err("%s: dump APIC RTE reg - L32: 0x%08x, H32: 0x%08x\n",
+		mmc_hostname(host->mmc), rte_lo, rte_hi);
+}
+
 static void sdhci_timeout_timer(unsigned long data)
 {
 	struct sdhci_host *host;
@@ -2415,6 +2429,9 @@ static void sdhci_timeout_timer(unsigned long data)
 		pr_err("%s: Timeout waiting for hardware "
 			"interrupt.\n", mmc_hostname(host->mmc));
 		sdhci_dumpregs(host);
+
+		if (host->rte_addr)
+			dump_rte_apic_reg(host, host->rte_addr);
 
 		if (host->data) {
 			host->data->error = -ETIMEDOUT;
