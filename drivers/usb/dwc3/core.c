@@ -53,6 +53,7 @@
 #include <linux/usb/otg.h>
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
+#include <linux/usb/ulpi.h>
 
 #include "core.h"
 #include "gadget.h"
