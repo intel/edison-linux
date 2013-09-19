@@ -111,6 +111,9 @@ static int mrfld_pmu_init(void)
 		mid_pmu_cxt->os_sss[0] |= SSMSK(D0I3_MASK, PMU_PSH_LSS_00);
 	}
 
+	/* Disable the Interrupt Enable bit in PM ICS register */
+	pmu_clear_interrupt_enable();
+
 	return PMU_SUCCESS;
 
 err3:
@@ -264,8 +267,10 @@ void platform_update_all_lss_states(struct pmu_ss_states *pmu_config,
 static bool mrfld_pmu_enter(int s0ix_state)
 {
 	mid_pmu_cxt->s0ix_entered = s0ix_state;
-	if (s0ix_state == MID_S3_STATE)
+	if (s0ix_state == MID_S3_STATE) {
 		mid_pmu_cxt->pmu_current_state = SYS_STATE_S3;
+		pmu_set_interrupt_enable();
+	}
 
 	return true;
 }
@@ -387,6 +392,10 @@ void s0ix_complete(void)
 {
 	if (mid_pmu_cxt->s0ix_entered) {
 		log_wakeup_irq();
+
+		if (mid_pmu_cxt->s0ix_entered == SYS_STATE_S3)
+			pmu_clear_interrupt_enable();
+
 		mid_pmu_cxt->pmu_current_state	=
 		mid_pmu_cxt->s0ix_entered	= 0;
 	}
