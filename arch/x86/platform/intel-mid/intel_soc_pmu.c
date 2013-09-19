@@ -272,7 +272,7 @@ void log_wakeup_irq(void)
 	return;
 }
 
-static int pmu_interrupt_pending(void)
+static inline int pmu_interrupt_pending(void)
 {
 	u32 temp;
 	union pmu_pm_ics result;
@@ -314,7 +314,7 @@ void pmu_set_interrupt_enable(void)
 	writel(temp, &mid_pmu_cxt->pmu_reg->pm_ics);
 }
 
-static inline void pmu_clear_interrupt_enable(void)
+void pmu_clear_interrupt_enable(void)
 {
 	u32 temp;
 	union pmu_pm_ics result;
