@@ -375,6 +375,7 @@ struct platform_pmu_ops {
 	void (*set_power_state_ops) (int);
 	void (*set_s0ix_complete) (void);
 	int (*nc_set_power_state) (int, int, int, int *);
+	bool (*check_nc_sc_status) (void);
 };
 
 extern char s0ix[5];

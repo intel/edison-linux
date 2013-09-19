@@ -23,6 +23,26 @@
 u32 __iomem *residency[SYS_STATE_MAX];
 u32 __iomem *s0ix_counter[SYS_STATE_MAX];
 
+/* list of north complex devices */
+char *mrfl_nc_devices[] = {
+	"GFXSLC",
+	"GSDKCK",
+	"GRSCD",
+	"VED",
+	"VEC",
+	"DPA",
+	"DPB",
+	"DPC",
+	"VSP",
+	"ISP",
+	"MIO",
+	"HDMIO",
+	"GFXSLCLDO"
+};
+
+int mrfl_no_of_nc_devices =
+	sizeof(mrfl_nc_devices)/sizeof(mrfl_nc_devices[0]);
+
 static int mrfld_pmu_init(void)
 {
 	mid_pmu_cxt->s3_hint = MRFLD_S3_HINT;
@@ -118,6 +138,58 @@ err4:
 
 	pr_err("Cannot map memory to read S0ix count\n");
 	return PMU_FAILED;
+}
+
+/* This function checks north complex (NC) and
+ * south complex (SC) device status in MRFLD.
+ * returns TRUE if all NC and SC devices are in d0i3
+ * else FALSE.
+ */
+static bool mrfld_nc_sc_status_check(void)
+{
+	int i;
+	u32 val, nc_pwr_sts;
+	struct pmu_ss_states cur_pmsss;
+	bool nc_status, sc_status;
+
+	/* assuming nc and sc are good */
+	nc_status = true;
+	sc_status = true;
+
+	/* Check south complex device status */
+	pmu_read_sss(&cur_pmsss);
+
+	if (!(((cur_pmsss.pmu2_states[0] & S0IX_TARGET_SSS0_MASK) ==
+					 S0IX_TARGET_SSS0) &&
+		((cur_pmsss.pmu2_states[1] & S0IX_TARGET_SSS1_MASK) ==
+					 S0IX_TARGET_SSS1) &&
+		((cur_pmsss.pmu2_states[2] & S0IX_TARGET_SSS2_MASK) ==
+					 S0IX_TARGET_SSS2) &&
+		((cur_pmsss.pmu2_states[3] & S0IX_TARGET_SSS3_MASK) ==
+					 (S0IX_TARGET_SSS3)))) {
+		sc_status = false;
+		pr_warn("SC device/devices not in d0i3!!\n");
+	}
+
+	if (sc_status) {
+		/* Check north complex status */
+		nc_pwr_sts =
+			 intel_mid_msgbus_read32(PUNIT_PORT, NC_PM_SSS);
+		/* loop through the status to see if any of nc power island
+		 * is not in D0i3 state
+		 */
+		for (i = 0; i < mrfl_no_of_nc_devices; i++) {
+			val = nc_pwr_sts & 3;
+			if (val != 3) {
+				nc_status = false;
+				pr_warn("NC device/devices is not in D0i3!!\n");
+				break;
+			}
+			nc_pwr_sts >>= BITS_PER_LSS;
+		}
+	}
+
+	return nc_status & sc_status;
 }
 
 /* FIXME: Need to start the counter only if debug is
@@ -325,4 +397,5 @@ struct platform_pmu_ops mrfld_pmu_ops = {
 	.enter	 = mrfld_pmu_enter,
 	.set_s0ix_complete = s0ix_complete,
 	.nc_set_power_state = mrfld_nc_set_power_state,
+	.check_nc_sc_status = mrfld_nc_sc_status_check,
 };
