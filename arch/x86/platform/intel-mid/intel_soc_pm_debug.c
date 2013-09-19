@@ -1327,24 +1327,7 @@ void pmu_stats_finish(void)
 
 #endif /*if CONFIG_X86_MDFLD_POWER || CONFIG_X86_CLV_POWER*/
 
-#ifdef CONFIG_INTEL_REMOVEME_ATOM_MRFLD_POWER
-static char *nc_devices[] = {
-	"GFXSLC",
-	"GSDKCK",
-	"GRSCD",
-	"VED",
-	"VEC",
-	"DPA",
-	"DPB",
-	"DPC",
-	"VSP",
-	"ISP",
-	"MIO",
-	"HDMIO",
-	"GFXSLCLDO"
-};
-
-static int no_of_nc_devices = sizeof(nc_devices)/sizeof(nc_devices[0]);
+#ifdef CONFIG_REMOVEME_INTEL_ATOM_MRFLD_POWER
 
 static void pmu_stat_seq_printf(struct seq_file *s, int type, char *typestr)
 {
@@ -1460,10 +1443,10 @@ static int pmu_devices_state_show(struct seq_file *s, void *unused)
 	seq_printf(s, "\nNORTH COMPLEX DEVICES :\n\n");
 
 	nc_pwr_sts = intel_mid_msgbus_read32(PUNIT_PORT, NC_PM_SSS);
-	for (i = 0; i < no_of_nc_devices; i++) {
+	for (i = 0; i < mrfl_no_of_nc_devices; i++) {
 		val = nc_pwr_sts & 3;
 		nc_pwr_sts >>= BITS_PER_LSS;
-		seq_printf(s, "%9s : %s\n", nc_devices[i], dstates[val]);
+		seq_printf(s, "%9s : %s\n", mrfl_nc_devices[i], dstates[val]);
 	}
 
 	seq_printf(s, "\nSOUTH COMPLEX DEVICES :\n\n");
