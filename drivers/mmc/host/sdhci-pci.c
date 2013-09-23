@@ -108,6 +108,7 @@ struct sdhci_pci_chip {
 	unsigned int		quirks;
 	unsigned int		quirks2;
 	bool			allow_runtime_pm;
+	unsigned int		autosuspend_delay;
 	const struct sdhci_pci_fixes *fixes;
 
 	int			num_slots;	/* Slots on controller */
@@ -599,6 +600,15 @@ static int byt_emmc_probe_slot(struct sdhci_pci_slot *slot)
 static int byt_sdio_probe_slot(struct sdhci_pci_slot *slot)
 {
 	slot->host->mmc->caps |= MMC_CAP_POWER_OFF_CARD | MMC_CAP_NONREMOVABLE;
+	switch (slot->chip->pdev->device) {
+	case PCI_DEVICE_ID_INTEL_BYT_SDIO:
+		/* add a delay after runtime resuming back from D0i3 */
+		slot->chip->pdev->d3_delay = 10;
+		/* reduce the auto suspend delay for SDIO to be 500ms */
+		slot->chip->autosuspend_delay = 500;
+		break;
+	}
+
 	return 0;
 }
 
@@ -2100,11 +2110,20 @@ static void sdhci_pci_remove_slot(struct sdhci_pci_slot *slot)
 	sdhci_free_host(slot->host);
 }
 
-static void sdhci_pci_runtime_pm_allow(struct device *dev)
+static void sdhci_pci_runtime_pm_allow(struct sdhci_pci_chip *chip)
 {
+	struct device *dev;
+
+	if (!chip || !chip->pdev)
+		return;
+
+	dev = &chip->pdev->dev;
 	pm_runtime_put_noidle(dev);
 	pm_runtime_allow(dev);
-	pm_runtime_set_autosuspend_delay(dev, 50);
+	if (chip->autosuspend_delay)
+		pm_runtime_set_autosuspend_delay(dev, chip->autosuspend_delay);
+	else
+		pm_runtime_set_autosuspend_delay(dev, 50);
 	pm_runtime_use_autosuspend(dev);
 	pm_suspend_ignore_children(dev, 1);
 }
@@ -2202,7 +2221,7 @@ static int sdhci_pci_probe(struct pci_dev *pdev,
 	}
 
 	if (chip->allow_runtime_pm)
-		sdhci_pci_runtime_pm_allow(&pdev->dev);
+		sdhci_pci_runtime_pm_allow(chip);
 
 	return 0;
 
