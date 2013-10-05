@@ -1406,6 +1406,13 @@ static inline void mwait_play_dead(void)
 
 	wbinvd();
 
+	/*
+	 * FIXME: SCU will abort S3 entry with ACK C6 timeout
+	 * if the lapic timer value programmed is low.
+	 * Hence program a high value before offlineing the CPU
+	 */
+	apic_write(APIC_TMICT, ~0);
+
 	while (1) {
 		/*
 		 * The CLFLUSH is a workaround for erratum AAI65 for
