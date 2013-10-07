@@ -70,6 +70,7 @@ int intel_mid_rproc_init(void)
 					RPROC_SCU, RP_FW_ACCESS);
 	register_rpmsg_service("rpmsg_ipc_util",
 					RPROC_SCU, RP_IPC_UTIL);
+	register_rpmsg_service("rpmsg_flis", RPROC_SCU, RP_FLIS_ACCESS);
 	register_rpmsg_service("rpmsg_watchdog", RPROC_SCU, RP_SET_WATCHDOG);
 	register_rpmsg_service("rpmsg_umip", RPROC_SCU, RP_UMIP_ACCESS);
 	register_rpmsg_service("rpmsg_osip", RPROC_SCU, RP_OSIP_ACCESS);

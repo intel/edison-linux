@@ -14,5 +14,4 @@
 
 #define FLIS_DEVICE_NAME "intel_scu_flis"
 
-#define CTP_PIN_NUM	217
 #endif

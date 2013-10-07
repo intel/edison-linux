@@ -790,7 +790,7 @@ config PVPANIC
 	  (guest) communicate panic events to the host.
 
 config INTEL_SCU_FLIS
-	tristate "scu flis driver config"
+	bool "scu flis driver config"
 	depends on INTEL_SCU_IPC
 	default y
 	help
