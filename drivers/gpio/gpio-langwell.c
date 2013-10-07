@@ -37,6 +37,11 @@
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
 #include <linux/irqdomain.h>
+#include <asm/intel_scu_flis.h>
+#include "gpiodebug.h"
+
+#define IRQ_TYPE_EDGE	(1 << 0)
+#define IRQ_TYPE_LEVEL	(1 << 1)
 
 /*
  * Langwell chip has 64 pins and thus there are 2 32bit registers to control
@@ -61,14 +66,137 @@ enum GPIO_REG {
 	GFER,		/* falling edge detect */
 	GEDR,		/* edge detect result */
 	GAFR,		/* alt function */
+	GFBR = 9,	/* glitch filter bypas */
+	GPIT,		/* interrupt type */
+	GPIP = GFER,	/* level interrupt polarity */
+	GPIM = GRER,	/* level interrupt mask */
+
+	/* the following registers only exist on MRFLD */
+	GFBR_TNG = 6,
+	GIMR,		/* interrupt mask */
+	GISR,		/* interrupt source */
+	GITR = 32,	/* interrupt type */
+	GLPR = 33,	/* level-input polarity */
+};
+
+enum GPIO_CONTROLLERS {
+	LINCROFT_GPIO,
+	PENWELL_GPIO_AON,
+	PENWELL_GPIO_CORE,
+	CLOVERVIEW_GPIO_AON,
+	CLOVERVIEW_GPIO_CORE,
+	TANGIER_GPIO,
+};
+
+/* langwell gpio driver data */
+struct lnw_gpio_ddata_t {
+	u16 ngpio;		/* number of gpio pins */
+	u32 gplr_offset;	/* offset of first GPLR register from base */
+	u32 (*get_flis_offset)(int gpio);
+	u32 chip_irq_type;	/* chip interrupt type */
+};
+
+struct gpio_flis_pair {
+	int gpio;	/* gpio number */
+	int offset;	/* register offset from FLIS base */
+};
+
+/*
+ * The following mapping table lists the pin and flis offset pair
+ * of some key gpio pins, the offset of other gpios can be calculated
+ * from the table.
+ */
+static struct gpio_flis_pair gpio_flis_mapping_table[] = {
+	{ 0,	0x2900 },
+	{ 12,	0x2544 },
+	{ 14,	0x0958 },
+	{ 16,	0x2D18 },
+	{ 17,	0x1D10 },
+	{ 19,	0x1D00 },
+	{ 23,	0x1D18 },
+	{ 31,	-EINVAL }, /* No GPIO 31 in pin list */
+	{ 32,	0x1508 },
+	{ 44,	0x3500 },
+	{ 64,	0x2534 },
+	{ 68,	0x2D1C },
+	{ 70,	0x1500 },
+	{ 72,	0x3D00 },
+	{ 77,	0x0D00 },
+	{ 97,	0x0954 },
+	{ 98,	-EINVAL }, /* No GPIO 98-101 in pin list */
+	{ 102,	0x1910 },
+	{ 120,	0x1900 },
+	{ 124,	0x2100 },
+	{ 136,	-EINVAL }, /* No GPIO 136 in pin list */
+	{ 137,	0x2D00 },
+	{ 143,	-EINVAL }, /* No GPIO 143-153 in pin list */
+	{ 154,	0x092C },
+	{ 164,	0x3900 },
+	{ 177,	0x2500 },
+	{ 190,	0x2D50 },
+};
+
+static u32 get_flis_offset_by_gpio(int gpio)
+{
+	int i;
+	int start;
+	u32 offset = -EINVAL;
+
+	for (i = 0; i < ARRAY_SIZE(gpio_flis_mapping_table) - 1; i++) {
+		if (gpio >= gpio_flis_mapping_table[i].gpio
+			&& gpio < gpio_flis_mapping_table[i + 1].gpio)
+			break;
+	}
+
+	start = gpio_flis_mapping_table[i].gpio;
+
+	if (gpio_flis_mapping_table[i].offset != -EINVAL) {
+		offset = gpio_flis_mapping_table[i].offset
+				+ (gpio - start) * 4;
+	}
+
+	return offset;
+}
+
+static struct lnw_gpio_ddata_t lnw_gpio_ddata[] = {
+	[LINCROFT_GPIO] = {
+		.ngpio = 64,
+	},
+	[PENWELL_GPIO_AON] = {
+		.ngpio = 96,
+		.chip_irq_type = IRQ_TYPE_EDGE,
+	},
+	[PENWELL_GPIO_CORE] = {
+		.ngpio = 96,
+		.chip_irq_type = IRQ_TYPE_EDGE,
+	},
+	[CLOVERVIEW_GPIO_AON] = {
+		.ngpio = 96,
+		.chip_irq_type = IRQ_TYPE_EDGE | IRQ_TYPE_LEVEL,
+	},
+	[CLOVERVIEW_GPIO_CORE] = {
+		.ngpio = 96,
+		.chip_irq_type = IRQ_TYPE_EDGE,
+	},
+	[TANGIER_GPIO] = {
+		.ngpio = 192,
+		.gplr_offset = 4,
+		.get_flis_offset = get_flis_offset_by_gpio,
+		.chip_irq_type = IRQ_TYPE_EDGE | IRQ_TYPE_LEVEL,
+	},
 };
 
 struct lnw_gpio {
-	struct gpio_chip		chip;
-	void				*reg_base;
-	spinlock_t			lock;
-	struct pci_dev			*pdev;
-	struct irq_domain		*domain;
+	struct gpio_chip	chip;
+	void			*reg_base;
+	void			*reg_gplr;
+	spinlock_t		lock;
+	struct pci_dev		*pdev;
+	struct irq_domain	*domain;
+	u32			(*get_flis_offset)(int gpio);
+	u32			chip_irq_type;
+	int			type;
+	struct gpio_debug	*debug;
 };
 
 #define to_lnw_priv(chip)	container_of(chip, struct lnw_gpio, chip)
@@ -81,8 +209,154 @@ static void __iomem *gpio_reg(struct gpio_chip *chip, unsigned offset,
 	u8 reg = offset / 32;
 	void __iomem *ptr;
 
-	ptr = (void __iomem *)(lnw->reg_base + reg_type * nreg * 4 + reg * 4);
+	/**
+	 * On TNG B0, GITR[0]'s address is 0xFF008300, while GPLR[0]'s address
+	 * is 0xFF008004. To count GITR[0]'s address, it's easier to count
+	 * from 0xFF008000. So for GITR,GLPR... we switch the base to reg_base.
+	 * This does not affect PNW/CLV, since the reg_gplr is the reg_base,
+	 * while on TNG, the reg_gplr has an offset of 0x4.
+	 */
+	base = reg_type < GITR ? lnw->reg_gplr : lnw->reg_base;
+	ptr = (void __iomem *)(base + reg_type * nreg * 4 + reg * 4);
 	return ptr;
+}
+
+void lnw_gpio_set_alt(int gpio, int alt)
+{
+	struct lnw_gpio *lnw;
+	u32 __iomem *mem;
+	int reg;
+	int bit;
+	u32 offset;
+	u32 value;
+	unsigned long flags;
+
+	/* use this trick to get memio */
+	lnw = irq_get_chip_data(gpio_to_irq(gpio));
+	if (!lnw) {
+		pr_err("langwell_gpio: can not find pin %d\n", gpio);
+		return;
+	}
+	if (gpio < lnw->chip.base || gpio >= lnw->chip.base + lnw->chip.ngpio) {
+		dev_err(lnw->chip.dev, "langwell_gpio: wrong pin %d to config alt\n", gpio);
+		return;
+	}
+#if 0
+	if (lnw->irq_base + gpio - lnw->chip.base != gpio_to_irq(gpio)) {
+		dev_err(lnw->chip.dev, "langwell_gpio: wrong chip data for pin %d\n", gpio);
+		return;
+	}
+#endif
+	gpio -= lnw->chip.base;
+
+	if (lnw->type != TANGIER_GPIO) {
+		reg = gpio / 16;
+		bit = gpio % 16;
+
+		mem = gpio_reg(&lnw->chip, 0, GAFR);
+		spin_lock_irqsave(&lnw->lock, flags);
+		value = readl(mem + reg);
+		value &= ~(3 << (bit * 2));
+		value |= (alt & 3) << (bit * 2);
+		writel(value, mem + reg);
+		spin_unlock_irqrestore(&lnw->lock, flags);
+		dev_dbg(lnw->chip.dev, "ALT: writing 0x%x to %p\n",
+			value, mem + reg);
+	} else {
+		offset = lnw->get_flis_offset(gpio);
+		if (WARN(offset == -EINVAL, "invalid pin %d\n", gpio))
+			return;
+
+		spin_lock_irqsave(&lnw->lock, flags);
+		value = get_flis_value(offset);
+		value &= ~7;
+		value |= (alt & 7);
+		set_flis_value(value, offset);
+		spin_unlock_irqrestore(&lnw->lock, flags);
+	}
+}
+EXPORT_SYMBOL_GPL(lnw_gpio_set_alt);
+
+int gpio_get_alt(int gpio)
+{
+	struct lnw_gpio *lnw;
+	u32 __iomem *mem;
+	int reg;
+	int bit;
+	u32 value;
+	u32 offset;
+
+	 /* use this trick to get memio */
+	lnw = irq_get_chip_data(gpio_to_irq(gpio));
+	if (!lnw) {
+		pr_err("langwell_gpio: can not find pin %d\n", gpio);
+		return -1;
+	}
+	if (gpio < lnw->chip.base || gpio >= lnw->chip.base + lnw->chip.ngpio) {
+		dev_err(lnw->chip.dev,
+			"langwell_gpio: wrong pin %d to config alt\n", gpio);
+		return -1;
+	}
+#if 0
+	if (lnw->irq_base + gpio - lnw->chip.base != gpio_to_irq(gpio)) {
+		dev_err(lnw->chip.dev,
+			"langwell_gpio: wrong chip data for pin %d\n", gpio);
+		return -1;
+	}
+#endif
+	gpio -= lnw->chip.base;
+
+	if (lnw->type != TANGIER_GPIO) {
+		reg = gpio / 16;
+		bit = gpio % 16;
+
+		mem = gpio_reg(&lnw->chip, 0, GAFR);
+		value = readl(mem + reg);
+		value &= (3 << (bit * 2));
+		value >>= (bit * 2);
+	} else {
+		offset = lnw->get_flis_offset(gpio);
+		if (WARN(offset == -EINVAL, "invalid pin %d\n", gpio))
+			return -EINVAL;
+
+		value = get_flis_value(offset) & 7;
+	}
+
+	return value;
+}
+EXPORT_SYMBOL_GPL(gpio_get_alt);
+
+static int lnw_gpio_set_debounce(struct gpio_chip *chip, unsigned offset,
+				 unsigned debounce)
+{
+	struct lnw_gpio *lnw = to_lnw_priv(chip);
+	void __iomem *gfbr;
+	unsigned long flags;
+	u32 value;
+	enum GPIO_REG reg_type;
+
+	reg_type = (lnw->type == TANGIER_GPIO) ? GFBR_TNG : GFBR;
+	gfbr = gpio_reg(chip, offset, reg_type);
+
+	if (lnw->pdev)
+		pm_runtime_get(&lnw->pdev->dev);
+
+	spin_lock_irqsave(&lnw->lock, flags);
+	value = readl(gfbr);
+	if (debounce) {
+		/* debounce bypass disable */
+		value &= ~BIT(offset % 32);
+	} else {
+		/* debounce bypass enable */
+		value |= BIT(offset % 32);
+	}
+	writel(value, gfbr);
+	spin_unlock_irqrestore(&lnw->lock, flags);
+
+	if (lnw->pdev)
+		pm_runtime_put(&lnw->pdev->dev);
+
+	return 0;
 }
 
 static void __iomem *gpio_reg_2bit(struct gpio_chip *chip, unsigned offset,
@@ -266,6 +540,400 @@ static void lnw_irq_handler(unsigned irq, struct irq_desc *desc)
 
 	chip->irq_eoi(data);
 }
+
+static char conf_reg_msg[] =
+	"\nGPIO configuration register:\n"
+	"\t[ 2: 0]\tpinmux\n"
+	"\t[ 6: 4]\tpull strength\n"
+	"\t[ 8: 8]\tpullup enable\n"
+	"\t[ 9: 9]\tpulldown enable\n"
+	"\t[10:10]\tslew A, B setting\n"
+	"\t[12:12]\toverride input enable\n"
+	"\t[13:13]\toverride input enable enable\n"
+	"\t[14:14]\toverride output enable\n"
+	"\t[15:15]\toverride output enable enable\n"
+	"\t[16:16]\toverride input value\n"
+	"\t[17:17]\tenable input data override\n"
+	"\t[18:18]\toverride output value\n"
+	"\t[19:19]\tenable output data override\n"
+	"\t[21:21]\topen drain enable\n"
+	"\t[22:22]\tenable OVR_IOSTBY_VAL\n"
+	"\t[23:23]\tOVR_IOSTBY_VAL\n"
+	"\t[24:24]\tSBY_OUTDATAOV_EN\n"
+	"\t[25:25]\tSBY_INDATAOV_EN\n"
+	"\t[26:26]\tSBY_OVOUTEN_EN\n"
+	"\t[27:27]\tSBY_OVINEN_EN\n"
+	"\t[29:28]\tstandby pullmode\n"
+	"\t[30:30]\tstandby open drain mode\n";
+
+static char *pinvalue[] = {"low", "high"};
+static char *pindirection[] = {"in", "out"};
+static char *irqtype[] = {"irq_none", "edge_rising", "edge_falling",
+			"edge_both"};
+static char *pinmux[] = {"mode0", "mode1", "mode2", "mode3", "mode4", "mode5",
+			"mode6", "mode7"};
+static char *pullmode[] = {"nopull", "pullup", "pulldown"};
+static char *pullstrength[] = {"2k", "20k", "50k", "910ohms"};
+static char *enable[] = {"disable", "enable"};
+static char *override_direction[] = {"no-override", "override-enable",
+			"override-disable"};
+static char *override_value[] = {"no-override", "override-high",
+			"override-low"};
+static char *standby_trigger[] = {"no-override", "override-trigger",
+			"override-notrigger"};
+static char *standby_pupd_state[] = {"keep", "pulldown", "pullup", "nopull"};
+
+static int gpio_get_pinvalue(struct gpio_control *control, void *private_data,
+		unsigned gpio)
+{
+	struct lnw_gpio *lnw = private_data;
+	u32 value;
+
+	value = lnw_gpio_get(&lnw->chip, gpio);
+
+	return value ? 1 : 0;
+}
+
+static int gpio_set_pinvalue(struct gpio_control *control, void *private_data,
+		unsigned gpio, unsigned int num)
+{
+	struct lnw_gpio *lnw = private_data;
+
+	lnw_gpio_set(&lnw->chip, gpio, num);
+
+	return 0;
+}
+
+static int gpio_get_normal(struct gpio_control *control, void *private_data,
+		unsigned gpio)
+{
+	struct lnw_gpio *lnw = private_data;
+	u32 __iomem *mem;
+	u32 value;
+
+	mem = gpio_reg(&lnw->chip, gpio, control->reg);
+
+	value = readl(mem);
+	value &= BIT(gpio % 32);
+
+	if (control->invert)
+		return value ? 0 : 1;
+	else
+		return value ? 1 : 0;
+}
+
+static int gpio_set_normal(struct gpio_control *control, void *private_data,
+		unsigned gpio, unsigned int num)
+{
+	struct lnw_gpio *lnw = private_data;
+	u32 __iomem *mem;
+	u32 value;
+	unsigned long flags;
+
+	mem = gpio_reg(&lnw->chip, gpio, control->reg);
+
+	spin_lock_irqsave(&lnw->lock, flags);
+	value = readl(mem);
+	value &= ~BIT(gpio % 32);
+	if (control->invert) {
+		if (num)
+			value &= ~BIT(gpio % 32);
+		else
+			value |= BIT(gpio % 32);
+	} else {
+		if (num)
+			value |= BIT(gpio % 32);
+		else
+			value &= ~BIT(gpio % 32);
+	}
+	writel(value, mem);
+	spin_unlock_irqrestore(&lnw->lock, flags);
+
+	return 0;
+}
+
+static int gpio_get_irqtype(struct gpio_control *control, void *private_data,
+		unsigned gpio)
+{
+	struct lnw_gpio *lnw = private_data;
+	void __iomem *grer = gpio_reg(&lnw->chip, gpio, GRER);
+	void __iomem *gfer = gpio_reg(&lnw->chip, gpio, GFER);
+	u32 value;
+	int num;
+
+	value = readl(grer) & BIT(gpio % 32);
+	num = value ? 1 : 0;
+	value = readl(gfer) & BIT(gpio % 32);
+	if (num)
+		num = value ? 3 : 1;
+	else
+		num = value ? 2 : 0;
+
+	return num;
+}
+
+static int flis_get_normal(struct gpio_control *control, void *private_data,
+		unsigned gpio)
+{
+	struct lnw_gpio *lnw = private_data;
+	u32 offset, value;
+	int num;
+
+	if (lnw->type == TANGIER_GPIO) {
+		offset = lnw->get_flis_offset(gpio);
+		if (WARN(offset == -EINVAL, "invalid pin %d\n", gpio))
+			return -1;
+
+		value = get_flis_value(offset);
+		num = (value >> control->shift) & control->mask;
+		if (num < control->num)
+			return num;
+	}
+
+	return -1;
+}
+
+static int flis_set_normal(struct gpio_control *control, void *private_data,
+		unsigned gpio, unsigned int num)
+{
+	struct lnw_gpio *lnw = private_data;
+	u32 shift = control->shift;
+	u32 mask = control->mask;
+	u32 offset, value;
+	unsigned long flags;
+
+	if (lnw->type == TANGIER_GPIO) {
+		offset = lnw->get_flis_offset(gpio);
+		if (WARN(offset == -EINVAL, "invalid pin %d\n", gpio))
+			return -1;
+
+		spin_lock_irqsave(&lnw->lock, flags);
+		value = get_flis_value(offset);
+		value &= ~(mask << shift);
+		value |= ((num & mask) << shift);
+		set_flis_value(value, offset);
+		spin_unlock_irqrestore(&lnw->lock, flags);
+
+		return 0;
+	}
+
+	return -1;
+}
+
+static int flis_get_override(struct gpio_control *control, void *private_data,
+		unsigned gpio)
+{
+	struct lnw_gpio *lnw = private_data;
+	u32 offset, value;
+	u32 val_bit, en_bit;
+	int num;
+
+	if (lnw->type == TANGIER_GPIO) {
+		offset = lnw->get_flis_offset(gpio);
+		if (WARN(offset == -EINVAL, "invalid pin %d\n", gpio))
+			return -1;
+
+		val_bit = 1 << control->shift;
+		en_bit = 1 << control->rshift;
+
+		value = get_flis_value(offset);
+
+		if (value & en_bit)
+			if (value & val_bit)
+				num = 1;
+			else
+				num = 2;
+		else
+			num = 0;
+
+		return num;
+	}
+
+	return -1;
+}
+
+static int flis_set_override(struct gpio_control *control, void *private_data,
+		unsigned gpio, unsigned int num)
+{
+	struct lnw_gpio *lnw = private_data;
+	u32 offset, value;
+	u32 val_bit, en_bit;
+	unsigned long flags;
+
+	if (lnw->type == TANGIER_GPIO) {
+		offset = lnw->get_flis_offset(gpio);
+		if (WARN(offset == -EINVAL, "invalid pin %d\n", gpio))
+			return -1;
+
+		val_bit = 1 << control->shift;
+		en_bit = 1 << control->rshift;
+
+		spin_lock_irqsave(&lnw->lock, flags);
+		value = get_flis_value(offset);
+		switch (num) {
+		case 0:
+			value &= ~(en_bit | val_bit);
+			break;
+		case 1:
+			value |= (en_bit | val_bit);
+			break;
+		case 2:
+			value |= en_bit;
+			value &= ~val_bit;
+			break;
+		default:
+			break;
+		}
+		set_flis_value(value, offset);
+		spin_unlock_irqrestore(&lnw->lock, flags);
+
+		return 0;
+	}
+
+	return -1;
+}
+
+#define GPIO_VALUE_CONTROL(xtype, xinfo, xnum) \
+{	.type = xtype, .pininfo = xinfo, .num = xnum, \
+	.get = gpio_get_pinvalue, .set = gpio_set_pinvalue}
+#define GPIO_NORMAL_CONTROL(xtype, xinfo, xnum, xreg, xinvert) \
+{	.type = xtype, .pininfo = xinfo, .num = xnum, .reg = xreg, \
+	.invert = xinvert, .get = gpio_get_normal, .set = gpio_set_normal}
+#define GPIO_IRQTYPE_CONTROL(xtype, xinfo, xnum) \
+{	.type = xtype, .pininfo = xinfo, .num = xnum, \
+	.get = gpio_get_irqtype, .set = NULL}
+#define FLIS_NORMAL_CONTROL(xtype, xinfo, xnum, xshift, xmask) \
+{	.type = xtype, .pininfo = xinfo, .num = xnum, .shift = xshift, \
+	.mask = xmask, .get = flis_get_normal, .set = flis_set_normal}
+#define FLIS_OVERRIDE_CONTROL(xtype, xinfo, xnum, xshift, xrshift) \
+{	.type = xtype, .pininfo = xinfo, .num = xnum, .shift = xshift, \
+	.rshift = xrshift, .get = flis_get_override, .set = flis_set_override}
+
+static struct gpio_control lnw_gpio_controls[] = {
+GPIO_VALUE_CONTROL(TYPE_PIN_VALUE, pinvalue, 2),
+GPIO_NORMAL_CONTROL(TYPE_DIRECTION, pindirection, 2, GPDR, 0),
+GPIO_IRQTYPE_CONTROL(TYPE_IRQ_TYPE, irqtype, 4),
+GPIO_NORMAL_CONTROL(TYPE_DEBOUNCE, enable, 2, GFBR_TNG, 1),
+FLIS_NORMAL_CONTROL(TYPE_PINMUX, pinmux, 8, 0, 0x7),
+FLIS_NORMAL_CONTROL(TYPE_PULLSTRENGTH, pullstrength, 4, 4, 0x7),
+FLIS_NORMAL_CONTROL(TYPE_PULLMODE, pullmode, 3, 8, 0x3),
+FLIS_NORMAL_CONTROL(TYPE_OPEN_DRAIN, enable, 2, 21, 0x1),
+FLIS_OVERRIDE_CONTROL(TYPE_OVERRIDE_INDIR, override_direction, 3, 12, 13),
+FLIS_OVERRIDE_CONTROL(TYPE_OVERRIDE_OUTDIR, override_direction, 3, 14, 15),
+FLIS_OVERRIDE_CONTROL(TYPE_OVERRIDE_INVAL, override_value, 3, 16, 17),
+FLIS_OVERRIDE_CONTROL(TYPE_OVERRIDE_OUTVAL, override_value, 3, 18, 19),
+FLIS_OVERRIDE_CONTROL(TYPE_SBY_OVR_IO, standby_trigger, 3, 23, 22),
+FLIS_OVERRIDE_CONTROL(TYPE_SBY_OVR_OUTVAL, override_value, 3, 18, 24),
+FLIS_OVERRIDE_CONTROL(TYPE_SBY_OVR_INVAL, override_value, 3, 16, 25),
+FLIS_OVERRIDE_CONTROL(TYPE_SBY_OVR_OUTDIR, override_direction, 3, 14, 26),
+FLIS_OVERRIDE_CONTROL(TYPE_SBY_OVR_INDIR, override_direction, 3, 12, 27),
+FLIS_NORMAL_CONTROL(TYPE_SBY_PUPD_STATE, standby_pupd_state, 4, 28, 0x3),
+FLIS_NORMAL_CONTROL(TYPE_SBY_OD_DIS, enable, 2, 30, 0x1),
+};
+
+static unsigned int lnw_get_conf_reg(struct gpio_debug *debug, unsigned gpio)
+{
+	struct lnw_gpio *lnw = debug->private_data;
+	u32 offset, value = 0;
+
+	if (lnw->type == TANGIER_GPIO) {
+		offset = lnw->get_flis_offset(gpio);
+		if (WARN(offset == -EINVAL, "invalid pin %d\n", gpio))
+			return -EINVAL;
+
+		value = get_flis_value(offset);
+	}
+
+	return value;
+}
+
+static void lnw_set_conf_reg(struct gpio_debug *debug, unsigned gpio,
+		unsigned int value)
+{
+	struct lnw_gpio *lnw = debug->private_data;
+	u32 offset;
+
+	if (lnw->type == TANGIER_GPIO) {
+		offset = lnw->get_flis_offset(gpio);
+		if (WARN(offset == -EINVAL, "invalid pin %d\n", gpio))
+			return;
+
+		set_flis_value(value, offset);
+	}
+
+	return;
+}
+
+static char **lnw_get_avl_pininfo(struct gpio_debug *debug, unsigned gpio,
+		unsigned int type, unsigned *num)
+{
+	struct gpio_control *control;
+
+	control = find_gpio_control(lnw_gpio_controls,
+			ARRAY_SIZE(lnw_gpio_controls), type);
+	if (control == NULL)
+		return NULL;
+
+	*num = control->num;
+
+	return control->pininfo;
+}
+
+static char *lnw_get_cul_pininfo(struct gpio_debug *debug, unsigned gpio,
+		unsigned int type)
+{
+	struct lnw_gpio *lnw = debug->private_data;
+	struct gpio_control *control;
+	int num;
+
+	control = find_gpio_control(lnw_gpio_controls,
+			ARRAY_SIZE(lnw_gpio_controls), type);
+	if (control == NULL)
+		return NULL;
+
+	num = control->get(control, lnw, gpio);
+	if (num == -1)
+		return NULL;
+
+	return *(control->pininfo + num);
+}
+
+static void lnw_set_pininfo(struct gpio_debug *debug, unsigned gpio,
+		unsigned int type, const char *info)
+{
+	struct lnw_gpio *lnw = debug->private_data;
+	struct gpio_control *control;
+	int num;
+
+	control = find_gpio_control(lnw_gpio_controls,
+			ARRAY_SIZE(lnw_gpio_controls), type);
+	if (control == NULL)
+		return;
+
+	num = find_pininfo_num(control, info);
+	if (num == -1)
+		return;
+
+	if (control->set)
+		control->set(control, lnw, gpio, num);
+}
+
+static int lnw_get_register_msg(char **buf, unsigned long *size)
+{
+	*buf = conf_reg_msg;
+	*size = strlen(conf_reg_msg);
+
+	return 0;
+}
+
+static struct gpio_debug_ops lnw_gpio_debug_ops = {
+	.get_conf_reg = lnw_get_conf_reg,
+	.set_conf_reg = lnw_set_conf_reg,
+	.get_avl_pininfo = lnw_get_avl_pininfo,
+	.get_cul_pininfo = lnw_get_cul_pininfo,
+	.set_pininfo = lnw_set_pininfo,
+	.get_register_msg = lnw_get_register_msg,
+};
 
 static void lnw_irq_init_hw(struct lnw_gpio *lnw)
 {
