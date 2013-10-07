@@ -81,6 +81,17 @@ config GPIO_SYSFS
 	  Kernel drivers may also request that a particular GPIO be
 	  exported to userspace; this can be useful when debugging.
 
+config GPIODEBUG
+	tristate "GPIO Setting DEBUG"
+	depends on DEBUG_FS
+	help
+	  Say yes here to support GPIO/FLIS Setting Debug.
+
+	  This is mostly useful to dump and set gpio/flis conguration.
+
+	  Kernel drivers may also request that a particular GPIO be
+	  exported to userspace; this can be useful when debugging.
+
 config GPIO_GENERIC
 	tristate
 
