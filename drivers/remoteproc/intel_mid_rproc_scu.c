@@ -257,6 +257,7 @@ static void intel_rproc_scu_kick(struct rproc *rproc, int vqid)
 	struct intel_mid_rproc *iproc;
 	struct rproc_vdev *rvdev;
 	struct device *dev = rproc->dev.parent;
+	static unsigned long ns_info_all_received;
 
 	iproc = (struct intel_mid_rproc *)rproc->priv;
 
@@ -268,19 +269,21 @@ static void intel_rproc_scu_kick(struct rproc *rproc, int vqid)
 
 	switch (idx) {
 	case RX_VRING:
-		if (iproc->ns_enabled &&
-			!list_is_last(&iproc->ns_info->node, &nslist->list)) {
+		if (iproc->ns_enabled && !ns_info_all_received) {
+			/* push messages with ns_info for ALL available
+			name services in the list (nslist) into
+			rx buffers. */
 			list_for_each_entry_continue(iproc->ns_info,
 				&nslist->list, node) {
 				ret = intel_mid_rproc_ns_handle(iproc,
-						iproc->ns_info);
+					iproc->ns_info);
 				if (ret) {
 					dev_err(dev, "ns handle error\n");
 					return;
 				}
-				break;
 			}
 
+			ns_info_all_received = 1;
 			intel_mid_rproc_vq_interrupt(rproc, vqid);
 		}
 		break;
