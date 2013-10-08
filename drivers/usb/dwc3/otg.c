@@ -948,7 +948,7 @@ static int ulpi_read(struct usb_phy *phy, u32 reg)
 {
 	struct dwc_otg2 *otg = container_of(phy, struct dwc_otg2, usb2_phy);
 	u32 val32 = 0, count = 200;
-	u8 val;
+	u8 val, tmp;
 
 	reg &= 0xFF;
 
@@ -986,7 +986,7 @@ static int ulpi_read(struct usb_phy *phy, u32 reg)
 				  GUSB2PHYACC0_REGDATA_MASK;
 			otg_dbg(otg, "%s - reg 0x%x data 0x%x\n",
 					__func__, reg, val);
-			return val;
+			goto cleanup;
 		}
 
 		count--;
@@ -995,12 +995,22 @@ static int ulpi_read(struct usb_phy *phy, u32 reg)
 	otg_err(otg, "%s read PHY data failed.\n", __func__);
 
 	return -ETIMEDOUT;
+
+cleanup:
+	/* Clear GUSB2PHYACC0[16:21] before return.
+	 * Otherwise, it will cause PHY can't in workable
+	 * state. This is one dwc3 controller silicon bug. */
+	tmp = otg_read(otg, GUSB2PHYACC0);
+	otg_write(otg, GUSB2PHYACC0, tmp &
+			~GUSB2PHYACC0_REGADDR(0x3F));
+	return val;
 }
 
 static int ulpi_write(struct usb_phy *phy, u32 val, u32 reg)
 {
 	struct dwc_otg2 *otg = container_of(phy, struct dwc_otg2, usb2_phy);
 	u32 val32 = 0, count = 200;
+	u8 tmp;
 
 	val &= 0xFF;
 	reg &= 0xFF;
@@ -1040,7 +1050,7 @@ static int ulpi_write(struct usb_phy *phy, u32 val, u32 reg)
 		if (otg_read(otg, GUSB2PHYACC0) & GUSB2PHYACC0_VSTSDONE) {
 			otg_dbg(otg, "%s - reg 0x%x data 0x%x write done\n",
 					__func__, reg, val);
-			return 0;
+			goto cleanup;
 		}
 
 		count--;
@@ -1049,6 +1059,15 @@ static int ulpi_write(struct usb_phy *phy, u32 val, u32 reg)
 	otg_err(otg, "%s read PHY data failed.\n", __func__);
 
 	return -ETIMEDOUT;
+
+cleanup:
+	/* Clear GUSB2PHYACC0[16:21] before return.
+	 * Otherwise, it will cause PHY can't in workable
+	 * state. This is one dwc3 controller silicon bug. */
+	tmp = otg_read(otg, GUSB2PHYACC0);
+	otg_write(otg, GUSB2PHYACC0, tmp &
+			~GUSB2PHYACC0_REGADDR(0x3F));
+	return 0;
 }
 
 static struct usb_phy_io_ops dwc_otg_io_ops = {
