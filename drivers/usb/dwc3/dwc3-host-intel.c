@@ -49,7 +49,7 @@ static void xhci_dwc3_quirks(struct device *dev, struct xhci_hcd *xhci)
 	 * Synopsys DWC3 controller will generate PLC when link transfer to
 	 * compliance/loopback mode.
 	 */
-	xhci->quirks |= XHCI_PLAT; 
+	xhci->quirks |= XHCI_PLAT;
 }
 
 /* called during probe() after chip reset completes */
@@ -299,10 +299,6 @@ static int dwc3_start_host(struct usb_hcd *hcd)
 	dwc_silicon_wa(hcd);
 	dwc_set_host_mode(hcd);
 	dwc_set_ssphy_p3_clockrate(hcd);
-
-	/* Clear the hcd->flags.
-	 * To prevent incorrect flags set during last time. */
-	hcd->flags = 0;
 
 	/* Clear the hcd->flags.
 	 * To prevent incorrect flags set during last time. */
