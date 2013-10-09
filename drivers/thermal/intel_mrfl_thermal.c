@@ -699,7 +699,7 @@ static int mrfl_thermal_probe(struct platform_device *pdev)
 	 * Order of the channels obtained from adc:
 	 * "SYSTHERM0", "SYSTHERM1", "SYSTHERM2", "PMICDIE"
 	 */
-	tdata->iio_chan = iio_channel_get_all(dev);
+	tdata->iio_chan = iio_channel_get_all(&pdev->dev);
 	if (tdata->iio_chan == NULL) {
 		dev_err(&pdev->dev, "tdata->iio_chan is null\n");
 		ret = -EINVAL;

@@ -24,6 +24,7 @@ struct iio_dev;
 
 struct intel_basincove_gpadc_platform_data {
 	unsigned long intr;
+	struct iio_map *iio_maps;
 };
 
 struct gpadc_result {
