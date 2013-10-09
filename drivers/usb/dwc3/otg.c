@@ -1055,19 +1055,6 @@ static struct usb_phy_io_ops dwc_otg_io_ops = {
 	.write = ulpi_write,
 };
 
-static void dwc_a_bus_drop(struct usb_phy *x)
-{
-	struct dwc_otg2 *otg = the_transceiver;
-	unsigned long flags;
-
-	if (otg->usb2_phy.vbus_state == VBUS_DISABLED) {
-		spin_lock_irqsave(&otg->lock, flags);
-		otg->user_events |= USER_A_BUS_DROP;
-		dwc3_wakeup_otg_thread(otg);
-		spin_unlock_irqrestore(&otg->lock, flags);
-	}
-}
-
 static struct dwc_otg2 *dwc3_otg_alloc(struct device *dev)
 {
 	struct dwc_otg2 *otg = NULL;
@@ -1107,8 +1094,6 @@ static struct dwc_otg2 *dwc3_otg_alloc(struct device *dev)
 	otg->state = DWC_STATE_B_IDLE;
 	spin_lock_init(&otg->lock);
 	init_waitqueue_head(&otg->main_wq);
-	otg->usb2_phy.a_bus_drop = dwc_a_bus_drop;
-	otg->usb2_phy.vbus_state = VBUS_ENABLED;
 
 	/* Register otg notifier to monitor ID and VBus change events */
 	otg->nb.notifier_call = dwc_otg_handle_notification;
