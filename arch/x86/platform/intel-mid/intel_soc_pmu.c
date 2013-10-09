@@ -145,6 +145,10 @@ int pmu_set_devices_in_d0i0(void)
 	cur_pmssc.pmu2_states[2] = D0I0_MASK;
 	cur_pmssc.pmu2_states[3] = D0I0_MASK;
 
+	/* Restrict platform Cx state to C6 */
+	pm_qos_update_request(mid_pmu_cxt->cstate_qos,
+				(CSTATE_EXIT_LATENCY_S0i1-1));
+
 	down(&mid_pmu_cxt->scu_ready_sem);
 
 	mid_pmu_cxt->shutdown_started = true;
@@ -159,6 +163,10 @@ int pmu_set_devices_in_d0i0(void)
 		printk(KERN_CRIT "%s: Failed to Issue a PM command to PMU2\n",
 								__func__);
 		mid_pmu_cxt->shutdown_started = false;
+
+		/* allow s0ix now */
+		pm_qos_update_request(mid_pmu_cxt->cstate_qos,
+						PM_QOS_DEFAULT_VALUE);
 		goto unlock;
 	}
 
@@ -1902,6 +1910,10 @@ static void mid_pmu_shutdown(struct pci_dev *dev)
 	dev_dbg(&mid_pmu_cxt->pmu_dev->dev, "Mid PM mid_pmu_shutdown called\n");
 
 	if (mid_pmu_cxt) {
+		/* Restrict platform Cx state to C6 */
+		pm_qos_update_request(mid_pmu_cxt->cstate_qos,
+					(CSTATE_EXIT_LATENCY_S0i1-1));
+
 		down(&mid_pmu_cxt->scu_ready_sem);
 		mid_pmu_cxt->shutdown_started = true;
 		up(&mid_pmu_cxt->scu_ready_sem);
@@ -1954,6 +1966,10 @@ static int mid_suspend_begin(suspend_state_t state)
 {
 	mid_pmu_cxt->suspend_started = true;
 	pmu_s3_stats_update(1);
+
+	/* Restrict to C6 during suspend */
+	pm_qos_update_request(mid_pmu_cxt->cstate_qos,
+					(CSTATE_EXIT_LATENCY_S0i1-1));
 	return 0;
 }
 
@@ -2010,6 +2026,10 @@ static int mid_suspend_enter(suspend_state_t state)
 
 static void mid_suspend_end(void)
 {
+	/* allow s0ix now */
+	pm_qos_update_request(mid_pmu_cxt->cstate_qos,
+					PM_QOS_DEFAULT_VALUE);
+
 	pmu_s3_stats_update(0);
 	mid_pmu_cxt->suspend_started = false;
 }
