@@ -401,6 +401,29 @@ void s0ix_complete(void)
 	}
 }
 
+bool could_do_s0ix(void)
+{
+	bool ret = false;
+	if (unlikely(!pmu_initialized))
+		goto ret;
+
+	/* dont do s0ix if suspend in progress */
+	if (unlikely(mid_pmu_cxt->suspend_started))
+		goto ret;
+
+	/* dont do s0ix if shutdown in progress */
+	if (unlikely(mid_pmu_cxt->shutdown_started))
+		goto ret;
+
+	if (nc_device_state())
+		goto ret;
+
+	ret = true;
+ret:
+	return ret;
+}
+EXPORT_SYMBOL(could_do_s0ix);
+
 struct platform_pmu_ops mrfld_pmu_ops = {
 	.init	 = mrfld_pmu_init,
 	.enter	 = mrfld_pmu_enter,
