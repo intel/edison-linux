@@ -22,6 +22,7 @@
 #include <linux/cpuidle.h>
 #include "intel_soc_pm_debug.h"
 #include <asm-generic/io-64-nonatomic-hi-lo.h>
+#include <asm/tsc.h>
 
 #ifdef CONFIG_PM_DEBUG
 #define MAX_CSTATES_POSSIBLE	32
@@ -1333,8 +1334,13 @@ static void pmu_stat_seq_printf(struct seq_file *s, int type, char *typestr)
 {
 	unsigned long long t;
 	u32 scu_val, time;
-	u32 micro_sec_rem, remainder;
+	u32 remainder;
 	unsigned long init_2_now_time;
+	unsigned long long tsc_freq = 1330000000;
+
+	/* If tsc calibration fails use the default as 1330Mhz */
+	if (tsc_khz)
+		tsc_freq = tsc_khz * 1000;
 
 	/* Print S0ix residency counter */
 	if (type < SYS_STATE_S3) {
@@ -1349,21 +1355,26 @@ static void pmu_stat_seq_printf(struct seq_file *s, int type, char *typestr)
 	} else
 		t = prev_s0ix_res[SYS_STATE_S3-1];
 
-	micro_sec_rem = do_div(t, MICRO_SEC);
-	time = (unsigned int)t;
+	/* s0ix residency counters are in TSC cycle count domain
+	 * convert this to nano second time domain
+	 */
+	remainder = do_div(t, tsc_freq);
+	remainder *= 1000;
+	do_div(remainder, tsc_freq);
+
+	/* store in time millisecs */
+	time = (unsigned int)(t*1000)+remainder;
 
 	seq_printf(s, "%s\t%5lu.%03lu\t",
-		typestr, (unsigned long)(t),
-			(unsigned long) micro_sec_rem / 1000);
+		typestr, (unsigned long)(t), (unsigned long) remainder);
 
 	t =  cpu_clock(0);
 	t -= mid_pmu_cxt->pmu_init_time;
-	do_div(t, NANO_SEC);
+	do_div(t, MICRO_SEC); /* time in milli secs */
 	init_2_now_time =  (unsigned long) t;
 
 	/* for calculating percentage residency */
-	time = time * 100;
-	t = (u64) time;
+	t = (u64) (time * 100);
 
 	/* take care of divide by zero */
 	if (init_2_now_time) {
@@ -1380,7 +1391,7 @@ static void pmu_stat_seq_printf(struct seq_file *s, int type, char *typestr)
 
 	seq_printf(s, "%5lu.%03lu\t", (unsigned long) time, (unsigned long) t);
 
-	/* Print number of interations of S0ix */
+	/* Print S0ix counters */
 	if (type < SYS_STATE_S3) {
 		scu_val = readl(s0ix_counter[type]);
 		if (scu_val < prev_s0ix_cnt[type-1])
