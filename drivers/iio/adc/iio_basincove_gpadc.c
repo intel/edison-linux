@@ -401,31 +401,6 @@ static const struct iio_info basincove_adc_info = {
 	.driver_module = THIS_MODULE,
 };
 
-#define MSIC_ADC_MAP(_adc_channel_label,			\
-		     _consumer_dev_name,			\
-		     _consumer_channel)				\
-	{							\
-		.adc_channel_label = _adc_channel_label,	\
-		.consumer_dev_name = _consumer_dev_name,	\
-		.consumer_channel = _consumer_channel,		\
-	}
-
-struct iio_map iio_maps[] = {
-	MSIC_ADC_MAP("CH0", "VIBAT", "VBAT"),
-	MSIC_ADC_MAP("CH1", "BATID", "BATID"),
-	MSIC_ADC_MAP("CH2", "VIBAT", "IBAT"),
-	MSIC_ADC_MAP("CH3", "PMICTEMP", "PMICTEMP"),
-	MSIC_ADC_MAP("CH4", "BATTEMP", "BATTEMP0"),
-	MSIC_ADC_MAP("CH5", "BATTEMP", "BATTEMP1"),
-	MSIC_ADC_MAP("CH6", "SYSTEMP", "SYSTEMP0"),
-	MSIC_ADC_MAP("CH7", "SYSTEMP", "SYSTEMP1"),
-	MSIC_ADC_MAP("CH8", "SYSTEMP", "SYSTEMP2"),
-	MSIC_ADC_MAP("CH6", "THERMAL", "SYSTEMP0"),
-	MSIC_ADC_MAP("CH7", "THERMAL", "SYSTEMP1"),
-	MSIC_ADC_MAP("CH8", "THERMAL", "SYSTEMP2"),
-	MSIC_ADC_MAP("CH3", "THERMAL", "PMICTEMP"),
-};
-
 static int bcove_gpadc_probe(struct platform_device *pdev)
 {
 	int err;
@@ -478,7 +453,7 @@ static int bcove_gpadc_probe(struct platform_device *pdev)
 	indio_dev->info = &basincove_adc_info;
 	indio_dev->modes = INDIO_DIRECT_MODE;
 
-	err = iio_map_array_register(indio_dev, iio_maps);
+	err = iio_map_array_register(indio_dev, pdata->iio_maps);
 	if (err)
 		goto err_release_irq;
 
