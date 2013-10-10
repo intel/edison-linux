@@ -32,6 +32,11 @@ enum hsu_pid {
 	hsu_pid_max,
 };
 
+struct hsu_func2port {
+	int func;
+	int port;
+};
+
 struct hsu_port_pin_cfg {
 	char *name;
 	int id;
