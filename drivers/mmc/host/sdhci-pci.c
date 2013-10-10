@@ -1593,6 +1593,13 @@ static int sdhci_pci_power_up_host(struct sdhci_host *host)
 
 	if (slot->data && slot->data->power_up)
 		ret = slot->data->power_up(host);
+	else {
+		/*
+		 * use standard PCI power up function
+		 */
+		ret = pci_set_power_state(slot->chip->pdev, PCI_D0);
+		mdelay(50);
+	}
 	/*
 	 * If there is no power_up callbacks in platform data,
 	 * return -ENOSYS;
