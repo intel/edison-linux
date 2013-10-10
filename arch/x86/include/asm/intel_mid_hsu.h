@@ -19,8 +19,14 @@ enum {
 	debug_port,
 };
 
+enum {
+	hsu_intel,
+	hsu_dw,
+};
+
 struct hsu_port_cfg {
 	int type;
+	int hw_ip;
 	int index;
 	char *name;
 	int idle;
@@ -39,6 +45,9 @@ struct hsu_port_cfg {
 	void(*hw_resume)(int port, struct device *dev);
 	unsigned int (*hw_get_clk)(void);
 	void (*wake_peer)(struct device *tty);
+	void (*set_clk)(unsigned int m, unsigned int n,
+			void __iomem *addr);
+	void (*hw_reset)(void __iomem *addr);
 };
 
 
@@ -53,5 +62,8 @@ unsigned int intel_mid_hsu_get_clk(void);
 int hsu_register_board_info(void *inf);
 void intel_mid_hsu_suspend_post(int port);
 struct device *intel_mid_hsu_set_wake_peer(int port,
-	void (*wake_peer)(struct device *));
+			void (*wake_peer)(struct device *));
+void intel_mid_hsu_reset(void __iomem *addr);
+void intel_mid_hsu_set_clk(unsigned int m, unsigned int n,
+			void __iomem *addr);
 #endif
