@@ -1137,6 +1137,23 @@ static void sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
 	if (clock == 0)
 		goto out;
 
+	/*
+	 * Check and change Host Controller pin GPIO buffer setting
+	 * according to the new clock will be used.
+	 * For example, when the SD bus frequency is 50MHz or 200MHz,
+	 * the controller SD bus CLK/CMD/DAT pin may need different
+	 * driving strength and slew settings.
+	 * So we add check here. And this API will also change the pin
+	 * gpio buffer settings if needed after the check. Of course,
+	 * it's platform specific behaviours.
+	 * To ensure that the clock signal does not change when gpio
+	 * buffer setting modified, we'd better disable SD bus clock
+	 * first before changing any gpio pin buffer settings and
+	 * enable the SD bus clock again after the changing.
+	 */
+	if (host->ops->gpio_buf_check)
+		host->ops->gpio_buf_check(host, clock);
+
 	if (host->version >= SDHCI_SPEC_300) {
 		if (sdhci_readw(host, SDHCI_HOST_CONTROL2) &
 			SDHCI_CTRL_PRESET_VAL_ENABLE) {

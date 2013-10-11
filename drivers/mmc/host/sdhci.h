@@ -294,6 +294,11 @@ struct sdhci_ops {
 	void	(*platform_resume)(struct sdhci_host *host);
 	void    (*adma_workaround)(struct sdhci_host *host, u32 intmask);
 	void	(*platform_init)(struct sdhci_host *host);
+	int	(*power_up_host)(struct sdhci_host *host);
+	void	(*set_dev_power)(struct sdhci_host *, bool);
+	int	(*get_cd)(struct sdhci_host *host);
+	int	(*get_tuning_count)(struct sdhci_host *host);
+	int	(*gpio_buf_check)(struct sdhci_host *host, unsigned int clk);
 };
 
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
