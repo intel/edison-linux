@@ -655,8 +655,8 @@ static void pmu_stat_seq_printf(struct seq_file *s, int type, char *typestr)
 	init_2_now_time =  (unsigned long) t;
 
 	/* for calculating percentage residency */
-	time = time * 100;
 	t = (u64) time;
+	t *= 100;
 
 	/* take care of divide by zero */
 	if (init_2_now_time) {
@@ -665,8 +665,8 @@ static void pmu_stat_seq_printf(struct seq_file *s, int type, char *typestr)
 
 		/* for getting 3 digit precision after
 		 * decimal dot */
-		remainder *= 1000;
 		t = (u64) remainder;
+		t *= 1000;
 		remainder = do_div(t, init_2_now_time);
 	} else
 		time = t = 0;
@@ -712,8 +712,8 @@ static unsigned long pmu_dev_res_print(int index, unsigned long *precision,
 	*sampled_time = time;
 
 	/* for calculating percentage residency */
-	time = time * 100;
 	t = (u64) time;
+	t *= 100;
 
 	/* take care of divide by zero */
 	if (init_to_now_time) {
@@ -722,8 +722,8 @@ static unsigned long pmu_dev_res_print(int index, unsigned long *precision,
 
 		/* for getting 3 digit precision after
 		* decimal dot */
-		remainder *= 1000;
 		t = (u64) remainder;
+		t *= 1000;
 		remainder = do_div(t, init_to_now_time);
 	} else
 		time = t = 0;
@@ -1145,7 +1145,8 @@ static void pmu_log_s0ix_status(int type, char *typestr,
 	init_2_now_time =  (unsigned long) t;
 
 	/* for calculating percentage residency */
-	t = (u64) time * 100;
+	t = (u64) time;
+	t *= 100;
 
 	/* take care of divide by zero */
 	if (init_2_now_time) {
@@ -1154,8 +1155,8 @@ static void pmu_log_s0ix_status(int type, char *typestr,
 
 		/* for getting 3 digit precision after
 		 * decimal dot */
-		remainder *= 1000;
 		t = (u64) remainder;
+		t *= 1000;
 		remainder = do_div(t, init_2_now_time);
 	} else
 		time = t = 0;
@@ -1337,11 +1338,11 @@ static void pmu_stat_seq_printf(struct seq_file *s, int type, char *typestr)
 	u32 scu_val, time;
 	u32 remainder;
 	unsigned long init_2_now_time;
-	unsigned long long tsc_freq = 1330000000;
+	unsigned long long tsc_freq = 1330000;
 
 	/* If tsc calibration fails use the default as 1330Mhz */
 	if (tsc_khz)
-		tsc_freq = tsc_khz * 1000;
+		tsc_freq = tsc_khz;
 
 	/* Print S0ix residency counter */
 	if (type < SYS_STATE_S3) {
@@ -1357,25 +1358,31 @@ static void pmu_stat_seq_printf(struct seq_file *s, int type, char *typestr)
 		t = prev_s0ix_res[SYS_STATE_S3];
 
 	/* s0ix residency counters are in TSC cycle count domain
-	 * convert this to nano second time domain
+	 * convert this to milli second time domain
 	 */
 	remainder = do_div(t, tsc_freq);
-	remainder *= 1000;
-	do_div(remainder, tsc_freq);
 
-	/* store in time millisecs */
-	time = (unsigned int)(t*1000)+remainder;
+	/* store time in millisecs */
+	time = (unsigned int)t;
 
-	seq_printf(s, "%s\t%5lu.%03lu\t",
-		typestr, (unsigned long)(t), (unsigned long) remainder);
+	seq_printf(s, "%s\t%5lu.%03lu\t", typestr,
+		(unsigned long)(time/1000), (unsigned long)(time%1000));
 
 	t =  cpu_clock(0);
 	t -= mid_pmu_cxt->pmu_init_time;
 	do_div(t, MICRO_SEC); /* time in milli secs */
+
+	/* Note: with millisecs accuracy we get more
+	 * precise residency percentages, but we have
+	 * to trade off with the max number of days
+	 * that we can run without clearing counters,
+	 * with 32bit counter this value is ~50days.
+	 */
 	init_2_now_time =  (unsigned long) t;
 
 	/* for calculating percentage residency */
-	t = (u64) (time * 100);
+	t	= (u64)(time);
+	t	*= 100;
 
 	/* take care of divide by zero */
 	if (init_2_now_time) {
@@ -1384,8 +1391,8 @@ static void pmu_stat_seq_printf(struct seq_file *s, int type, char *typestr)
 
 		/* for getting 3 digit precision after
 		 * decimal dot */
-		remainder *= 1000;
 		t = (u64) remainder;
+		t *= 1000;
 		remainder = do_div(t, init_2_now_time);
 	} else
 		time = t = 0;
