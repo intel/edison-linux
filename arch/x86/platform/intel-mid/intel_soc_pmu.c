@@ -146,7 +146,7 @@ int pmu_set_devices_in_d0i0(void)
 	cur_pmssc.pmu2_states[3] = D0I0_MASK;
 
 	/* Restrict platform Cx state to C6 */
-	pm_qos_update_request(mid_pmu_cxt->cstate_qos,
+	pm_qos_update_request(mid_pmu_cxt->s3_restrict_qos,
 				(CSTATE_EXIT_LATENCY_S0i1-1));
 
 	down(&mid_pmu_cxt->scu_ready_sem);
@@ -165,7 +165,7 @@ int pmu_set_devices_in_d0i0(void)
 		mid_pmu_cxt->shutdown_started = false;
 
 		/* allow s0ix now */
-		pm_qos_update_request(mid_pmu_cxt->cstate_qos,
+		pm_qos_update_request(mid_pmu_cxt->s3_restrict_qos,
 						PM_QOS_DEFAULT_VALUE);
 		goto unlock;
 	}
@@ -1911,7 +1911,7 @@ static void mid_pmu_shutdown(struct pci_dev *dev)
 
 	if (mid_pmu_cxt) {
 		/* Restrict platform Cx state to C6 */
-		pm_qos_update_request(mid_pmu_cxt->cstate_qos,
+		pm_qos_update_request(mid_pmu_cxt->s3_restrict_qos,
 					(CSTATE_EXIT_LATENCY_S0i1-1));
 
 		down(&mid_pmu_cxt->scu_ready_sem);
@@ -1968,7 +1968,7 @@ static int mid_suspend_begin(suspend_state_t state)
 	pmu_s3_stats_update(1);
 
 	/* Restrict to C6 during suspend */
-	pm_qos_update_request(mid_pmu_cxt->cstate_qos,
+	pm_qos_update_request(mid_pmu_cxt->s3_restrict_qos,
 					(CSTATE_EXIT_LATENCY_S0i1-1));
 	return 0;
 }
@@ -2027,7 +2027,7 @@ static int mid_suspend_enter(suspend_state_t state)
 static void mid_suspend_end(void)
 {
 	/* allow s0ix now */
-	pm_qos_update_request(mid_pmu_cxt->cstate_qos,
+	pm_qos_update_request(mid_pmu_cxt->s3_restrict_qos,
 					PM_QOS_DEFAULT_VALUE);
 
 	pmu_s3_stats_update(0);
@@ -2054,6 +2054,15 @@ static int __init mid_pci_register_init(void)
 
 	if (mid_pmu_cxt == NULL)
 		return -ENOMEM;
+
+	mid_pmu_cxt->s3_restrict_qos =
+		kzalloc(sizeof(struct pm_qos_request), GFP_KERNEL);
+	if (mid_pmu_cxt->s3_restrict_qos) {
+		pm_qos_add_request(mid_pmu_cxt->s3_restrict_qos,
+			 PM_QOS_CPU_DMA_LATENCY, PM_QOS_DEFAULT_VALUE);
+	} else {
+		return -ENOMEM;
+	}
 
 	init_nc_device_states();
 
@@ -2083,6 +2092,9 @@ void pmu_power_off(void)
 
 static void __exit mid_pci_cleanup(void)
 {
+	if (mid_pmu_cxt && mid_pmu_cxt->s3_restrict_qos)
+		pm_qos_remove_request(mid_pmu_cxt->s3_restrict_qos);
+
 	suspend_set_ops(NULL);
 
 	/* registering PCI device */
