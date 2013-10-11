@@ -27,10 +27,6 @@
 #ifdef CONFIG_PM_DEBUG
 #define MAX_CSTATES_POSSIBLE	32
 
-u32 prev_s0ix_cnt[SYS_STATE_MAX];
-unsigned long long prev_s0ix_res[SYS_STATE_MAX];
-u32 S3_count;
-unsigned long long S3_res;
 
 
 static struct latency_stat *lat_stat;
@@ -1330,6 +1326,11 @@ void pmu_stats_finish(void)
 
 #ifdef CONFIG_REMOVEME_INTEL_ATOM_MRFLD_POWER
 
+static u32 prev_s0ix_cnt[SYS_STATE_MAX];
+static unsigned long long prev_s0ix_res[SYS_STATE_MAX];
+static u32 S3_count;
+static unsigned long long S3_res;
+
 static void pmu_stat_seq_printf(struct seq_file *s, int type, char *typestr)
 {
 	unsigned long long t;
@@ -1345,15 +1346,15 @@ static void pmu_stat_seq_printf(struct seq_file *s, int type, char *typestr)
 	/* Print S0ix residency counter */
 	if (type < SYS_STATE_S3) {
 		t = readq(residency[type]);
-		if (t < prev_s0ix_res[type-1])
-			t += (((unsigned long long)~0) - prev_s0ix_res[type-1]);
+		if (t < prev_s0ix_res[type])
+			t += (((unsigned long long)~0) - prev_s0ix_res[type]);
 		else
-			t -= prev_s0ix_res[type-1];
+			t -= prev_s0ix_res[type];
 
 		if (type == SYS_STATE_S0I3)
-			t -= prev_s0ix_res[SYS_STATE_S3-1];
+			t -= prev_s0ix_res[SYS_STATE_S3];
 	} else
-		t = prev_s0ix_res[SYS_STATE_S3-1];
+		t = prev_s0ix_res[SYS_STATE_S3];
 
 	/* s0ix residency counters are in TSC cycle count domain
 	 * convert this to nano second time domain
@@ -1394,15 +1395,15 @@ static void pmu_stat_seq_printf(struct seq_file *s, int type, char *typestr)
 	/* Print S0ix counters */
 	if (type < SYS_STATE_S3) {
 		scu_val = readl(s0ix_counter[type]);
-		if (scu_val < prev_s0ix_cnt[type-1])
-			scu_val += (((u32)~0) - prev_s0ix_cnt[type-1]);
+		if (scu_val < prev_s0ix_cnt[type])
+			scu_val += (((u32)~0) - prev_s0ix_cnt[type]);
 		else
-			scu_val -= prev_s0ix_cnt[type-1];
+			scu_val -= prev_s0ix_cnt[type];
 
 		if (type == SYS_STATE_S0I3)
-			scu_val -= prev_s0ix_cnt[SYS_STATE_S3-1];
+			scu_val -= prev_s0ix_cnt[SYS_STATE_S3];
 	} else
-			scu_val = prev_s0ix_cnt[SYS_STATE_S3-1];
+			scu_val = prev_s0ix_cnt[SYS_STATE_S3];
 
 	seq_printf(s, "%lu\n", (unsigned long) scu_val);
 }
@@ -1434,17 +1435,17 @@ static int pmu_devices_state_show(struct seq_file *s, void *unused)
 
 	seq_printf(s, "\ttime(secs)\tresidency(%%)\tcount\n");
 
+	down(&mid_pmu_cxt->scu_ready_sem);
 	/* Dump S0ix residency counters */
 	ret = intel_scu_ipc_simple_command(DUMP_RES_COUNTER, 0);
-	if (ret) {
+	if (ret)
 		seq_printf(s, "IPC command to DUMP S0ix residency failed\n");
-		return 0;
-	}
 
 	/* Dump number of interations of S0ix */
 	ret = intel_scu_ipc_simple_command(DUMP_S0IX_COUNT, 0);
 	if (ret)
 		seq_printf(s, "IPC command to DUMP S0ix count failed\n");
+	up(&mid_pmu_cxt->scu_ready_sem);
 
 	pmu_stat_seq_printf(s, SYS_STATE_S0I1, "s0i1");
 	pmu_stat_seq_printf(s, SYS_STATE_S0I2, "S0i2");
@@ -1519,17 +1520,17 @@ static ssize_t devices_state_write(struct file *file,
 		ret = intel_scu_ipc_simple_command(DUMP_S0IX_COUNT, 0);
 		if (ret)
 			printk(KERN_ERR "IPC command to DUMP S0ix count failed\n");
+		up(&mid_pmu_cxt->scu_ready_sem);
 
 		mid_pmu_cxt->pmu_init_time = cpu_clock(0);
-		prev_s0ix_cnt[0] = readl(s0ix_counter[SYS_STATE_S0I1]);
-		prev_s0ix_cnt[1] = readl(s0ix_counter[SYS_STATE_S0I2]);
-		prev_s0ix_cnt[2] = readl(s0ix_counter[SYS_STATE_S0I3]);
-		prev_s0ix_cnt[3] = 0;
-		prev_s0ix_res[0] = readq(residency[SYS_STATE_S0I1]);
-		prev_s0ix_res[1] = readq(residency[SYS_STATE_S0I2]);
-		prev_s0ix_res[2] = readq(residency[SYS_STATE_S0I3]);
-		prev_s0ix_res[3] = 0 ;
-		up(&mid_pmu_cxt->scu_ready_sem);
+		prev_s0ix_cnt[SYS_STATE_S0I1] = readl(s0ix_counter[SYS_STATE_S0I1]);
+		prev_s0ix_cnt[SYS_STATE_S0I2] = readl(s0ix_counter[SYS_STATE_S0I2]);
+		prev_s0ix_cnt[SYS_STATE_S0I3] = readl(s0ix_counter[SYS_STATE_S0I3]);
+		prev_s0ix_cnt[SYS_STATE_S3] = 0;
+		prev_s0ix_res[SYS_STATE_S0I1] = readq(residency[SYS_STATE_S0I1]);
+		prev_s0ix_res[SYS_STATE_S0I2] = readq(residency[SYS_STATE_S0I2]);
+		prev_s0ix_res[SYS_STATE_S0I3] = readq(residency[SYS_STATE_S0I3]);
+		prev_s0ix_res[SYS_STATE_S3] = 0 ;
 	}
 	return buf_size;
 }
@@ -2389,11 +2390,11 @@ void pmu_s3_stats_update(int enter)
 
 	if (enter == 1) {
 		S3_count  = readl(s0ix_counter[SYS_STATE_S0I3]);
-		S3_res = readl(residency[SYS_STATE_S0I3]);
+		S3_res = readq(residency[SYS_STATE_S0I3]);
 	} else {
-		prev_s0ix_cnt[3] +=
+		prev_s0ix_cnt[SYS_STATE_S3] +=
 			(readl(s0ix_counter[SYS_STATE_S0I3])) - S3_count;
-		prev_s0ix_res[3] += (readl(residency[SYS_STATE_S0I3])) - S3_res;
+		prev_s0ix_res[SYS_STATE_S3] += (readq(residency[SYS_STATE_S0I3])) - S3_res;
 	}
 
 #endif
