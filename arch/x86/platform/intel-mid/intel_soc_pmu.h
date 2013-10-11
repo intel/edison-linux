@@ -348,6 +348,7 @@ struct mid_pmu_dev {
 	struct mid_pmu_stats pmu_stats[SYS_STATE_MAX];
 	struct device_residency pmu_dev_res[MAX_DEVICES];
 	struct delayed_work log_work;
+	struct pm_qos_request *s3_restrict_qos;
 
 #ifdef LOG_PMU_EVENTS
 	struct mid_pmu_cmd_log cmd_log[LOG_SIZE];
