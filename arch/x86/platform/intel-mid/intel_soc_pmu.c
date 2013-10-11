@@ -1508,6 +1508,19 @@ nc_done:
 	}
 #endif
 
+	/* FIXME:: If S0ix is enabled when North Complex is ON we see
+	 * Fabric errors, tracked in BZ: 115181, hence hold pm_qos
+	 * to restrict s0ix during North Island in D0i0
+	 */
+	if (nc_device_state()) {
+		if (!pm_qos_request_active(mid_pmu_cxt->nc_restrict_qos))
+			pm_qos_add_request(mid_pmu_cxt->nc_restrict_qos,
+			 PM_QOS_CPU_DMA_LATENCY, (CSTATE_EXIT_LATENCY_S0i1-1));
+	} else {
+		if (pm_qos_request_active(mid_pmu_cxt->nc_restrict_qos))
+			pm_qos_remove_request(mid_pmu_cxt->nc_restrict_qos);
+	}
+
 unlock:
 	up(&mid_pmu_cxt->scu_ready_sem);
 
@@ -2066,6 +2079,11 @@ static int __init mid_pci_register_init(void)
 
 	init_nc_device_states();
 
+	mid_pmu_cxt->nc_restrict_qos =
+		kzalloc(sizeof(struct pm_qos_request), GFP_KERNEL);
+	if (mid_pmu_cxt->nc_restrict_qos == NULL)
+		return -ENOMEM;
+
 	/* initialize the semaphores */
 	sema_init(&mid_pmu_cxt->scu_ready_sem, 1);
 
@@ -2092,8 +2110,13 @@ void pmu_power_off(void)
 
 static void __exit mid_pci_cleanup(void)
 {
-	if (mid_pmu_cxt && mid_pmu_cxt->s3_restrict_qos)
-		pm_qos_remove_request(mid_pmu_cxt->s3_restrict_qos);
+	if (mid_pmu_cxt) {
+		if (mid_pmu_cxt->s3_restrict_qos)
+			pm_qos_remove_request(mid_pmu_cxt->s3_restrict_qos);
+
+		if (pm_qos_request_active(mid_pmu_cxt->nc_restrict_qos))
+			pm_qos_remove_request(mid_pmu_cxt->nc_restrict_qos);
+	}
 
 	suspend_set_ops(NULL);
 
