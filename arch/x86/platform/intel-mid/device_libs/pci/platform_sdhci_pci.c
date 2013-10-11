@@ -71,6 +71,7 @@ int sdhci_pdata_set_quirks(const unsigned int quirks)
 	return 0;
 }
 
+static int mrfl_flis_check(void *data, unsigned int clk);
 static int mrfl_sdio_setup(struct sdhci_pci_data *data);
 static void mrfl_sdio_cleanup(struct sdhci_pci_data *data);
 
@@ -199,7 +200,6 @@ static int clv_sdio_setup(struct sdhci_pci_data *data)
 	return 0;
 }
 
-
 /* CLV platform data */
 static struct sdhci_pci_data clv_sdhci_pci_data[] = {
 	[EMMC0_INDEX] = {
@@ -239,6 +239,77 @@ static struct sdhci_pci_data clv_sdhci_pci_data[] = {
 	},
 };
 
+#define TNG_EMMC_0_FLIS_ADDR		0xff0c0900
+#define TNG_EMMC_FLIS_SLEW		0x00000400
+#define TNG_EMMC_0_CLK_PULLDOWN		0x00000200
+static int mrfl_flis_slew_change(int slew)
+{
+	void __iomem *flis_addr;
+	unsigned int reg;
+	int i, ret = 0;
+
+	flis_addr = ioremap_nocache(TNG_EMMC_0_FLIS_ADDR, 64);
+
+	if (!flis_addr) {
+		pr_err("flis_addr ioremap fail!\n");
+		ret = -ENOMEM;
+	} else {
+		pr_info("flis_addr mapped addr: %p\n", flis_addr);
+		/*
+		 * Change TNG gpio FLIS settings for all eMMC0
+		 * CLK/CMD/DAT pins.
+		 * That is, including emmc_0_clk, emmc_0_cmd,
+		 * emmc_0_d_0, emmc_0_d_1, emmc_0_d_2, emmc_0_d_3,
+		 * emmc_0_d_4, emmc_0_d_5, emmc_0_d_6, emmc_0_d_7
+		 */
+		for (i = 0; i < 10; i++) {
+			reg = readl(flis_addr + (i * 4));
+			if (slew)
+				reg |= TNG_EMMC_FLIS_SLEW; /* SLEW B */
+			else
+				reg &= ~TNG_EMMC_FLIS_SLEW; /* SLEW A */
+			writel(reg, flis_addr + (i * 4));
+		}
+
+		/* Disable PullDown for emmc_0_clk */
+		reg = readl(flis_addr);
+		reg &= ~TNG_EMMC_0_CLK_PULLDOWN;
+		writel(reg, flis_addr);
+
+		ret = 0;
+	}
+
+	if (flis_addr)
+		iounmap(flis_addr);
+
+	return ret;
+}
+
+static int mrfl_flis_check(void *data, unsigned int clk)
+{
+	struct sdhci_host *host = data;
+	int ret = 0;
+
+	if ((host->clock <= 52000000) && (clk > 52000000))
+		ret = mrfl_flis_slew_change(1);
+	else if ((host->clock > 52000000) && (clk <= 52000000))
+		ret = mrfl_flis_slew_change(0);
+
+	return ret;
+}
+
+/* Board specific setup related to eMMC goes here */
+static int mrfl_emmc_setup(struct sdhci_pci_data *data)
+{
+	struct pci_dev *pdev = data->pdev;
+	int ret = 0;
+
+	if (pdev->revision == 0x01) /* TNB B0 stepping */
+		ret = mrfl_flis_slew_change(1); /* HS200 FLIS slew setting */
+
+	return ret;
+}
+
 /* Board specific setup related to SD goes here */
 static int mrfl_sd_setup(struct sdhci_pci_data *data)
 {
@@ -275,12 +346,6 @@ static void mrfl_sd_cleanup(struct sdhci_pci_data *data)
 {
 }
 
-
-/* Board specific cleanup related to SDIO goes here */
-static void mrfl_sdio_cleanup(struct sdhci_pci_data *data)
-{
-}
-
 /* Board specific setup related to SDIO goes here */
 static int mrfl_sdio_setup(struct sdhci_pci_data *data)
 {
@@ -301,6 +366,11 @@ static int mrfl_sdio_setup(struct sdhci_pci_data *data)
 	return 0;
 }
 
+/* Board specific cleanup related to SDIO goes here */
+static void mrfl_sdio_cleanup(struct sdhci_pci_data *data)
+{
+}
+
 /* MRFL platform data */
 static struct sdhci_pci_data mrfl_sdhci_pci_data[] = {
 	[EMMC0_INDEX] = {
@@ -310,19 +380,9 @@ static struct sdhci_pci_data mrfl_sdhci_pci_data[] = {
 			.cd_gpio = -EINVAL,
 			.quirks = 0,
 			.platform_quirks = 0,
-			.setup = 0,
+			.setup = mrfl_emmc_setup,
 			.cleanup = 0,
 			.power_up = panic_mode_emmc0_power_up,
-	},
-	[EMMC1_INDEX] = {
-			.pdev = NULL,
-			.slotno = EMMC1_INDEX,
-			.rst_n_gpio = 97,
-			.cd_gpio = -EINVAL,
-			.quirks = 0,
-			.platform_quirks = 0,
-			.setup = 0,
-			.cleanup = 0,
 	},
 	[SD_INDEX] = {
 			.pdev = NULL,
@@ -345,7 +405,6 @@ static struct sdhci_pci_data mrfl_sdhci_pci_data[] = {
 			.cleanup = mrfl_sdio_cleanup,
 	},
 };
-
 
 /* Board specific setup related to SDIO goes here */
 static int byt_sdio_setup(struct sdhci_pci_data *data)
