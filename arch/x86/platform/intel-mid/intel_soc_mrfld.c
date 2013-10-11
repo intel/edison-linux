@@ -116,6 +116,15 @@ static int mrfld_pmu_init(void)
 
 	return PMU_SUCCESS;
 
+err6:
+	iounmap(s0ix_counter[SYS_STATE_S0I3]);
+	s0ix_counter[SYS_STATE_S0I3] = NULL;
+err5:
+	iounmap(s0ix_counter[SYS_STATE_S0I2]);
+	s0ix_counter[SYS_STATE_S0I2] = NULL;
+err4:
+	iounmap(s0ix_counter[SYS_STATE_S0I1]);
+	s0ix_counter[SYS_STATE_S0I1] = NULL;
 err3:
 	iounmap(residency[SYS_STATE_S0I3]);
 	residency[SYS_STATE_S0I3] = NULL;
@@ -127,19 +136,6 @@ err1:
 	residency[SYS_STATE_S0I1] = NULL;
 
 	pr_err("Cannot map memory to read S0ix residency and count\n");
-	return PMU_FAILED;
-
-err6:
-	iounmap(s0ix_counter[SYS_STATE_S0I3]);
-	s0ix_counter[SYS_STATE_S0I3] = NULL;
-err5:
-	iounmap(s0ix_counter[SYS_STATE_S0I2]);
-	s0ix_counter[SYS_STATE_S0I2] = NULL;
-err4:
-	iounmap(s0ix_counter[SYS_STATE_S0I1]);
-	s0ix_counter[SYS_STATE_S0I1] = NULL;
-
-	pr_err("Cannot map memory to read S0ix count\n");
 	return PMU_FAILED;
 }
 
