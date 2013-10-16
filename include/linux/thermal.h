@@ -137,6 +137,10 @@ struct thermal_cooling_device_ops {
 	int (*get_max_state) (struct thermal_cooling_device *, unsigned long *);
 	int (*get_cur_state) (struct thermal_cooling_device *, unsigned long *);
 	int (*set_cur_state) (struct thermal_cooling_device *, unsigned long);
+	int (*get_force_state_override) (struct thermal_cooling_device *,
+								char *);
+	int (*set_force_state_override) (struct thermal_cooling_device *,
+								char *);
 };
 
 struct thermal_cooling_device {

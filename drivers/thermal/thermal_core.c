@@ -794,6 +794,34 @@ thermal_cooling_device_max_state_show(struct device *dev,
 	return sprintf(buf, "%ld\n", state);
 }
 
+/*
+ * Sysfs to read the mapped values and to override
+ * the default values mapped to each state during runtime.
+ */
+static ssize_t
+thermal_cooling_device_force_state_override_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	struct thermal_cooling_device *cdev = to_cooling_device(dev);
+
+	return cdev->ops->get_force_state_override(cdev, buf);
+}
+
+static ssize_t
+thermal_cooling_device_force_state_override_store(struct device *dev,
+					struct device_attribute *attr,
+					const char *buf, size_t count)
+{
+	int ret;
+	struct thermal_cooling_device *cdev = to_cooling_device(dev);
+
+	ret = cdev->ops->set_force_state_override(cdev, buf);
+	if (ret)
+		return ret;
+
+	return count;
+}
+
 static ssize_t
 thermal_cooling_device_cur_state_show(struct device *dev,
 				      struct device_attribute *attr, char *buf)
@@ -836,6 +864,9 @@ static DEVICE_ATTR(max_state, 0444,
 static DEVICE_ATTR(cur_state, 0644,
 		   thermal_cooling_device_cur_state_show,
 		   thermal_cooling_device_cur_state_store);
+static DEVICE_ATTR(force_state_override, 0644,
+		thermal_cooling_device_force_state_override_show,
+		thermal_cooling_device_force_state_override_store);
 
 static ssize_t
 thermal_cooling_device_trip_point_show(struct device *dev,
@@ -1353,6 +1384,13 @@ thermal_cooling_device_register(char *type, void *devdata,
 	if (result)
 		goto unregister;
 
+	if (ops->get_force_state_override) {
+		result = device_create_file(&cdev->device,
+					&dev_attr_force_state_override);
+		if (result)
+			goto unregister;
+	}
+
 	/* Add 'this' new cdev to the global cdev list */
 	mutex_lock(&thermal_list_lock);
 	list_add(&cdev->node, &thermal_cdev_list);
@@ -1423,7 +1461,9 @@ void thermal_cooling_device_unregister(struct thermal_cooling_device *cdev)
 		device_remove_file(&cdev->device, &dev_attr_cdev_type);
 	device_remove_file(&cdev->device, &dev_attr_max_state);
 	device_remove_file(&cdev->device, &dev_attr_cur_state);
-
+	if (cdev->ops->get_force_state_override)
+		device_remove_file(&cdev->device,
+					&dev_attr_force_state_override);
 	release_idr(&thermal_cdev_idr, &thermal_idr_lock, cdev->id);
 	device_unregister(&cdev->device);
 	return;
