@@ -622,6 +622,7 @@ struct dwc3_request {
 	unsigned		direction:1;
 	unsigned		mapped:1;
 	unsigned		queued:1;
+	unsigned		short_packet:1;
 };
 
 /*
