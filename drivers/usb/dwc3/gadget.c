@@ -1439,7 +1439,7 @@ static int dwc3_gadget_ep_queue(struct usb_ep *ep, struct usb_request *request,
 	/* pad OUT endpoint buffer to MaxPacketSize per databook requirement*/
 	req->short_packet = false;
 	if (!IS_ALIGNED(request->length, ep->desc->wMaxPacketSize)
-		&& !(dep->number & 1) && (dep->number != DWC3_EP_EBC_OUT_NB)) {
+				&& !(dep->number & 1)) {
 		request->length = roundup(request->length,
 					(u32) ep->desc->wMaxPacketSize);
 		/* set flag for bulk-out short request */
