@@ -1760,6 +1760,19 @@ struct thermal_zone_device *thermal_zone_device_register(const char *type,
 			goto unregister;
 	}
 
+	/* Create Sysfs for slope/intercept values */
+	if (tz->ops->get_slope) {
+		result = device_create_file(&tz->device, &dev_attr_slope);
+		if (result)
+			goto unregister;
+	}
+
+	if (tz->ops->get_intercept) {
+		result = device_create_file(&tz->device, &dev_attr_intercept);
+		if (result)
+			goto unregister;
+	}
+
 #ifdef CONFIG_THERMAL_EMULATION
 	result = device_create_file(&tz->device, &dev_attr_emul_temp);
 	if (result)
@@ -1859,6 +1872,11 @@ void thermal_zone_device_unregister(struct thermal_zone_device *tz)
 	device_remove_file(&tz->device, &dev_attr_temp);
 	if (tz->ops->get_mode)
 		device_remove_file(&tz->device, &dev_attr_mode);
+	if (tz->ops->get_slope)
+		device_remove_file(&tz->device, &dev_attr_slope);
+	if (tz->ops->get_intercept)
+		device_remove_file(&tz->device, &dev_attr_intercept);
+
 	device_remove_file(&tz->device, &dev_attr_policy);
 	remove_trip_attrs(tz);
 	tz->governor = NULL;
