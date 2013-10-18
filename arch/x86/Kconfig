@@ -466,10 +466,39 @@ config X86_MDFLD
 	select MFD_INTEL_MSIC
 	---help---
 	  Medfield is Intel's Low Power Intel Architecture (LPIA) based Moblin
-	  Internet Device(MID) platform. 
+	  Internet Device(MID) platform.
 	  Unlike standard x86 PCs, Medfield does not have many legacy devices
 	  nor standard legacy replacement devices/features. e.g. Medfield does
 	  not contain i8259, i8254, HPET, legacy BIOS, most of the io ports.
+
+config ATOM_SOC_POWER
+	bool "Select Atom SOC Power"
+
+choice
+	prompt "Select PMU support"
+	depends on ATOM_SOC_POWER
+	default REMOVEME_INTEL_ATOM_MDFLD_POWER
+
+config REMOVEME_INTEL_ATOM_MDFLD_POWER
+	bool "Medfield"
+
+config REMOVEME_INTEL_ATOM_CLV_POWER
+	bool "Clovertrail"
+
+config REMOVEME_INTEL_ATOM_MRFLD_POWER
+	bool "Merrifield"
+
+endchoice
+
+config INTEL_DEBUG_FEATURE
+       bool "Debug feature interface on Intel MID platform"
+       depends on X86_INTEL_MID
+       ---help---
+         Provides an interface to list the debug features
+	 that are enabled on an Intel MID platform. The
+	 enabling of the debug features depends on the mode
+	 the device is in (e.g. manufacturing, production,
+	 end user, etc...).
 
 endif
 
