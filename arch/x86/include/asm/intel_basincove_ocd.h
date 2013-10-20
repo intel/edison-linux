@@ -14,6 +14,9 @@
 #define B6	(1 << 6)
 #define B7	(1 << 7)
 
+/* 30 seconds delay macro for VWARN1 interrupt Unmask (enable) */
+#define VWARN2_INTR_EN_DELAY	(30 * HZ)
+
 /* IRQ registers */
 #define BCUIRQ                  0x05
 #define IRQLVL1                 0x01
@@ -73,9 +76,13 @@
 #define SVCRIT                  (1<<2)
 
 /* S_BCUCTRL register status bits */
-#define SBCUCTRL_CAMTORCH       (1<<3)
-#define SBCUCTRL_CAMFLDIS       (1<<2)
-#define SBCUCTRL_BCUDISW2       (1<<1)
+#define S_CAMFLTORCH		B3
+#define S_CAMFLDIS		B2
+#define S_BCUDISW2		B1
+
+#define S_BCUDISW2_MASK		B1
+#define S_CAMFLDIS_MASK		B2
+#define S_CAMFLTORCH_MASK	B3
 
 /* check whether bit is sticky or not by checking 5th bit */
 #define IS_STICKY(data)         (!!(data & 0x10))
