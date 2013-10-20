@@ -33,6 +33,8 @@
 
 #define PCI_MRST_DMAC1_ID	0x0814
 #define PCI_MDFL_DMAC1_ID	0x0827
+#define PCI_BYT_DMAC1_ID	0x0f06
+#define PCI_MRFL_DMAC_ID	0x11A2
 
 #define SSP_NOT_SYNC 0x400000
 #define MAX_SPI_TRANSFER_SIZE 8192
@@ -72,6 +74,10 @@
 #define QUIRKS_BIT_BANGING		32
 /* If set, SPI is in slave clock mode                               */
 #define QUIRKS_SPI_SLAVE_CLOCK_MODE	64
+/* Add more platform here. */
+/* This quirks is set on Baytrail. */
+#define QUIRKS_PLATFORM_BYT		128
+#define QUIRKS_PLATFORM_MRFL		256
 
 /* Uncomment to get RX and TX short dumps after each transfer */
 /* #define DUMP_RX 1 */
@@ -157,6 +163,8 @@ DEFINE_SSP_REG(GAFR1_U, 0x44);
 #define SSSR_RFS		(1 << 6)	/* Rx FIFO Service Request */
 #define SSSR_ROR		(1 << 7)	/* Rx FIFO Overrun */
 #define SSSR_TFL_MASK           (0x0F << 8)     /* Tx FIFO level field mask */
+#define SSSR_RFL_SHIFT		12		/* Rx FIFO MASK shift */
+#define SSSR_RFL_MASK		(0x0F << SSSR_RFL_SHIFT)/* RxFIFOlevel mask */
 
 #define SSCR0_TIM    (1 << 23)          /* Transmit FIFO Under Run Int Mask */
 #define SSCR0_RIM    (1 << 22)          /* Receive FIFO Over Run int Mask */

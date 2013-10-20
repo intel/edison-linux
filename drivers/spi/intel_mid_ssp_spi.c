@@ -304,10 +304,15 @@ static void intel_mid_ssp_spi_dma_done(void *arg)
 	struct device *dev = &sspc->pdev->dev;
 	void *reg = sspc->ioaddr;
 
-	if (cb_param->direction == TX_DIRECTION)
+	if (cb_param->direction == TX_DIRECTION) {
+		dma_sync_single_for_cpu(dev, sspc->tx_dma,
+			sspc->len, DMA_TO_DEVICE);
 		sspc->txdma_done = 1;
-	else
+	} else {
 		sspc->rxdma_done = 1;
+		dma_sync_single_for_cpu(dev, sspc->rx_dma,
+			sspc->len, DMA_FROM_DEVICE);
+	}
 
 	dev_dbg(dev, "DMA callback for direction %d [RX done:%d] [TX done:%d]\n",
 		cb_param->direction, sspc->rxdma_done,
@@ -347,19 +352,27 @@ static void intel_mid_ssp_spi_dma_init(struct ssp_drv_context *sspc)
 	ds->direction = DMA_FROM_DEVICE;
 	rxs->hs_mode = LNW_DMA_HW_HS;
 	rxs->cfg_mode = LNW_DMA_PER_TO_MEM;
-	ds->dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+	ds->dst_addr_width = sspc->n_bytes;
 	ds->src_addr_width = sspc->n_bytes;
+
+	if (sspc->quirks & QUIRKS_PLATFORM_BYT) {
+		/*These are fixed HW info from Baytrail datasheet*/
+		rxs->device_instance = 1; /*DMA Req line*/
+	} else if (sspc->quirks & QUIRKS_PLATFORM_MRFL)
+		rxs->device_instance = sspc->master->bus_num;
+	else
+		rxs->device_instance = 0;
 
 	/* Use a DMA burst according to the FIFO thresholds */
 	if (sspc->rx_fifo_threshold == 8) {
-		ds->src_maxburst = 8;
-		ds->dst_maxburst = 8;
+		ds->src_maxburst = LNW_DMA_MSIZE_8;
+		ds->dst_maxburst = LNW_DMA_MSIZE_8;
 	} else if (sspc->rx_fifo_threshold == 4) {
-		ds->src_maxburst = 4;
-		ds->dst_maxburst = 4;
+		ds->src_maxburst = LNW_DMA_MSIZE_4;
+		ds->dst_maxburst = LNW_DMA_MSIZE_4;
 	} else {
-		ds->src_maxburst = 1;
-		ds->dst_maxburst = 1;
+		ds->src_maxburst = LNW_DMA_MSIZE_1;
+		ds->dst_maxburst = LNW_DMA_MSIZE_1;
 	}
 
 	/* Configure TX channel parameters */
@@ -369,19 +382,27 @@ static void intel_mid_ssp_spi_dma_init(struct ssp_drv_context *sspc)
 	ds->direction = DMA_TO_DEVICE;
 	txs->hs_mode = LNW_DMA_HW_HS;
 	txs->cfg_mode = LNW_DMA_MEM_TO_PER;
-	ds->src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+	ds->src_addr_width = sspc->n_bytes;
 	ds->dst_addr_width = sspc->n_bytes;
+
+	if (sspc->quirks & QUIRKS_PLATFORM_BYT) {
+		/*These are fixed HW info from Baytrail datasheet*/
+		txs->device_instance = 0;/*DMA Req Line*/
+	} else if (sspc->quirks & QUIRKS_PLATFORM_MRFL)
+		txs->device_instance = sspc->master->bus_num;
+	else
+		txs->device_instance = 0;
 
 	/* Use a DMA burst according to the FIFO thresholds */
 	if (sspc->rx_fifo_threshold == 8) {
-		ds->src_maxburst = 8;
-		ds->dst_maxburst = 8;
+		ds->src_maxburst = LNW_DMA_MSIZE_8;
+		ds->dst_maxburst = LNW_DMA_MSIZE_8;
 	} else if (sspc->rx_fifo_threshold == 4) {
-		ds->src_maxburst = 4;
-		ds->dst_maxburst = 4;
+		ds->src_maxburst = LNW_DMA_MSIZE_4;
+		ds->dst_maxburst = LNW_DMA_MSIZE_4;
 	} else {
-		ds->src_maxburst = 1;
-		ds->dst_maxburst = 1;
+		ds->src_maxburst = LNW_DMA_MSIZE_1;
+		ds->dst_maxburst = LNW_DMA_MSIZE_1;
 	}
 
 	/* Nothing more to do if already initialized */
@@ -391,6 +412,10 @@ static void intel_mid_ssp_spi_dma_init(struct ssp_drv_context *sspc)
 	/* Use DMAC1 */
 	if (sspc->quirks & QUIRKS_PLATFORM_MRST)
 		device_id = PCI_MRST_DMAC1_ID;
+	else if (sspc->quirks & QUIRKS_PLATFORM_BYT)
+		device_id = PCI_BYT_DMAC1_ID;
+	else if (sspc->quirks & QUIRKS_PLATFORM_MRFL)
+		device_id = PCI_MRFL_DMAC_ID;
 	else
 		device_id = PCI_MDFL_DMAC1_ID;
 
@@ -521,6 +546,12 @@ static void dma_transfer(struct ssp_drv_context *sspc)
 			dev_err(dev, "ERROR : sspc->rx_dma is null!\n");
 	}
 
+	sspc->dmas_rx.dma_slave.src_addr = ssdr_addr;
+	rxchan->device->device_control(rxchan, DMA_SLAVE_CONFIG,
+		(unsigned long)&(sspc->dmas_rx.dma_slave));
+	dma_sync_single_for_device(dev, sspc->rx_dma,
+		sspc->len, DMA_FROM_DEVICE);
+
 	rxdesc = rxchan->device->device_prep_dma_memcpy
 		(rxchan,			/* DMA Channel */
 		sspc->rx_dma,			/* DAR */
@@ -538,6 +569,12 @@ static void dma_transfer(struct ssp_drv_context *sspc)
 	}
 
 	/* 3. prepare the TX dma transfer */
+	sspc->dmas_tx.dma_slave.dst_addr = ssdr_addr;
+	txchan->device->device_control(txchan, DMA_SLAVE_CONFIG,
+		(unsigned long)&(sspc->dmas_tx.dma_slave));
+	dma_sync_single_for_device(dev, sspc->tx_dma,
+		sspc->len, DMA_TO_DEVICE);
+
 	if (sspc->tx_dma) {
 		txdesc = txchan->device->device_prep_dma_memcpy
 			(txchan,			/* DMA Channel */
@@ -558,7 +595,7 @@ static void dma_transfer(struct ssp_drv_context *sspc)
 		return;
 	}
 
-	dev_info(dev, "DMA transfer len:%d len_dma_tx:%d len_dma_rx:%d\n",
+	dev_dbg(dev, "DMA transfer len:%d len_dma_tx:%d len_dma_rx:%d\n",
 		sspc->len, sspc->len_dma_tx, sspc->len_dma_rx);
 
 	if (rxdesc || txdesc) {
@@ -736,7 +773,7 @@ static irqreturn_t ssp_int(int irq, void *dev_id)
 	u32 status = read_SSSR(reg);
 
 	/* It should never be our interrupt since SSP will */
-	/* only trigs interrupt for under/over run.        */
+	/* only trigs interrupt for under/over run.*/
 	if (likely(!(status & sspc->mask_sr)))
 		return IRQ_NONE;
 
@@ -1110,6 +1147,11 @@ static int setup(struct spi_device *spi)
 		sspc->rx_fifo_threshold = 4;
 	else
 		sspc->rx_fifo_threshold = 1;
+	/*FIXME:this is workaround.
+	On MRST, in DMA mode, it is very strang that RX fifo can't reach
+	burst size.*/
+	if (sspc->quirks & QUIRKS_PLATFORM_MRFL && chip->dma_enabled)
+		sspc->rx_fifo_threshold = 1;
 	tx_fifo_threshold = SPI_FIFO_SIZE - sspc->rx_fifo_threshold;
 	chip->cr1 |= (SSCR1_RxTresh(sspc->rx_fifo_threshold) &
 		SSCR1_RFT) | (SSCR1_TxTresh(tx_fifo_threshold) & SSCR1_TFT);
@@ -1410,15 +1452,23 @@ static void intel_mid_ssp_spi_remove(struct pci_dev *pdev)
 
 	pm_runtime_forbid(&pdev->dev);
 	pm_runtime_get_noresume(&pdev->dev);
+
+	if (sspc->dma_wq)
+		destroy_workqueue(sspc->dma_wq);
+	if (sspc->workqueue)
+		destroy_workqueue(sspc->workqueue);
+
 	/* Release IRQ */
 	free_irq(sspc->irq, sspc);
 
-	iounmap(sspc->ioaddr);
-	if (sspc->quirks & QUIRKS_BIT_BANGING)
+	if (sspc->ioaddr)
+		iounmap(sspc->ioaddr);
+	if (sspc->quirks & QUIRKS_BIT_BANGING && sspc->I2C_ioaddr)
 		iounmap(sspc->I2C_ioaddr);
 
 	/* disconnect from the SPI framework */
-	spi_unregister_master(sspc->master);
+	if (sspc->master)
+		spi_unregister_master(sspc->master);
 
 	pci_set_drvdata(pdev, NULL);
 	pci_release_region(pdev, 0);
@@ -1518,7 +1568,9 @@ static DEFINE_PCI_DEVICE_TABLE(pci_ids) = {
 	/* MDFL SSP3 */
 	{ PCI_VDEVICE(INTEL, 0x0816), QUIRKS_PLATFORM_MDFL},
 	/* MRFL SSP5 */
-	{ PCI_VDEVICE(INTEL, 0x1194), 0},
+	{ PCI_VDEVICE(INTEL, 0x1194), QUIRKS_PLATFORM_MRFL},
+	/* BYT SSP3 */
+	{ PCI_VDEVICE(INTEL, 0x0f0e), QUIRKS_PLATFORM_BYT},
 	{},
 };
 
