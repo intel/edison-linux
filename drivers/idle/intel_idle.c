@@ -662,6 +662,17 @@ static int intel_idle(struct cpuidle_device *dev,
 	unsigned int cstate;
 	int cpu = smp_processor_id();
 
+#if (defined(CONFIG_REMOVEME_INTEL_ATOM_MRFLD_POWER) && \
+	defined(CONFIG_PM_DEBUG))
+	{
+		/* Get Cstate based on ignore table from PMU driver */
+		unsigned int ncstate;
+		cstate =
+		(((eax) >> MWAIT_SUBSTATE_SIZE) & MWAIT_CSTATE_MASK) + 1;
+		ncstate = pmu_get_new_cstate(cstate, &index);
+		eax	= flg2MWAIT(drv->states[index].flags);
+	}
+#endif
 	cstate = (((eax) >> MWAIT_SUBSTATE_SIZE) & MWAIT_CSTATE_MASK) + 1;
 
 	/*
