@@ -868,10 +868,9 @@ int set_enable_s0ix(const char *val, struct kernel_param *kp)
 			mid_pmu_cxt->cstate_ignore =
 				~((1 << CPUIDLE_STATE_MAX) - 1);
 
-			/* Ignore C2, C3, C4, C5 states */
+			/* Ignore C2, C3, C5 states */
 			mid_pmu_cxt->cstate_ignore |= (1 << 1);
 			mid_pmu_cxt->cstate_ignore |= (1 << 2);
-			mid_pmu_cxt->cstate_ignore |= (1 << 3);
 			mid_pmu_cxt->cstate_ignore |= (1 << 4);
 
 			/* For now ignore C7, C8, C9, C10 states */
@@ -887,11 +886,12 @@ int set_enable_s0ix(const char *val, struct kernel_param *kp)
 			mid_pmu_cxt->cstate_ignore =
 				~((1 << CPUIDLE_STATE_MAX) - 1);
 
-			/* Ignore C2, C3, C4, C5 states */
+			/* Ignore C2, C3, C5, C8 and C10 states */
 			mid_pmu_cxt->cstate_ignore |= (1 << 1);
 			mid_pmu_cxt->cstate_ignore |= (1 << 2);
-			mid_pmu_cxt->cstate_ignore |= (1 << 3);
 			mid_pmu_cxt->cstate_ignore |= (1 << 4);
+			mid_pmu_cxt->cstate_ignore |= (1 << 7);
+			mid_pmu_cxt->cstate_ignore |= (1 << 9);
 
 			pm_qos_update_request(mid_pmu_cxt->cstate_qos,
 							PM_QOS_DEFAULT_VALUE);
