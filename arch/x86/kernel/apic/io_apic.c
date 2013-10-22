@@ -2543,6 +2543,7 @@ static struct irq_chip ioapic_chip __read_mostly = {
 	.irq_set_affinity	= native_ioapic_set_affinity,
 	.irq_set_wake		= ioapic_set_wake,
 	.irq_retrigger		= ioapic_retrigger_irq,
+	.flags			= IRQCHIP_SKIP_SET_WAKE,
 };
 
 static inline void init_IO_APIC_traps(void)
