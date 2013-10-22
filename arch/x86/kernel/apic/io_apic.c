@@ -2373,6 +2373,10 @@ int native_ioapic_set_affinity(struct irq_data *data,
 	return ret;
 }
 
+static int ioapic_set_wake(struct irq_data *data, unsigned int on)
+{
+	return 0;
+}
 static void ack_apic_edge(struct irq_data *data)
 {
 	irq_complete_move(data->chip_data);
@@ -2537,6 +2541,7 @@ static struct irq_chip ioapic_chip __read_mostly = {
 	.irq_ack		= ack_apic_edge,
 	.irq_eoi		= ack_apic_level,
 	.irq_set_affinity	= native_ioapic_set_affinity,
+	.irq_set_wake		= ioapic_set_wake,
 	.irq_retrigger		= ioapic_retrigger_irq,
 };
 
