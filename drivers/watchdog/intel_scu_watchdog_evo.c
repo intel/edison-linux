@@ -608,7 +608,7 @@ static ssize_t kwd_reset_type_read(struct file *file, char __user *buff,
 	if (ret)
 		return -EINVAL;
 	else {
-		for (len = 0 ; len < STRING_RESET_TYPE_MAX_LEN
+		for (len = 0; len < (STRING_RESET_TYPE_MAX_LEN - 1)
 			     && str[len] != '\0'; len++)
 			;
 		str[len++] = '\n';
