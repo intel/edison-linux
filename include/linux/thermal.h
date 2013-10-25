@@ -110,26 +110,22 @@ struct thermal_zone_device_ops {
 		     struct thermal_cooling_device *);
 	int (*unbind) (struct thermal_zone_device *,
 		       struct thermal_cooling_device *);
-	int (*get_temp) (struct thermal_zone_device *, unsigned long *);
+	int (*get_temp) (struct thermal_zone_device *, long *);
 	int (*get_mode) (struct thermal_zone_device *,
 			 enum thermal_device_mode *);
 	int (*set_mode) (struct thermal_zone_device *,
 		enum thermal_device_mode);
 	int (*get_trip_type) (struct thermal_zone_device *, int,
 		enum thermal_trip_type *);
-	int (*get_trip_temp) (struct thermal_zone_device *, int,
-			      unsigned long *);
-	int (*set_trip_temp) (struct thermal_zone_device *, int,
-			      unsigned long);
-	int (*get_trip_hyst) (struct thermal_zone_device *, int,
-			      unsigned long *);
-	int (*set_trip_hyst) (struct thermal_zone_device *, int,
-			      unsigned long);
+	int (*get_trip_temp) (struct thermal_zone_device *, int, long *);
+	int (*set_trip_temp) (struct thermal_zone_device *, int, long);
+	int (*get_trip_hyst) (struct thermal_zone_device *, int, long *);
+	int (*set_trip_hyst) (struct thermal_zone_device *, int, long);
 	int (*get_slope) (struct thermal_zone_device *, long *);
 	int (*set_slope) (struct thermal_zone_device *, long);
 	int (*get_intercept) (struct thermal_zone_device *, long *);
 	int (*set_intercept) (struct thermal_zone_device *, long);
-	int (*get_crit_temp) (struct thermal_zone_device *, unsigned long *);
+	int (*get_crit_temp) (struct thermal_zone_device *, long *);
 	int (*set_emul_temp) (struct thermal_zone_device *, unsigned long);
 	int (*get_trend) (struct thermal_zone_device *, int,
 			  enum thermal_trend *);
