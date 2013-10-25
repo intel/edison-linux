@@ -664,7 +664,8 @@ static int intel_mrfl_mmc_probe_slot(struct sdhci_pci_slot *slot)
 			slot->host->mmc->caps2 |= MMC_CAP2_HS200_1_8V_SDR;
 			/* WA for async abort silicon issue */
 			slot->host->quirks2 |= SDHCI_QUIRK2_CARD_CD_DELAY |
-					SDHCI_QUIRK2_WAIT_FOR_IDLE;
+					SDHCI_QUIRK2_WAIT_FOR_IDLE |
+					SDHCI_QUIRK2_TUNING_POLL;
 		}
 		mrfl_ioapic_rte_reg_addr_map(slot);
 		break;
