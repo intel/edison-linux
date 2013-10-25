@@ -563,7 +563,7 @@ trip_point_temp_store(struct device *dev, struct device_attribute *attr,
 {
 	struct thermal_zone_device *tz = to_thermal_zone(dev);
 	int trip, ret;
-	unsigned long temperature;
+	long temperature;
 
 	if (!tz->ops->set_trip_temp)
 		return -EPERM;
@@ -1138,7 +1138,7 @@ thermal_add_hwmon_sysfs(struct thermal_zone_device *tz)
 		goto free_temp_mem;
 
 	if (tz->ops->get_crit_temp) {
-		unsigned long temperature;
+		long temperature;
 		if (!tz->ops->get_crit_temp(tz, &temperature)) {
 			snprintf(temp->temp_crit.name,
 				 sizeof(temp->temp_crit.name),
