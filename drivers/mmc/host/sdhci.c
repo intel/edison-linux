@@ -2242,9 +2242,13 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 		host->tuning_done = 0;
 
 		ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
-		tuning_loop_counter--;
-		timeout--;
-		mdelay(1);
+		if (tuning_loop_counter)
+			tuning_loop_counter--;
+		if (timeout)
+			timeout--;
+		spin_unlock(&host->lock);
+		usleep_range(900, 1100);
+		spin_lock(&host->lock);
 	} while (ctrl & SDHCI_CTRL_EXEC_TUNING);
 
 	/*
