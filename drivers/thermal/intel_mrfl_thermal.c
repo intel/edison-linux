@@ -43,7 +43,6 @@
 #include <linux/iio/consumer.h>
 
 #define DRIVER_NAME "bcove_thrm"
-#define DEVICE_NAME "mrfl_pmic_thermal"
 
 /* Number of Thermal sensors on the PMIC */
 #define PMIC_THERMAL_SENSORS	4
