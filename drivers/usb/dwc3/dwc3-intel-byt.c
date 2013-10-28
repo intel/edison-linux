@@ -716,15 +716,13 @@ int dwc3_intel_byt_prepare_start_peripheral(struct dwc_otg2 *otg)
 
 int dwc3_intel_byt_suspend(struct dwc_otg2 *otg)
 {
-	struct pci_dev *pci_dev = to_pci_dev(otg->dev);
-	pci_power_t state = PCI_D3cold;
+	struct pci_dev *pci_dev;
+	pci_power_t state = PCI_D3hot;
 
 	if (!otg)
 		return 0;
 
-	if (otg->state == DWC_STATE_B_PERIPHERAL ||
-			otg->state == DWC_STATE_A_HOST)
-		state = PCI_D3hot;
+	pci_dev = to_pci_dev(otg->dev);
 
 	set_sus_phy(otg, 1);
 
