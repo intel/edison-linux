@@ -59,6 +59,7 @@ struct mmc_ios {
 #define MMC_TIMING_UHS_SDR104	6
 #define MMC_TIMING_UHS_DDR50	7
 #define MMC_TIMING_MMC_HS200	8
+#define MMC_TIMING_MMC_HS400	9
 
 #define MMC_SDR_MODE		0
 #define MMC_1_2V_DDR_MODE	1
@@ -281,6 +282,17 @@ struct mmc_host {
 #define MMC_CAP2_PACKED_CMD	(MMC_CAP2_PACKED_RD | \
 				 MMC_CAP2_PACKED_WR)
 #define MMC_CAP2_NO_PRESCAN_POWERUP (1 << 14)	/* Don't power up before scan */
+#define MMC_CAP2_INIT_CARD_SYNC	(1 << 15)	/* init card in sync mode */
+#define MMC_CAP2_POLL_R1B_BUSY	(1 << 16)	/* host poll R1B busy*/
+#define MMC_CAP2_RPMBPART_NOACC	(1 << 17)	/* RPMB partition no access */
+#define MMC_CAP2_LED_SUPPORT	(1 << 18)	/* led support */
+#define MMC_CAP2_PWCTRL_POWER	(1 << 19)	/* power control card power */
+#define MMC_CAP2_FIXED_NCRC	(1 << 20)	/* fixed NCRC */
+#define MMC_CAP2_HS200_WA	(1 << 21)	/* WA: 100MHz clock in HS200 */
+#define MMC_CAP2_HS400_1_8V_DDR	(1 << 22)	/* support HS400 */
+#define MMC_CAP2_HS400_1_2V_DDR	(1 << 23)	/* support HS400 */
+#define MMC_CAP2_HS400		(MMC_CAP2_HS400_1_8V_DDR | \
+				MMC_CAP2_HS400_1_2V_DDR)
 
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
 

@@ -477,10 +477,22 @@ static int intel_moor_emmc_probe_slot(struct sdhci_pci_slot *slot)
 	slot->host->mmc->caps2 |= MMC_CAP2_POLL_R1B_BUSY |
 				MMC_CAP2_INIT_CARD_SYNC;
 
+	/* Enable HS200 and HS400 */
+	slot->host->mmc->caps2 |= MMC_CAP2_HS200_1_8V_SDR;
+
+	if (slot->chip->pdev->revision == 0x1) { /* B0 stepping */
+		slot->host->mmc->caps2 |= MMC_CAP2_HS400_1_8V_DDR;
+	}
+
 	if (slot->data)
 		if (slot->data->platform_quirks & PLFM_QUIRK_NO_HIGH_SPEED) {
 			slot->host->quirks2 |= SDHCI_QUIRK2_DISABLE_HIGH_SPEED;
 			slot->host->mmc->caps &= ~MMC_CAP_1_8V_DDR;
+			slot->host->mmc->caps2 &= ~MMC_CAP2_HS200_1_8V_SDR;
+			if (slot->chip->pdev->revision == 0x1) {
+				slot->host->mmc->caps2 &=
+					~MMC_CAP2_HS400_1_8V_DDR;
+			}
 		}
 
 	if (slot->data)
