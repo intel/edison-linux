@@ -26,6 +26,7 @@
 #include <asm/intel_scu_ipc.h>
 #include <asm/intel_scu_flis.h>
 #include <asm/intel_mid_rpmsg.h>
+#include <asm/intel_mid_remoteproc.h>
 #include <linux/platform_data/intel_mid_remoteproc.h>
 
 static struct rpmsg_instance *flis_instance;
@@ -46,6 +47,7 @@ struct intel_scu_flis_info {
 	int pin_num;
 	int initialized;
 	void *flis_base;
+	u32 flis_paddr;
 };
 
 static struct intel_scu_flis_info flis_info;
@@ -75,10 +77,26 @@ void set_flis_value(u32 value, u32 offset)
 	if (!isfi->initialized || !isfi->flis_base)
 		return;
 
-	mem = (void __iomem *)(isfi->flis_base + offset);
-	spin_lock_irqsave(&mmio_flis_lock, flags);
-	writel(value, mem);
-	spin_unlock_irqrestore(&mmio_flis_lock, flags);
+	/*
+	 * There is one security region for Merrifield FLIS, which
+	 * are read only to OS side. Use IPC when write access is needed.
+	 */
+	if (intel_mid_identify_cpu() == INTEL_MID_CPU_CHIP_TANGIER
+			&& offset >= 0x1d00
+			&& offset <= 0x1d34) {
+		/* IPC call should not be called in atomic context */
+		might_sleep();
+		rpmsg_send_generic_raw_command(RP_INDIRECT_WRITE, 0,
+					(u8 *)&value, 4,
+					NULL, 0,
+					isfi->flis_paddr + offset, 0);
+
+	} else {
+		mem = (void __iomem *)(isfi->flis_base + offset);
+		spin_lock_irqsave(&mmio_flis_lock, flags);
+		writel(value, mem);
+		spin_unlock_irqrestore(&mmio_flis_lock, flags);
+	}
 }
 EXPORT_SYMBOL(set_flis_value);
 
@@ -584,6 +602,7 @@ static int scu_flis_probe(struct platform_device *pdev)
 	isfi->pin_num = pdata->pin_num;
 	isfi->mmio_flis_t = pdata->mmio_flis_t;
 	if (pdata->mmio_flis_t && pdata->flis_base) {
+		isfi->flis_paddr = pdata->flis_base;
 		isfi->flis_base = ioremap_nocache(pdata->flis_base,
 					pdata->flis_len);
 		if (!isfi->flis_base) {
