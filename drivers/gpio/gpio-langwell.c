@@ -391,9 +391,45 @@ static int lnw_gpio_get(struct gpio_chip *chip, unsigned offset)
 	return readl(gplr) & BIT(offset % 32);
 }
 
+#define PULLUP_ENABLE	(1 << 8)
+#define PULLDOWN_ENABLE	(1 << 9)
+#define PUPD_VAL_2K	(0 << 4)
+#define PUPD_VAL_20K	(1 << 4)
+#define PUPD_VAL_50K	(2 << 4)
+#define PUPD_VAL_910	(3 << 4)
+#define I2C_FLIS_START	0x1D00
+#define I2C_FLIS_END	0x1D34
+
+static int lnw_gpio_set_pull(struct gpio_chip *chip, unsigned gpio, int value)
+{
+	u32 flis_offset, flis_value;
+	struct lnw_gpio *lnw = to_lnw_priv(chip);
+
+	if (lnw->type != TANGIER_GPIO)
+		return 0;
+
+	flis_offset = lnw->get_flis_offset(gpio);
+	if (WARN(flis_offset == -EINVAL, "invalid pin %d\n", gpio))
+		return -1;
+	if (flis_offset >= I2C_FLIS_START && flis_offset <= I2C_FLIS_END)
+		return 0;
+	flis_value = get_flis_value(flis_offset);
+	if (value) {
+		flis_value |= PULLUP_ENABLE;
+		flis_value &= ~PULLDOWN_ENABLE;
+	} else {
+		flis_value |= PULLDOWN_ENABLE;
+		flis_value &= ~PULLUP_ENABLE;
+	}
+	flis_value |= PUPD_VAL_50K;
+	set_flis_value(flis_value, flis_offset);
+}
+
 static void lnw_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
 {
 	void __iomem *gpsr, *gpcr;
+
+	lnw_gpio_set_pull(chip, offset, value);
 
 	if (value) {
 		gpsr = gpio_reg(chip, offset, GPSR);
@@ -600,7 +636,6 @@ static int gpio_set_pinvalue(struct gpio_control *control, void *private_data,
 	struct lnw_gpio *lnw = private_data;
 
 	lnw_gpio_set(&lnw->chip, gpio, num);
-
 	return 0;
 }
 
