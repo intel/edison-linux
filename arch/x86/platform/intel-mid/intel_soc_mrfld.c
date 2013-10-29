@@ -81,26 +81,34 @@ static int mrfld_pmu_init(void)
 	residency[SYS_STATE_S0I1] = ioremap_nocache(S0I1_RES_ADDR, sizeof(u64));
 	if (residency[SYS_STATE_S0I1] == NULL)
 		goto err1;
+	residency[SYS_STATE_LPMP3] = ioremap_nocache(LPMP3_RES_ADDR,
+								sizeof(u64));
+	if (residency[SYS_STATE_LPMP3] == NULL)
+		goto err2;
 	residency[SYS_STATE_S0I2] = ioremap_nocache(S0I2_RES_ADDR, sizeof(u64));
 	if (residency[SYS_STATE_S0I2] == NULL)
-		goto err2;
+		goto err3;
 	residency[SYS_STATE_S0I3] = ioremap_nocache(S0I3_RES_ADDR, sizeof(u64));
 	if (residency[SYS_STATE_S0I3] == NULL)
-		goto err3;
+		goto err4;
 
 	/* Map S0ix iteration counters */
 	s0ix_counter[SYS_STATE_S0I1] = ioremap_nocache(S0I1_COUNT_ADDR,
 								sizeof(u32));
 	if (s0ix_counter[SYS_STATE_S0I1] == NULL)
-		goto err4;
+		goto err5;
+	s0ix_counter[SYS_STATE_LPMP3] = ioremap_nocache(LPMP3_COUNT_ADDR,
+								sizeof(u32));
+	if (s0ix_counter[SYS_STATE_LPMP3] == NULL)
+		goto err6;
 	s0ix_counter[SYS_STATE_S0I2] = ioremap_nocache(S0I2_COUNT_ADDR,
 								sizeof(u32));
 	if (s0ix_counter[SYS_STATE_S0I2] == NULL)
-		goto err5;
+		goto err7;
 	s0ix_counter[SYS_STATE_S0I3] = ioremap_nocache(S0I3_COUNT_ADDR,
 								sizeof(u32));
 	if (s0ix_counter[SYS_STATE_S0I3] == NULL)
-		goto err6;
+		goto err8;
 	/* Keep PSH LSS's 00, 33, 34 in D0i0 if PM is disabled */
 	if (!enable_s0ix && !enable_s3) {
 		mid_pmu_cxt->os_sss[2] &=
@@ -116,21 +124,27 @@ static int mrfld_pmu_init(void)
 
 	return PMU_SUCCESS;
 
-err6:
+err8:
 	iounmap(s0ix_counter[SYS_STATE_S0I3]);
 	s0ix_counter[SYS_STATE_S0I3] = NULL;
-err5:
+err7:
 	iounmap(s0ix_counter[SYS_STATE_S0I2]);
 	s0ix_counter[SYS_STATE_S0I2] = NULL;
-err4:
+err6:
+	iounmap(s0ix_counter[SYS_STATE_LPMP3]);
+	s0ix_counter[SYS_STATE_LPMP3] = NULL;
+err5:
 	iounmap(s0ix_counter[SYS_STATE_S0I1]);
 	s0ix_counter[SYS_STATE_S0I1] = NULL;
-err3:
+err4:
 	iounmap(residency[SYS_STATE_S0I3]);
 	residency[SYS_STATE_S0I3] = NULL;
-err2:
+err3:
 	iounmap(residency[SYS_STATE_S0I2]);
 	residency[SYS_STATE_S0I2] = NULL;
+err2:
+	iounmap(residency[SYS_STATE_LPMP3]);
+	residency[SYS_STATE_LPMP3] = NULL;
 err1:
 	iounmap(residency[SYS_STATE_S0I1]);
 	residency[SYS_STATE_S0I1] = NULL;
