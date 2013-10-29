@@ -1455,7 +1455,8 @@ static int pmu_devices_state_show(struct seq_file *s, void *unused)
 	up(&mid_pmu_cxt->scu_ready_sem);
 
 	pmu_stat_seq_printf(s, SYS_STATE_S0I1, "s0i1");
-	pmu_stat_seq_printf(s, SYS_STATE_S0I2, "S0i2");
+	pmu_stat_seq_printf(s, SYS_STATE_LPMP3, "lpmp3");
+	pmu_stat_seq_printf(s, SYS_STATE_S0I2, "s0i2");
 	pmu_stat_seq_printf(s, SYS_STATE_S0I3, "s0i3");
 	pmu_stat_seq_printf(s, SYS_STATE_S3, "s3");
 
@@ -1531,10 +1532,12 @@ static ssize_t devices_state_write(struct file *file,
 
 		mid_pmu_cxt->pmu_init_time = cpu_clock(0);
 		prev_s0ix_cnt[SYS_STATE_S0I1] = readl(s0ix_counter[SYS_STATE_S0I1]);
+		prev_s0ix_cnt[SYS_STATE_LPMP3] = readl(s0ix_counter[SYS_STATE_LPMP3]);
 		prev_s0ix_cnt[SYS_STATE_S0I2] = readl(s0ix_counter[SYS_STATE_S0I2]);
 		prev_s0ix_cnt[SYS_STATE_S0I3] = readl(s0ix_counter[SYS_STATE_S0I3]);
 		prev_s0ix_cnt[SYS_STATE_S3] = 0;
 		prev_s0ix_res[SYS_STATE_S0I1] = readq(residency[SYS_STATE_S0I1]);
+		prev_s0ix_res[SYS_STATE_LPMP3] = readq(residency[SYS_STATE_LPMP3]);
 		prev_s0ix_res[SYS_STATE_S0I2] = readq(residency[SYS_STATE_S0I2]);
 		prev_s0ix_res[SYS_STATE_S0I3] = readq(residency[SYS_STATE_S0I3]);
 		prev_s0ix_res[SYS_STATE_S3] = 0 ;
