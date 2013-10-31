@@ -33,26 +33,6 @@
 #define NUM_VOLT_LEVELS         3
 #define NUM_CURR_LEVELS         2
 
-/* Macros for the Exit Debounce Time for VW1, VW2 and VCRIT trip points */
-#define VW_EXIT_DB_CLK0		~(B6 | B5 | B4)
-#define VW_EXIT_DB_CLK1		B4
-#define VW_EXIT_DB_CLK2		B5
-#define VW_EXIT_DB_CLK5		(B5 | B4)
-#define VW_EXIT_DB_CLK10	B6
-#define VW_EXIT_DB_CLK20	(B6 | B4)
-#define VW_EXIT_DB_CLK40	(B6 | B5)
-#define VW_EXIT_DB_CLK160	(B6 | B5 | B4)
-
-/* Macros for the Exit Debounce Time for VCRIT trip point */
-#define VCRIT_EXIT_DB_CLK0	~(B6 | B5)
-#define VCRIT_EXIT_DB_CLK5	B5
-#define VCRIT_EXIT_DB_CLK40	B6
-#define VCRIT_EXIT_DB_CLK160	(B6 | B5)
-
-/* Macros for the Exit Debounce Time for VW1, VW2 and VCRIT trip points Mask */
-#define VW_EXIT_DB_MASK		(B6 | B5 | B4)
-#define VCRIT_EXIT_DB_MASK	(B6 | B5)
-
 #define VWARN_EN_MASK		B3
 #define ICCMAXVCC_EN_MASK	B6
 
