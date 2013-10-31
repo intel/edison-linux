@@ -727,6 +727,9 @@ static void int_transfer_complete(struct ssp_drv_context *sspc)
 	dump_trailer(dev, sspc->rx, sspc->len, 16);
 #endif
 
+	if (sspc->cs_control)
+		sspc->cs_control(CS_DEASSERT);
+
 	dev_dbg(dev, "End of transfer. SSSR:%08X\n", read_SSSR(reg));
 	msg = sspc->cur_msg;
 	if (likely(msg->complete))
@@ -750,6 +753,9 @@ static void poll_transfer_complete(struct ssp_drv_context *sspc)
 	sspc->cur_msg->actual_length += sspc->len - (sspc->rx_end - sspc->rx);
 
 	sspc->cur_msg->status = 0;
+	if (sspc->cs_control)
+		sspc->cs_control(CS_DEASSERT);
+
 	msg = sspc->cur_msg;
 	if (likely(msg->complete))
 		msg->complete(msg->context);
@@ -969,6 +975,8 @@ static int handle_message(struct ssp_drv_context *sspc)
 	sspc->len = transfer->len;
 	sspc->write = chip->write;
 	sspc->read = chip->read;
+	sspc->cs_control = chip->cs_control;
+	sspc->cs_change = transfer->cs_change;
 
 	if (likely(chip->dma_enabled)) {
 		sspc->dma_mapped = map_dma_buffers(sspc);
@@ -1036,6 +1044,9 @@ static int handle_message(struct ssp_drv_context *sspc)
 		} else
 			write_SSCR0(chip->cr0, reg);
 	}
+
+	if (sspc->cs_control)
+		sspc->cs_control(CS_ASSERT);
 
 	if (likely(chip->dma_enabled)) {
 		if (unlikely(sspc->quirks & QUIRKS_USE_PM_QOS))
@@ -1127,6 +1138,7 @@ static int setup(struct spi_device *spi)
 			chip->cr1 |= SSCR1_LBM;
 
 		chip->dma_enabled = chip_info->dma_enabled;
+		chip->cs_control = chip_info->cs_control;
 
 	} else {
 		/* if no chip_info provided by protocol driver, */
