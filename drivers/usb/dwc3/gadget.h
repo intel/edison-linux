@@ -54,6 +54,7 @@ struct dwc3;
 #define DWC3_DEPCFG_XFER_NOT_READY_EN	(1 << 10)
 #define DWC3_DEPCFG_FIFO_ERROR_EN	(1 << 11)
 #define DWC3_DEPCFG_STREAM_EVENT_EN	(1 << 13)
+#define DWC3_DEPCFG_EBC_MODE_EN		(1 << 15)
 #define DWC3_DEPCFG_BINTERVAL_M1(n)	((n) << 16)
 #define DWC3_DEPCFG_STREAM_CAPABLE	(1 << 24)
 #define DWC3_DEPCFG_EP_NUMBER(n)	((n) << 25)
