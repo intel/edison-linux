@@ -163,7 +163,9 @@ static char *ipc_err_sources[] = {
 	[IPC_ERR_CMD_FAILED] =
 		"command failed",
 	[IPC_ERR_EMSECURITY] =
-		"unsigned kernel",
+		"Invalid Battery",
+	[IPC_ERR_UNSIGNEDKERNEL] =
+		"Unsigned kernel",
 };
 
 /* Suspend status get */
@@ -301,6 +303,8 @@ int intel_scu_ipc_check_status(void)
 			dev_err(&ipcdev.pdev->dev,
 				"IPC failed: unknown error, IPC_STS=0x%x, "
 				"IPC_CMD=0x%x\n", status, ipcdev.cmd);
+		if ((i == IPC_ERR_UNSIGNEDKERNEL) || (i == IPC_ERR_EMSECURITY))
+			ret = -EACCES;
 	}
 
 	return ret;
