@@ -41,6 +41,7 @@
 #define IPC_ERR_CMD_INVALID		4
 #define IPC_ERR_CMD_FAILED		5
 #define IPC_ERR_EMSECURITY		6
+#define IPC_ERR_UNSIGNEDKERNEL		7
 
 #define MSIC_DEBUG_FILE "msic"
 #define MSIC_ALL_DEBUG_FILE "msic_all"
