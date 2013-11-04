@@ -304,6 +304,10 @@ static int dwc3_start_host(struct usb_hcd *hcd)
 	 * To prevent incorrect flags set during last time. */
 	hcd->flags = 0;
 
+	/* Clear the hcd->flags.
+	 * To prevent incorrect flags set during last time. */
+	hcd->flags = 0;
+
 	ret = usb_add_hcd(hcd, otg_irqnum, IRQF_SHARED);
 	if (ret)
 		return -EINVAL;
