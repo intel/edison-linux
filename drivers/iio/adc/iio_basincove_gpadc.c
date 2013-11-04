@@ -45,32 +45,6 @@
 #include <linux/iio/types.h>
 #include <linux/iio/consumer.h>
 
-#define GPADCREQ	0xDC
-#define GPADCREQ_IRQEN	(1 << 1)
-#define GPADCREQ_BUSY	(1 << 0)
-#define MIRQLVL1_ADC	(1 << 4)
-#define MIRQLVL1	0x0C
-#define ADC1CNTL	0xDD
-#define ADCIRQ		0x06
-#define MADCIRQ		0x11
-
-static struct gpadc_regmap_t {
-	char *name;
-	int cntl;	/* GPADC Conversion Control Bit indicator */
-	int rslth;	/* GPADC Conversion Result Register Addr High */
-	int rsltl;	/* GPADC Conversion Result Register Addr Low */
-} gpadc_regmaps[GPADC_CH_NUM] = {
-	{"VBAT",	5, 0xE9, 0xEA, },
-	{"BATID",	4, 0xEB, 0xEC, },
-	{"IBAT",	5, 0xED, 0xEE, },
-	{"PMICTEMP",	3, 0xCC, 0xCD, },
-	{"BATTEMP0",	2, 0xC8, 0xC9, },
-	{"BATTEMP1",	2, 0xCA, 0xCB, },
-	{"SYSTEMP0",	3, 0xC2, 0xC3, },
-	{"SYSTEMP1",	3, 0xC4, 0xC5, },
-	{"SYSTEMP2",	3, 0xC6, 0xC7, },
-};
-
 struct gpadc_info {
 	int initialized;
 	/* This mutex protects gpadc sample/config from concurrent conflict.
@@ -85,6 +59,9 @@ struct gpadc_info {
 	wait_queue_head_t wait;
 	int sample_done;
 	void __iomem *intr;
+	int channel_num;
+	struct gpadc_regmap_t *gpadc_regmaps;
+	struct gpadc_regs_t *gpadc_regs;
 };
 
 static inline int gpadc_clear_bits(u16 addr, u8 mask)
@@ -107,19 +84,19 @@ static inline int gpadc_read(u16 addr, u8 *data)
 	return intel_scu_ipc_ioread8(addr, data);
 }
 
-static int gpadc_busy_wait(void)
+static int gpadc_busy_wait(struct gpadc_regs_t *regs)
 {
 	u8 tmp;
 	int timeout = 0;
 
-	gpadc_read(GPADCREQ, &tmp);
-	while (tmp & GPADCREQ_BUSY && timeout < 500) {
-		gpadc_read(GPADCREQ, &tmp);
+	gpadc_read(regs->gpadcreq, &tmp);
+	while (tmp & regs->gpadcreq_busy && timeout < 500) {
+		gpadc_read(regs->gpadcreq, &tmp);
 		usleep_range(1800, 2000);
 		timeout++;
 	}
 
-	if (tmp & GPADCREQ_BUSY)
+	if (tmp & regs->gpadcreq_busy)
 		return -EBUSY;
 	else
 		return 0;
@@ -128,15 +105,16 @@ static int gpadc_busy_wait(void)
 static void gpadc_dump(struct gpadc_info *info)
 {
 	u8 tmp;
+	struct gpadc_regs_t *regs = info->gpadc_regs;
 
 	dev_err(info->dev, "GPADC registers dump:\n");
-	gpadc_read(ADCIRQ, &tmp);
+	gpadc_read(regs->adcirq, &tmp);
 	dev_err(info->dev, "ADCIRQ: 0x%x\n", tmp);
-	gpadc_read(MADCIRQ, &tmp);
+	gpadc_read(regs->madcirq, &tmp);
 	dev_err(info->dev, "MADCIRQ: 0x%x\n", tmp);
-	gpadc_read(GPADCREQ, &tmp);
+	gpadc_read(regs->gpadcreq, &tmp);
 	dev_err(info->dev, "GPADCREQ: 0x%x\n", tmp);
-	gpadc_read(ADC1CNTL, &tmp);
+	gpadc_read(regs->adc1cntl, &tmp);
 	dev_err(info->dev, "ADC1CNTL: 0x%x\n", tmp);
 }
 
@@ -152,8 +130,11 @@ static irqreturn_t gpadc_isr(int irq, void *data)
 
 static irqreturn_t gpadc_threaded_isr(int irq, void *data)
 {
+	struct gpadc_info *info = iio_priv(data);
+	struct gpadc_regs_t *regs = info->gpadc_regs;
+
 	/* Clear IRQLVL1MASK */
-	gpadc_clear_bits(MIRQLVL1, MIRQLVL1_ADC);
+	gpadc_clear_bits(regs->mirqlvl1, regs->mirqlvl1_adc);
 
 	return IRQ_HANDLED;
 }
@@ -178,6 +159,7 @@ int iio_basincove_gpadc_sample(struct iio_dev *indio_dev,
 	int i, ret;
 	u8 tmp, th, tl;
 	u8 mask;
+	struct gpadc_regs_t *regs = info->gpadc_regs;
 
 	if (!info->initialized)
 		return -ENODEV;
@@ -185,25 +167,25 @@ int iio_basincove_gpadc_sample(struct iio_dev *indio_dev,
 	mutex_lock(&info->lock);
 
 	mask = MBATTEMP | MSYSTEMP | MBATT | MVIBATT | MCCTICK;
-	gpadc_clear_bits(MADCIRQ, mask);
-	gpadc_clear_bits(MIRQLVL1, MIRQLVL1_ADC);
+	gpadc_clear_bits(regs->madcirq, mask);
+	gpadc_clear_bits(regs->mirqlvl1, regs->mirqlvl1_adc);
 
-	tmp = GPADCREQ_IRQEN;
+	tmp = regs->gpadcreq_irqen;
 
-	for (i = 0; i < GPADC_CH_NUM; i++) {
+	for (i = 0; i < info->channel_num; i++) {
 		if (ch & (1 << i))
-			tmp |= (1 << gpadc_regmaps[i].cntl);
+			tmp |= (1 << info->gpadc_regmaps[i].cntl);
 	}
 
 	info->sample_done = 0;
 
-	ret = gpadc_busy_wait();
+	ret = gpadc_busy_wait(regs);
 	if (ret) {
 		dev_err(info->dev, "GPADC is busy\n");
 		goto done;
 	}
 
-	gpadc_write(GPADCREQ, tmp);
+	gpadc_write(regs->gpadcreq, tmp);
 
 	ret = wait_event_timeout(info->wait, info->sample_done, HZ);
 	if (ret == 0) {
@@ -215,17 +197,17 @@ int iio_basincove_gpadc_sample(struct iio_dev *indio_dev,
 		ret = 0;
 	}
 
-	for (i = 0; i < GPADC_CH_NUM; i++) {
+	for (i = 0; i < info->channel_num; i++) {
 		if (ch & (1 << i)) {
-			gpadc_read(gpadc_regmaps[i].rslth, &th);
-			gpadc_read(gpadc_regmaps[i].rsltl, &tl);
+			gpadc_read(info->gpadc_regmaps[i].rslth, &th);
+			gpadc_read(info->gpadc_regmaps[i].rsltl, &tl);
 			res->data[i] = ((th & 0x3) << 8) + tl;
 		}
 	}
 
 done:
-	gpadc_set_bits(MIRQLVL1, MIRQLVL1_ADC);
-	gpadc_set_bits(MADCIRQ, mask);
+	gpadc_set_bits(regs->mirqlvl1, regs->mirqlvl1_adc);
+	gpadc_set_bits(regs->madcirq, mask);
 	mutex_unlock(&info->lock);
 	return ret;
 }
@@ -238,12 +220,15 @@ static ssize_t intel_basincove_gpadc_store_channel(struct device *dev,
 					struct device_attribute *attr,
 					const char *buf, size_t size)
 {
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct gpadc_info *info = iio_priv(indio_dev);
+
 	if (sscanf(buf, "%x", &chs) != 1) {
 		dev_err(dev, "one channel argument is needed\n");
 		return -EINVAL;
 	}
 
-	if (chs < (1 << 0) || chs >= (1 << GPADC_CH_NUM)) {
+	if (chs < (1 << 0) || chs >= (1 << info->channel_num)) {
 		dev_err(dev, "invalid channel, should be in [0x1 - 0x1FF]\n");
 		return -EINVAL;
 	}
@@ -291,8 +276,10 @@ static ssize_t intel_basincove_gpadc_show_result(struct device *dev,
 {
 	int i;
 	int used = 0;
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct gpadc_info *info = iio_priv(indio_dev);
 
-	for (i = 0; i < GPADC_CH_NUM; i++) {
+	for (i = 0; i < info->channel_num; i++) {
 		used += snprintf(buf + used, PAGE_SIZE - used,
 			 "sample_result[%d] = %d\n", i, sample_result.data[i]);
 	}
@@ -316,26 +303,6 @@ static struct attribute *intel_basincove_gpadc_attrs[] = {
 static struct attribute_group intel_basincove_gpadc_attr_group = {
 	.name = "basincove_gpadc",
 	.attrs = intel_basincove_gpadc_attrs,
-};
-
-#define MSIC_ADC_CHANNEL(_type, _channel, _datasheet_name) \
-	{				\
-		.indexed = 1,		\
-		.type = _type,		\
-		.channel = _channel,	\
-		.datasheet_name = _datasheet_name,	\
-	}
-
-static const struct iio_chan_spec const basincove_adc_channels[] = {
-	MSIC_ADC_CHANNEL(IIO_VOLTAGE, 0, "CH0"),
-	MSIC_ADC_CHANNEL(IIO_RESISTANCE, 1, "CH1"),
-	MSIC_ADC_CHANNEL(IIO_CURRENT, 2, "CH2"),
-	MSIC_ADC_CHANNEL(IIO_TEMP, 3, "CH3"),
-	MSIC_ADC_CHANNEL(IIO_TEMP, 4, "CH4"),
-	MSIC_ADC_CHANNEL(IIO_TEMP, 5, "CH5"),
-	MSIC_ADC_CHANNEL(IIO_TEMP, 6, "CH6"),
-	MSIC_ADC_CHANNEL(IIO_TEMP, 7, "CH7"),
-	MSIC_ADC_CHANNEL(IIO_TEMP, 8, "CH8"),
 };
 
 static int basincove_adc_read_raw(struct iio_dev *indio_dev,
@@ -434,6 +401,9 @@ static int bcove_gpadc_probe(struct platform_device *pdev)
 		err = -ENOMEM;
 		goto err_free;
 	}
+	info->channel_num = pdata->channel_num;
+	info->gpadc_regmaps = pdata->gpadc_regmaps;
+	info->gpadc_regs = pdata->gpadc_regs;
 
 	err = request_threaded_irq(info->irq, gpadc_isr, gpadc_threaded_isr,
 			IRQF_ONESHOT, "adc", indio_dev);
@@ -448,12 +418,12 @@ static int bcove_gpadc_probe(struct platform_device *pdev)
 	indio_dev->dev.parent = &pdev->dev;
 	indio_dev->name = pdev->name;
 
-	indio_dev->channels = basincove_adc_channels;
-	indio_dev->num_channels = ARRAY_SIZE(basincove_adc_channels);
+	indio_dev->channels = pdata->gpadc_channels;
+	indio_dev->num_channels = pdata->channel_num;
 	indio_dev->info = &basincove_adc_info;
 	indio_dev->modes = INDIO_DIRECT_MODE;
 
-	err = iio_map_array_register(indio_dev, pdata->iio_maps);
+	err = iio_map_array_register(indio_dev, pdata->gpadc_iio_maps);
 	if (err)
 		goto err_release_irq;
 
