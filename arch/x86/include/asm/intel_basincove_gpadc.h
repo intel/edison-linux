@@ -20,11 +20,33 @@
 
 #define GPADC_RSL(channel, res) (res->data[ffs(channel)-1])
 
+struct gpadc_regmap_t {
+	char *name;
+	int cntl;       /* GPADC Conversion Control Bit indicator */
+	int rslth;      /* GPADC Conversion Result Register Addr High */
+	int rsltl;      /* GPADC Conversion Result Register Addr Low */
+};
+
+struct gpadc_regs_t {
+	u16 gpadcreq;
+	u16 gpadcreq_irqen;
+	u16 gpadcreq_busy;
+	u16 mirqlvl1;
+	u16 mirqlvl1_adc;
+	u16 adc1cntl;
+	u16 adcirq;
+	u16 madcirq;
+};
+
 struct iio_dev;
 
 struct intel_basincove_gpadc_platform_data {
+	int channel_num;
 	unsigned long intr;
-	struct iio_map *iio_maps;
+	struct iio_map *gpadc_iio_maps;
+	struct gpadc_regmap_t *gpadc_regmaps;
+	struct gpadc_regs_t *gpadc_regs;
+	struct iio_chan_spec *gpadc_channels;
 };
 
 struct gpadc_result {
