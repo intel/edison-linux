@@ -45,6 +45,7 @@ struct iio_map iio_maps[] = {
 	MSIC_ADC_MAP("CH7", "bcove_thrm", "SYSTEMP1"),
 	MSIC_ADC_MAP("CH8", "bcove_thrm", "SYSTEMP2"),
 	MSIC_ADC_MAP("CH3", "bcove_thrm", "PMICTEMP"),
+	{ },
 };
 
 void __init *bcove_adc_platform_data(void *info)
