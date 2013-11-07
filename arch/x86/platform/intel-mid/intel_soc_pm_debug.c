@@ -1329,13 +1329,16 @@ void pmu_stats_finish(void)
 
 static u32 prev_s0ix_cnt[SYS_STATE_MAX];
 static unsigned long long prev_s0ix_res[SYS_STATE_MAX];
+static unsigned long long cur_s0ix_res[SYS_STATE_MAX];
+static unsigned long long cur_s0ix_cnt[SYS_STATE_MAX];
 static u32 S3_count;
 static unsigned long long S3_res;
 
-static void pmu_stat_seq_printf(struct seq_file *s, int type, char *typestr)
+static void pmu_stat_seq_printf(struct seq_file *s, int type, char *typestr,
+							long long uptime)
 {
 	unsigned long long t;
-	u32 scu_val, time;
+	u32 scu_val = 0, time = 0;
 	u32 remainder;
 	unsigned long init_2_now_time;
 	unsigned long long tsc_freq = 1330000;
@@ -1345,7 +1348,10 @@ static void pmu_stat_seq_printf(struct seq_file *s, int type, char *typestr)
 		tsc_freq = tsc_khz;
 
 	/* Print S0ix residency counter */
-	if (type < SYS_STATE_S3) {
+	if (type == SYS_STATE_S0I0) {
+		for (t = SYS_STATE_S0I1; t <= SYS_STATE_S3; t++)
+			time += cur_s0ix_res[t];
+	} else if (type < SYS_STATE_S3) {
 		t = readq(residency[type]);
 		if (t < prev_s0ix_res[type])
 			t += (((unsigned long long)~0) - prev_s0ix_res[type]);
@@ -1357,19 +1363,26 @@ static void pmu_stat_seq_printf(struct seq_file *s, int type, char *typestr)
 	} else
 		t = prev_s0ix_res[SYS_STATE_S3];
 
-	/* s0ix residency counters are in TSC cycle count domain
-	 * convert this to milli second time domain
-	 */
-	remainder = do_div(t, tsc_freq);
+	if (type == SYS_STATE_S0I0) {
+		/* uptime(nanoS) - sum_res(miliSec) */
+		t = uptime;
+		do_div(t, MICRO_SEC);
+		time = t - time;
+	} else {
+		/* s0ix residency counters are in TSC cycle count domain
+		 * convert this to milli second time domain
+		 */
+		remainder = do_div(t, tsc_freq);
 
-	/* store time in millisecs */
-	time = (unsigned int)t;
+		/* store time in millisecs */
+		time = (unsigned int)t;
+	}
+	cur_s0ix_res[type] = (unsigned int)time;
 
 	seq_printf(s, "%s\t%5lu.%03lu\t", typestr,
 		(unsigned long)(time/1000), (unsigned long)(time%1000));
 
-	t =  cpu_clock(0);
-	t -= mid_pmu_cxt->pmu_init_time;
+	t = uptime;
 	do_div(t, MICRO_SEC); /* time in milli secs */
 
 	/* Note: with millisecs accuracy we get more
@@ -1400,7 +1413,12 @@ static void pmu_stat_seq_printf(struct seq_file *s, int type, char *typestr)
 	seq_printf(s, "%5lu.%03lu\t", (unsigned long) time, (unsigned long) t);
 
 	/* Print S0ix counters */
-	if (type < SYS_STATE_S3) {
+	if (type == SYS_STATE_S0I0) {
+		for (t = SYS_STATE_S0I1; t <= SYS_STATE_S3; t++)
+			scu_val += cur_s0ix_cnt[t];
+		if (scu_val == 0) /* S0I0 residency 100% */
+			scu_val = 1;
+	} else if (type < SYS_STATE_S3) {
 		scu_val = readl(s0ix_counter[type]);
 		if (scu_val < prev_s0ix_cnt[type])
 			scu_val += (((u32)~0) - prev_s0ix_cnt[type]);
@@ -1412,7 +1430,19 @@ static void pmu_stat_seq_printf(struct seq_file *s, int type, char *typestr)
 	} else
 			scu_val = prev_s0ix_cnt[SYS_STATE_S3];
 
-	seq_printf(s, "%lu\n", (unsigned long) scu_val);
+	if (type != SYS_STATE_S0I0)
+		cur_s0ix_cnt[type] = scu_val;
+
+	seq_printf(s, "%5lu\t", (unsigned long) scu_val);
+
+	remainder = 0;
+	t = cur_s0ix_res[type];
+	if (scu_val) { /* s0ix_time in millisecs */
+		do_div(t, scu_val);
+		remainder = do_div(t, 1000);
+	}
+	seq_printf(s, "%5lu.%03lu\n", (unsigned long) t,
+			(unsigned long) remainder);
 }
 
 static int pmu_devices_state_show(struct seq_file *s, void *unused)
@@ -1422,6 +1452,7 @@ static int pmu_devices_state_show(struct seq_file *s, void *unused)
 	unsigned int base_class;
 	u32 mask, val, nc_pwr_sts;
 	struct pmu_ss_states cur_pmsss;
+	long long uptime;
 	int ret;
 
 	if (!pmu_initialized)
@@ -1440,7 +1471,7 @@ static int pmu_devices_state_show(struct seq_file *s, void *unused)
 
 	seq_printf(s, "cmd_error_int count: %d\n", mid_pmu_cxt->cmd_error_int);
 
-	seq_printf(s, "\ttime(secs)\tresidency(%%)\tcount\n");
+	seq_printf(s, "\ttime(secs)\tresidency(%%)\tcount\tAvg.Res(Sec)\n");
 
 	down(&mid_pmu_cxt->scu_ready_sem);
 	/* Dump S0ix residency counters */
@@ -1454,11 +1485,18 @@ static int pmu_devices_state_show(struct seq_file *s, void *unused)
 		seq_printf(s, "IPC command to DUMP S0ix count failed\n");
 	up(&mid_pmu_cxt->scu_ready_sem);
 
-	pmu_stat_seq_printf(s, SYS_STATE_S0I1, "s0i1");
-	pmu_stat_seq_printf(s, SYS_STATE_LPMP3, "lpmp3");
-	pmu_stat_seq_printf(s, SYS_STATE_S0I2, "s0i2");
-	pmu_stat_seq_printf(s, SYS_STATE_S0I3, "s0i3");
-	pmu_stat_seq_printf(s, SYS_STATE_S3, "s3");
+	uptime =  cpu_clock(0);
+	uptime -= mid_pmu_cxt->pmu_init_time;
+	pmu_stat_seq_printf(s, SYS_STATE_S0I1, "s0i1", uptime);
+	pmu_stat_seq_printf(s, SYS_STATE_LPMP3, "lpmp3", uptime);
+	pmu_stat_seq_printf(s, SYS_STATE_S0I2, "s0i2", uptime);
+	pmu_stat_seq_printf(s, SYS_STATE_S0I3, "s0i3", uptime);
+	pmu_stat_seq_printf(s, SYS_STATE_S3, "s3", uptime);
+	pmu_stat_seq_printf(s, SYS_STATE_S0I0, "s0", uptime);
+
+	val = do_div(uptime, NANO_SEC);
+	seq_printf(s, "\n\nTotal time: %5lu.%03lu Sec\n", (unsigned long)uptime,
+		   (unsigned long) val/1000000);
 
 	seq_printf(s, "\nNORTH COMPLEX DEVICES :\n\n");
 
