@@ -164,6 +164,8 @@ static struct osnib_wake_src osnib_wake_srcs[] = {
 	{ WAKE_FORCED_RESET, "forced reset"},
 	{ WAKE_ACDC_CHRG_INSERT, "ac charger inserted" },
 	{ WAKE_PMIC_WATCHDOG_RESET, "pmic watchdog reset" },
+	{ WAKE_PLATFORM_WATCHDOG_RESET, "HWWDT reset platform" },
+	{ WAKE_SC_WATCHDOG_RESET, "HWWDT reset SC" },
 };
 
 
@@ -2294,6 +2296,10 @@ static int oshob_init(void)
 		}
 	}
 
+	if (!rr_found)
+		pr_warn("[BOOT] RR=[UNKNOWN 0x%02x] WD=0x%02x ALARM=0x%02x (osnib)\n",
+			rr, wd, alarm);
+
 	for (i = 0; i < ARRAY_SIZE(osnib_wake_srcs); i++) {
 		if (osnib_wake_srcs[i].id == wakesrc) {
 			pr_warn("[BOOT] WAKESRC=[%s] (osnib)\n",
@@ -2303,8 +2309,8 @@ static int oshob_init(void)
 		}
 	}
 
-	if ((!rr_found) || (!wksrc_found))
-		pr_err("[BOOT] Could not identify passed RR/WAKESRC\n");
+	if (!wksrc_found)
+		pr_warn("[BOOT] WAKESRC=[UNKNOWN 0x%02x] (osnib)\n", wakesrc);
 
 	for (i = 0; i < ARRAY_SIZE(chip_reset_events); i++) {
 		if (chip_reset_events[i].id == oshob_info->platform_type) {
