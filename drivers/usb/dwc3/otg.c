@@ -564,7 +564,17 @@ static enum dwc_otg_state do_a_host(struct dwc_otg2 *otg)
 	int id = RID_UNKNOWN;
 	unsigned long flags;
 
-	if (otg->charging_cap.chrg_type != CHRG_ACA_DOCK) {
+	/* If Battery low and connected charger is not ACA-DOCK.
+	 * Then stop trying to start host mode. */
+	if ((otg->usb2_phy.vbus_state == VBUS_DISABLED) &&
+			(otg->charging_cap.chrg_type !=
+			POWER_SUPPLY_CHARGER_TYPE_ACA_DOCK)) {
+		otg_uevent_trigger(&otg->usb2_phy);
+		return DWC_STATE_B_IDLE;
+	}
+
+	if (otg->charging_cap.chrg_type !=
+			POWER_SUPPLY_CHARGER_TYPE_ACA_DOCK) {
 		dwc_otg_enable_vbus(otg, 1);
 
 		/* meant receive vbus valid event*/
@@ -609,6 +619,19 @@ static enum dwc_otg_state do_a_host(struct dwc_otg2 *otg)
 		else
 			dwc_otg_enable_vbus(otg, 0);
 
+		stop_host(otg);
+		return DWC_STATE_B_IDLE;
+	}
+
+	if (user_events & USER_A_BUS_DROP) {
+		/* Due to big consume by DUT, even ACA-Dock connected,
+		 * the battery capability still maybe decrease. For this
+		 * case, still save host mode. Because DUT haven't drive VBus.*/
+		if (otg->charging_cap.chrg_type ==
+				POWER_SUPPLY_CHARGER_TYPE_ACA_DOCK)
+			goto stay_host;
+
+		dwc_otg_enable_vbus(otg, 0);
 		stop_host(otg);
 		return DWC_STATE_B_IDLE;
 	}
