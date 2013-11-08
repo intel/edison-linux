@@ -30,8 +30,17 @@
 #include <asm/mce.h>
 #include <asm/msr.h>
 
-/* How long to wait between reporting thermal events */
+/*
+ * How long to wait between reporting thermal events ?
+ * If Interrupt is enabled for Coretemp driver, the BIOS
+ * takes care of hysteresis and thus there are no spurious
+ * interrupts expected. Hence making this interval to 0.
+ */
+#ifdef CONFIG_SENSORS_CORETEMP_INTERRUPT
+#define CHECK_INTERVAL         (0)
+#else
 #define CHECK_INTERVAL		(300 * HZ)
+#endif
 
 #define THERMAL_THROTTLING_EVENT	0
 #define POWER_LIMIT_EVENT		1
