@@ -3411,8 +3411,8 @@ int dwc3_runtime_suspend(struct device *device)
 
 	spin_unlock_irqrestore(&dwc->lock, flags);
 
-	schedule_delayed_work(&dwc->link_work, msecs_to_jiffies(1000));
-	dev_info(dwc->dev, "suspended\n");
+	__dwc3_vbus_draw(dwc, OTG_DEVICE_SUSPEND);
+	dev_dbg(dwc->dev, "%s(): suspended\n", __func__);
 	dev_vdbg(dwc->dev, "<--- %s()\n", __func__);
 
 	return 0;
