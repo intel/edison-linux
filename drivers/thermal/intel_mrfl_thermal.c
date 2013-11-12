@@ -63,6 +63,12 @@
 #define PMIC_SRAM_THRM_OFFSET	0x03
 #define IOMAP_SIZE		0x04
 
+/* NVM BANK REGISTER */
+#define EEPROM_CTRL		0x1FE
+#define EEPROM_REG15		0x1EE
+#define EEPROM_BANK1_SELECT	0x02
+#define EEPROM_BANK1_UNSELECT	0x00
+
 #define PMICALRT	(1 << 3)
 #define SYS2ALRT	(1 << 2)
 #define SYS1ALRT	(1 << 1)
@@ -190,11 +196,19 @@ static int adc_to_temp(int direct, uint16_t adc_val, unsigned long *tp)
 	int nr, dr;		/* Numerator & Denominator */
 	int indx;
 	int x = adc_val;
+	int8_t pmic_temp_offset;
 
 	/* Direct conversion for pmic die temperature */
 	if (direct) {
 		if (adc_val < PMIC_DIE_ADC_MIN || adc_val > PMIC_DIE_ADC_MAX)
 			return -EINVAL;
+
+		/* An offset added for pmic temp from NVM in TNG B0 */
+		intel_scu_ipc_iowrite8(EEPROM_CTRL, EEPROM_BANK1_SELECT);
+		intel_scu_ipc_ioread8(EEPROM_REG15, &pmic_temp_offset);
+		intel_scu_ipc_iowrite8(EEPROM_CTRL, EEPROM_BANK1_UNSELECT);
+
+		adc_val = adc_val + pmic_temp_offset;
 
 		*tp = adc_to_pmic_die_temp(adc_val);
 		return 0;
