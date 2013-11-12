@@ -1006,6 +1006,7 @@ static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 	mod_timer(&host->timer, jiffies + 10 * HZ);
 
 	host->cmd = cmd;
+	host->r1b_busy_end = 0;
 
 	sdhci_prepare_data(host, cmd);
 
@@ -2527,7 +2528,10 @@ static void sdhci_cmd_irq(struct sdhci_host *host, u32 intmask)
 			DBG("Cannot wait for busy signal when also "
 				"doing a data transfer");
 		else if (!(host->quirks & SDHCI_QUIRK_NO_BUSY_IRQ))
-			return;
+			if (!host->r1b_busy_end) {
+				host->r1b_busy_end = 1;
+				return;
+			}
 
 		/* The controller does not support the end-of-busy IRQ,
 		 * fall through and take the SDHCI_INT_RESPONSE */
@@ -2590,7 +2594,10 @@ static void sdhci_data_irq(struct sdhci_host *host, u32 intmask)
 		 */
 		if (host->cmd && (host->cmd->flags & MMC_RSP_BUSY)) {
 			if (intmask & SDHCI_INT_DATA_END) {
-				sdhci_finish_command(host);
+				if (host->r1b_busy_end)
+					sdhci_finish_command(host);
+				else
+					host->r1b_busy_end = 1;
 				return;
 			}
 		}
@@ -2842,6 +2849,7 @@ static void sdhci_panic_send_cmd(struct sdhci_host *host,
 	}
 
 	host->cmd = cmd;
+	host->r1b_busy_end = 0;
 
 	/*
 	 * set the data timeout register to be max value
@@ -3037,7 +3045,10 @@ static void sdhci_panic_cmd_irq(struct sdhci_host *host, u32 intmask)
 		if (host->cmd->data)
 			pr_dbg("Cannot wait for busy signal when also doing a data transfer\n");
 		else if (!(host->quirks & SDHCI_QUIRK_NO_BUSY_IRQ))
-			return;
+			if (!host->r1b_busy_end) {
+				host->r1b_busy_end = 1;
+				return;
+			}
 	}
 
 	if (intmask & SDHCI_INT_RESPONSE)
@@ -3063,7 +3074,10 @@ static void sdhci_panic_data_irq(struct sdhci_host *host, u32 intmask)
 		 */
 		if (host->cmd && (host->cmd->flags & MMC_RSP_BUSY)) {
 			if (intmask & SDHCI_INT_DATA_END) {
-				sdhci_panic_finish_command(host);
+				if (host->r1b_busy_end)
+					sdhci_panic_finish_command(host);
+				else
+					host->r1b_busy_end = 1;
 				return;
 			}
 		}
