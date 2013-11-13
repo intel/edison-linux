@@ -112,6 +112,7 @@ int intel_scu_ipc_msic_vprog1(int on);
 int intel_scu_ipc_msic_vprog2(int on);
 
 /* OSHOB-OS Handoff Buffer read */
+int intel_scu_ipc_get_oshob_base(void);
 int intel_scu_ipc_get_oshob_size(void);
 
 /* SCU trace buffer interface */

@@ -772,8 +772,20 @@ static long scu_ipc_ioctl(struct file *fp, unsigned int cmd,
 	return ret;
 }
 
+int intel_scu_ipc_get_oshob_base(void)
+{
+	if (oshob_info == NULL)
+		return NULL;
+
+	return oshob_info->oshob_base;
+}
+EXPORT_SYMBOL_GPL(intel_scu_ipc_get_oshob_base);
+
 int intel_scu_ipc_get_oshob_size(void)
 {
+	if (oshob_info == NULL)
+		return 0;
+
 	return oshob_info->oshob_size;
 }
 EXPORT_SYMBOL_GPL(intel_scu_ipc_get_oshob_size);
