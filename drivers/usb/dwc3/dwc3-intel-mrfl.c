@@ -674,7 +674,8 @@ static int dwc3_intel_notify_charger_type(struct dwc_otg2 *otg,
 
 	if ((otg->charging_cap.chrg_type ==
 			POWER_SUPPLY_CHARGER_TYPE_USB_SDP) &&
-			((otg->charging_cap.ma != 100) &&
+			((otg->charging_cap.ma != 0) &&
+			 (otg->charging_cap.ma != 100) &&
 			 (otg->charging_cap.ma != 150) &&
 			 (otg->charging_cap.ma != 500) &&
 			 (otg->charging_cap.ma != 900))) {
