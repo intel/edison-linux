@@ -710,6 +710,11 @@ acpi_os_physical_table_override(struct acpi_table_header *existing_table,
 		table = acpi_os_map_memory(acpi_tables_addr + table_offset,
 					   ACPI_HEADER_SIZE);
 
+		if (table == NULL) {
+			pr_err("Error mapping ACPI memory\n");
+			return AE_ERROR;
+		}
+
 		if (table_offset + table->length > all_tables_size) {
 			acpi_os_unmap_memory(table, ACPI_HEADER_SIZE);
 			WARN_ON(1);
