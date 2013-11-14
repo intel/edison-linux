@@ -1023,8 +1023,10 @@ int ecryptfs_new_file_context(struct inode *ecryptfs_inode)
 		       "to the inode key sigs; rc = [%d]\n", rc);
 		goto out;
 	}
+	/* TODO: Investigate side effect of truncating name if too long */
 	cipher_name_len =
-		strlen(mount_crypt_stat->global_default_cipher_name);
+		min(strlen(mount_crypt_stat->global_default_cipher_name),
+		    sizeof(crypt_stat->cipher)-1);
 	memcpy(crypt_stat->cipher,
 	       mount_crypt_stat->global_default_cipher_name,
 	       cipher_name_len);
