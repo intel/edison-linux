@@ -411,6 +411,11 @@ int mid_s0ix_enter(int s0ix_state)
 	/* no need to proceed if schedule pending */
 	if (unlikely(need_resched())) {
 		pmu_stat_clear();
+		/*set wkc to appropriate value suitable for s0ix*/
+		writel(mid_pmu_cxt->ss_config->wake_state.wake_enable[0],
+		       &mid_pmu_cxt->pmu_reg->pm_wkc[0]);
+		writel(mid_pmu_cxt->ss_config->wake_state.wake_enable[1],
+		       &mid_pmu_cxt->pmu_reg->pm_wkc[1]);
 		up(&mid_pmu_cxt->scu_ready_sem);
 		goto ret;
 	}
@@ -418,6 +423,13 @@ int mid_s0ix_enter(int s0ix_state)
 	/* entry function for pmu driver ops */
 	if (pmu_ops->enter(s0ix_state))
 		ret = s0ix_state;
+	else  {
+		/*set wkc to appropriate value suitable for s0ix*/
+		writel(mid_pmu_cxt->ss_config->wake_state.wake_enable[0],
+		       &mid_pmu_cxt->pmu_reg->pm_wkc[0]);
+		writel(mid_pmu_cxt->ss_config->wake_state.wake_enable[1],
+		       &mid_pmu_cxt->pmu_reg->pm_wkc[1]);
+	}
 
 ret:
 	return ret;
