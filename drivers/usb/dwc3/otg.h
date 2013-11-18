@@ -120,6 +120,8 @@ struct dwc_device_par {
 #define GCTL_PRT_CAP_DIR_OTG 3
 #define GCTL_GBL_HIBERNATION_EN 0x2
 #define GCTL_CORESOFTRESET (1 << 11)
+#define GCTL_PWRDNSCALE(x) (x << 19)
+#define GCTL_PWRDNSCALE_MASK (0x1fff << 19)
 
 #define OCFG					0xcc00
 #define OCFG_SRP_CAP				0x01
