@@ -276,7 +276,11 @@ static int watchdog_stop(void)
 /* warning interrupt handler */
 static irqreturn_t watchdog_warning_interrupt(int irq, void *dev_id)
 {
-	pr_warn("[SHTDWN] %s, WATCHDOG TIMEOUT!\n", __func__);
+	if (unlikely(!kicking_active))
+		pr_warn("[SHTDWN] WATCHDOG TIMEOUT for test!, %s\n", __func__);
+
+	else
+		pr_warn("[SHTDWN] %s, WATCHDOG TIMEOUT!\n", __func__);
 
 	/* Let's reset the platform after dumping some data */
 	trigger_all_cpu_backtrace();
