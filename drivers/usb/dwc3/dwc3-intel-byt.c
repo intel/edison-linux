@@ -349,28 +349,28 @@ static int dwc3_intel_byt_set_power(struct usb_phy *_otg,
 	if (ma == OTG_DEVICE_SUSPEND) {
 		spin_lock_irqsave(&otg->lock, flags);
 		cap.chrg_type = otg->charging_cap.chrg_type;
-		cap.mA = otg->charging_cap.mA;
+		cap.ma = otg->charging_cap.ma;
 		cap.chrg_evt = POWER_SUPPLY_CHARGER_EVENT_SUSPEND;
 		spin_unlock_irqrestore(&otg->lock, flags);
 
-		/* mA is zero mean D+/D- opened cable.
-		 * If SMIP set, then notify 500mA.
-		 * Otherwise, notify 0mA.
+		/* ma is zero mean D+/D- opened cable.
+		 * If SMIP set, then notify 500ma.
+		 * Otherwise, notify 0ma.
 		*/
-		if (!cap.mA) {
+		if (!cap.ma) {
 			if (data->charging_compliance) {
-				cap.mA = 500;
+				cap.ma = 500;
 				cap.chrg_evt =
 					POWER_SUPPLY_CHARGER_EVENT_CONNECT;
 			}
 		/* For standard SDP, if SMIP set, then ignore suspend */
 		} else if (data->charging_compliance)
 			return 0;
-		/* Stander SDP(cap.mA != 0) and SMIP not set.
-		 * Should send 0mA with SUSPEND event
+		/* Stander SDP(cap.ma != 0) and SMIP not set.
+		 * Should send 0ma with SUSPEND event
 		 */
 		else
-			cap.mA = 0;
+			cap.ma = 0;
 
 		atomic_notifier_call_chain(&otg->usb2_phy.notifier,
 				USB_EVENT_CHARGER, &cap);
@@ -385,7 +385,7 @@ static int dwc3_intel_byt_set_power(struct usb_phy *_otg,
 		return 0;
 	}
 
-	/* For SMIP set case, only need to report 500/900mA */
+	/* For SMIP set case, only need to report 500/900ma */
 	if (data->charging_compliance) {
 		if ((ma != OTG_USB2_500MA) &&
 				(ma != OTG_USB3_900MA))
@@ -412,7 +412,7 @@ static int dwc3_intel_byt_set_power(struct usb_phy *_otg,
 	}
 
 	spin_lock_irqsave(&otg->lock, flags);
-	otg->charging_cap.mA = ma;
+	otg->charging_cap.ma = ma;
 	spin_unlock_irqrestore(&otg->lock, flags);
 
 	dwc3_intel_byt_notify_charger_type(otg,
@@ -445,17 +445,17 @@ static int dwc3_intel_byt_notify_charger_type(struct dwc_otg2 *otg,
 
 	if ((otg->charging_cap.chrg_type ==
 			POWER_SUPPLY_CHARGER_TYPE_USB_SDP) &&
-			((otg->charging_cap.mA != 100) &&
-			 (otg->charging_cap.mA != 150) &&
-			 (otg->charging_cap.mA != 500) &&
-			 (otg->charging_cap.mA != 900))) {
+			((otg->charging_cap.ma != 100) &&
+			 (otg->charging_cap.ma != 150) &&
+			 (otg->charging_cap.ma != 500) &&
+			 (otg->charging_cap.ma != 900))) {
 		otg_err(otg, "%s: invalid SDP current!\n", __func__);
 		return -EINVAL;
 	}
 
 	spin_lock_irqsave(&otg->lock, flags);
 	cap.chrg_type = otg->charging_cap.chrg_type;
-	cap.mA = otg->charging_cap.mA;
+	cap.ma = otg->charging_cap.ma;
 	cap.chrg_evt = event;
 	spin_unlock_irqrestore(&otg->lock, flags);
 
