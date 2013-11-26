@@ -521,7 +521,7 @@ static enum dwc_otg_state do_charger_detection(struct dwc_otg2 *otg)
 
 	spin_lock_irqsave(&otg->lock, flags);
 	otg->charging_cap.chrg_type = charger;
-	otg->charging_cap.mA = ma;
+	otg->charging_cap.ma = ma;
 	spin_unlock_irqrestore(&otg->lock, flags);
 
 	switch (charger) {
