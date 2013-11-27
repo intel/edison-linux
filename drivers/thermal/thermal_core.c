@@ -815,7 +815,7 @@ thermal_cooling_device_force_state_override_store(struct device *dev,
 	int ret;
 	struct thermal_cooling_device *cdev = to_cooling_device(dev);
 
-	ret = cdev->ops->set_force_state_override(cdev, buf);
+	ret = cdev->ops->set_force_state_override(cdev, (char *) buf);
 	if (ret)
 		return ret;
 
