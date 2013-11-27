@@ -266,7 +266,7 @@ static void enable_soc_dts(void)
 	}
 }
 
-static ssize_t show_trip_hyst(struct thermal_zone_device *tzd,
+static int show_trip_hyst(struct thermal_zone_device *tzd,
 				int trip, long *hyst)
 {
 	u32 eax, edx;
@@ -289,7 +289,7 @@ static ssize_t show_trip_hyst(struct thermal_zone_device *tzd,
 	return 0;
 }
 
-static ssize_t store_trip_hyst(struct thermal_zone_device *tzd,
+static int store_trip_hyst(struct thermal_zone_device *tzd,
 				int trip, long hyst)
 {
 	u32 eax, edx;
@@ -314,7 +314,7 @@ static ssize_t store_trip_hyst(struct thermal_zone_device *tzd,
 	return 0;
 }
 
-static ssize_t show_temp(struct thermal_zone_device *tzd, long *temp)
+static int show_temp(struct thermal_zone_device *tzd, long *temp)
 {
 	struct thermal_device_info *td_info = tzd->devdata;
 	u32 val = read_soc_reg(PUNIT_TEMP_REG);
@@ -334,7 +334,7 @@ static ssize_t show_temp(struct thermal_zone_device *tzd, long *temp)
 	return 0;
 }
 
-static ssize_t show_trip_type(struct thermal_zone_device *tzd,
+static int show_trip_type(struct thermal_zone_device *tzd,
 			int trip, enum thermal_trip_type *trip_type)
 {
 	/* All are passive trip points */
@@ -343,7 +343,7 @@ static ssize_t show_trip_type(struct thermal_zone_device *tzd,
 	return 0;
 }
 
-static ssize_t show_trip_temp(struct thermal_zone_device *tzd,
+static int show_trip_temp(struct thermal_zone_device *tzd,
 				int trip, long *trip_temp)
 {
 	u32 aux_value = read_soc_reg(PUNIT_AUX_REG);
@@ -360,7 +360,7 @@ static ssize_t show_trip_temp(struct thermal_zone_device *tzd,
 	return 0;
 }
 
-static ssize_t store_trip_temp(struct thermal_zone_device *tzd,
+static int store_trip_temp(struct thermal_zone_device *tzd,
 				int trip, long trip_temp)
 {
 	u32 aux_trip, aux = 0;

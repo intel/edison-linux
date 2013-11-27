@@ -2,6 +2,10 @@
 # Makefile for sensor chip drivers.
 #
 
+CFLAGS_intel_mrfl_thermal.o := -Werror
+CFLAGS_intel_soc_thermal.o := -Werror
+CFLAGS_thermal_core.o := -Werror
+
 obj-$(CONFIG_THERMAL)		+= thermal_sys.o
 thermal_sys-y			+= thermal_core.o
 
