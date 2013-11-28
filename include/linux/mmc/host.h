@@ -141,6 +141,8 @@ struct mmc_host_ops {
 	void	(*hw_reset)(struct mmc_host *host);
 	void	(*card_event)(struct mmc_host *host);
 	void	(*set_dev_power)(struct mmc_host *, bool);
+	/* Prevent host controller from Auto Clock Gating by busy reading */
+	void	(*busy_wait)(struct mmc_host *mmc, u32 delay);
 };
 
 struct mmc_card;

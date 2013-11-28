@@ -1407,7 +1407,10 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage)
 	mmc_set_ios(host);
 
 	/* Wait for at least 1 ms according to spec */
-	mmc_delay(1);
+	if (host->ops->busy_wait)
+		host->ops->busy_wait(host, 1000);
+	else
+		mmc_delay(1);
 
 	/*
 	 * Failure to switch is indicated by the card holding
