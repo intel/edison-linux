@@ -911,9 +911,12 @@ static void start_bitbanging(struct ssp_drv_context *sspc)
 	write_I2CCTRL(0x01070038, i2c_reg);
 }
 
-static unsigned int ssp_get_clk_div(int speed)
+static unsigned int ssp_get_clk_div(struct ssp_drv_context *sspc, int speed)
 {
-	return max(100000000 / speed, 4) - 1;
+	if (sspc->quirks & QUIRKS_PLATFORM_MRFL)
+		return max(25000000 / speed, 4) - 1;
+	else
+		return max(100000000 / speed, 4) - 1;
 }
 
 /**
@@ -945,6 +948,7 @@ static int handle_message(struct ssp_drv_context *sspc)
 	u32 cr1;
 	struct device *dev = &sspc->pdev->dev;
 	struct spi_message *msg = sspc->cur_msg;
+	u32 clk_div;
 
 	chip = spi_get_ctldata(msg->spi);
 
@@ -1027,6 +1031,10 @@ static int handle_message(struct ssp_drv_context *sspc)
 	if (intel_mid_identify_cpu() == INTEL_MID_CPU_CHIP_TANGIER)
 		write_SSFS((1 << chip->chip_select), reg);
 
+	/* recalculate the frequency for each transfer */
+	clk_div = ssp_get_clk_div(sspc, transfer->speed_hz);
+	chip->cr0 |= clk_div << 8;
+
 	/* Do bitbanging only if SSP not-enabled or not-synchronized */
 	if (unlikely(((read_SSSR(reg) & SSP_NOT_SYNC) ||
 		(!(read_SSCR0(reg) & SSCR0_SSE))) &&
@@ -1035,11 +1043,15 @@ static int handle_message(struct ssp_drv_context *sspc)
 	} else {
 		/* (re)start the SSP */
 		if (ssp_timing_wr) {
-			chip->cr0 = 0x00C0000F;
+			dev_dbg(dev, "original cr0 before reset:%x",
+				chip->cr0);
+			/*we should not disable TUM and RIM interrup*/
+			write_SSCR0(0x0000000F, reg);
+			chip->cr0 &= ~(SSCR0_SSE);
+			dev_dbg(dev, "reset ssp:cr0:%x", chip->cr0);
 			write_SSCR0(chip->cr0, reg);
-			chip->cr0 = 0x00C12C0F;
-			write_SSCR0(chip->cr0, reg);
-			chip->cr0 = 0x00C12C8F;
+			chip->cr0 |= SSCR0_SSE;
+			dev_dbg(dev, "reset ssp:cr0:%x", chip->cr0);
 			write_SSCR0(chip->cr0, reg);
 		} else
 			write_SSCR0(chip->cr0, reg);
@@ -1204,9 +1216,10 @@ static int setup(struct spi_device *spi)
 
 	if ((sspc->quirks & QUIRKS_SPI_SLAVE_CLOCK_MODE) == 0) {
 		chip->speed_hz = spi->max_speed_hz;
-		clk_div = ssp_get_clk_div(chip->speed_hz);
-		if (!ssp_timing_wr)
-			chip->cr0 |= clk_div << 8;
+		clk_div = ssp_get_clk_div(sspc, chip->speed_hz);
+		chip->cr0 |= clk_div << 8;
+		dev_dbg(&spi->dev, "spi->max_speed_hz:%d clk_div:%x cr0:%x",
+			spi->max_speed_hz, clk_div, chip->cr0);
 	}
 	chip->bits_per_word = spi->bits_per_word;
 	chip->chip_select = spi->chip_select;
