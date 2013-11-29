@@ -187,12 +187,8 @@ int dwc3_start_peripheral(struct usb_gadget *g)
 	spin_unlock_irqrestore(&dwc->lock, flags);
 
 	irq = platform_get_irq(to_platform_device(dwc->dev), 0);
-	if (dwc->quirks_disable_irqthread)
-		ret = request_irq(irq, dwc3_quirks_interrupt,
-				IRQF_SHARED, "dwc3", dwc);
-	else
-		ret = request_threaded_irq(irq, dwc3_interrupt, dwc3_thread_interrupt,
-				IRQF_SHARED, "dwc3", dwc);
+	ret = request_threaded_irq(irq, dwc3_interrupt, dwc3_thread_interrupt,
+			IRQF_SHARED, "dwc3", dwc);
 	if (ret) {
 		dev_err(dwc->dev, "failed to request irq #%d --> %d\n",
 				irq, ret);
