@@ -1181,15 +1181,17 @@ DEFINE_PER_CPU_ALIGNED(struct stack_canary, stack_canary);
  */
 static void clear_all_debug_regs(void)
 {
-	int i;
+/*	int i;
 
 	for (i = 0; i < 8; i++) {
+*/
 		/* Ignore db4, db5 */
-		if ((i == 4) || (i == 5))
+/*		if ((i == 4) || (i == 5))
 			continue;
 
 		set_debugreg(0, i);
 	}
+*/
 }
 
 #ifdef CONFIG_KGDB
