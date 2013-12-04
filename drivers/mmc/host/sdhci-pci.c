@@ -1665,8 +1665,10 @@ static int sdhci_pci_get_tuning_count(struct sdhci_host *host)
 	switch (slot->chip->pdev->device) {
 	case PCI_DEVICE_ID_INTEL_BYT_EMMC45:
 		tuning_count = 4; /* using 8 seconds, this can be tuning */
+		break;
 	case PCI_DEVICE_ID_INTEL_MRFL_MMC:
-		tuning_count = 4; /* using 8 seconds, this can be tuning */
+		tuning_count = 8; /* using 128 seconds, this can be tuning */
+		break;
 	default:
 		break;
 	}
