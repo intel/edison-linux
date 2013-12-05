@@ -457,45 +457,44 @@ static int dwc3_gadget_set_ep_config(struct dwc3 *dwc, struct dwc3_ep *dep,
 		const struct usb_ss_ep_comp_descriptor *comp_desc,
 		bool ignore, u32 cfg_action)
 {
-	u16	maxp;
-
 	struct dwc3_gadget_ep_cmd_params params;
 
 	memset(&params, 0x00, sizeof(params));
 
-	if (dep->ebc) {
-		/* special consideration for TNG A0 */
-		if (dep->ebc->epnum == DWC3_EP_EBC_OUT_NB ||
-				dep->ebc->epnum == DWC3_EP_EBC_IN_NB)
-			maxp = 64;
-		else
-			maxp = usb_endpoint_maxp(desc);
-	} else
-		maxp = usb_endpoint_maxp(desc);
-
 	params.param0 = DWC3_DEPCFG_EP_TYPE(usb_endpoint_type(desc))
-		| DWC3_DEPCFG_MAX_PACKET_SIZE(maxp)
+		| DWC3_DEPCFG_MAX_PACKET_SIZE(usb_endpoint_maxp(desc))
 		| cfg_action;
 
-	/* Burst size is only needed in SuperSpeed mode */
-	if (dwc->gadget.speed == USB_SPEED_SUPER) {
-		/* In case a function forgets to set maxburst, maxburst may be
-		 * still 0, and we shouldn't minus 1 for it.
-		 */
-		u32 burst = dep->endpoint.maxburst ?
-				dep->endpoint.maxburst - 1 : 0;
+	if (dep->ebc) {
+		if (dwc->gadget.speed == USB_SPEED_SUPER) {
+			u32 burst = 0;
 
 			params.param0 |= DWC3_DEPCFG_BURST_SIZE(burst);
 		}
 
 		params.param0 |= DWC3_DEPCFG_IGN_SEQ_NUM;
 
-	if (dep->ebc) {
 		params.param1 = DWC3_DEPCFG_EBC_MODE_EN;
+
 		if (dep->ebc->is_ondemand)
 			params.param1 |= DWC3_DEPCFG_XFER_NOT_READY_EN;
+
 		dep->stream_capable = false;
 	} else {
+		/* Burst size is only needed in SuperSpeed mode */
+		if (dwc->gadget.speed == USB_SPEED_SUPER) {
+			/* In case a function forgets to set maxburst, maxburst
+			 * may be still 0, and we shouldn't minus 1 for it.
+			 */
+			u32 burst = dep->endpoint.maxburst ?
+					dep->endpoint.maxburst - 1 : 0;
+
+			params.param0 |= DWC3_DEPCFG_BURST_SIZE(burst);
+		}
+
+		if (ignore)
+			params.param0 |= DWC3_DEPCFG_IGN_SEQ_NUM;
+
 		params.param1 = DWC3_DEPCFG_XFER_COMPLETE_EN
 			| DWC3_DEPCFG_XFER_NOT_READY_EN;
 
@@ -532,6 +531,53 @@ static int dwc3_gadget_set_ep_config(struct dwc3 *dwc, struct dwc3_ep *dep,
 
 	if (cfg_action == DWC3_DEPCFG_ACTION_RESTORE)
 		params.param2 = dep->ep_state;
+
+	return dwc3_send_gadget_ep_cmd(dwc, dep->number,
+			DWC3_DEPCMD_SETEPCONFIG, &params);
+}
+
+static int dwc3_gadget_update_ebc_ep_config(struct dwc3 *dwc,
+		struct dwc3_ep *dep,
+		const struct usb_endpoint_descriptor *desc,
+		const struct usb_ss_ep_comp_descriptor *comp_desc,
+		bool ignore_nrdy)
+{
+	u16	maxp;
+	struct dwc3_gadget_ep_cmd_params params;
+
+	if (!dep->ebc)
+		return -EINVAL;
+
+	memset(&params, 0x00, sizeof(params));
+
+	maxp = usb_endpoint_maxp(desc);
+
+	params.param0 =	DWC3_DEPCFG_EP_TYPE(usb_endpoint_type(desc))
+		| DWC3_DEPCFG_MAX_PACKET_SIZE(maxp)
+		| DWC3_DEPCFG_ACTION_MODIFY;
+
+	if (dwc->gadget.speed == USB_SPEED_SUPER) {
+		u32 burst = 0;
+
+		params.param0 |= DWC3_DEPCFG_BURST_SIZE(burst);
+	}
+	params.param0 |= DWC3_DEPCFG_IGN_SEQ_NUM;
+	params.param1 = DWC3_DEPCFG_EBC_MODE_EN;
+
+	if (!ignore_nrdy)
+		params.param1 |= DWC3_DEPCFG_XFER_NOT_READY_EN;
+
+	dep->stream_capable = false;
+
+	params.param1 |= DWC3_DEPCFG_EP_NUMBER(dep->number);
+
+	if (dep->direction)
+		params.param0 |= DWC3_DEPCFG_FIFO_NUMBER(dep->number >> 1);
+
+	if (desc->bInterval) {
+		params.param1 |= DWC3_DEPCFG_BINTERVAL_M1(desc->bInterval - 1);
+		dep->interval = 1 << (desc->bInterval - 1);
+	}
 
 	return dwc3_send_gadget_ep_cmd(dwc, dep->number,
 			DWC3_DEPCMD_SETEPCONFIG, &params);
@@ -1208,9 +1254,25 @@ static int __dwc3_gadget_kick_transfer(struct dwc3_ep *dep, u16 cmd_param,
 		WARN_ON_ONCE(!dep->resource_index);
 	}
 
-	if (dep->ebc)
+	if (dep->ebc) {
+		if (dep->ebc->is_ondemand == 1) {
+			ret = dwc3_gadget_update_ebc_ep_config(dwc, dep,
+				dep->endpoint.desc, dep->comp_desc, true);
+
+			if (ret < 0) {
+				dev_dbg(dwc->dev,
+					"DEPCFG command failed on %s\n",
+					dep->name);
+				return ret;
+			}
+			dev_dbg(dwc->dev,
+				"successfully udpated DEPCFG command on %s\n",
+				dep->name);
+		}
+
 		if (dep->ebc->xfer_start)
 			dep->ebc->xfer_start();
+	}
 
 	return 0;
 }
@@ -1258,13 +1320,16 @@ static int __dwc3_gadget_ep_queue(struct dwc3_ep *dep, struct dwc3_request *req)
 	if (dep->ebc) {
 		list_add_tail(&req->list, &dep->request_list);
 
-		if (!dep->ebc->is_ondemand) {
-			if (dep->flags & DWC3_EP_BUSY) {
-				dwc3_stop_active_transfer(dwc, dep->number, 1);
-				dep->flags = DWC3_EP_ENABLED;
-			}
-		} else if (!(dep->flags & DWC3_EP_PENDING_REQUEST)) {
+		if ((dep->ebc->is_ondemand == 1) &&
+			(!(dep->flags & DWC3_EP_PENDING_REQUEST))) {
+			dev_dbg(dwc->dev, "%s: delayed to kick ebc transfers\n",
+				dep->name);
 			return 0;
+		}
+
+		if (dep->flags & DWC3_EP_BUSY) {
+			dwc3_stop_active_transfer(dwc, dep->number);
+			dep->flags = DWC3_EP_ENABLED;
 		}
 
 		ret = __dwc3_gadget_kick_transfer(dep, 0, true);
@@ -2010,7 +2075,7 @@ static int dwc3_gadget_init_hw_endpoints(struct dwc3 *dwc,
 			if (epnum == ebc->epnum) {
 				dep->ebc = ebc;
 				if (ebc->init)
-					if (!ebc->init())
+					if (ebc->init() == -ENODEV)
 						dev_err(dwc->dev,
 						"debug class init fail %d\n",
 						epnum);
@@ -2377,8 +2442,26 @@ static void dwc3_stop_active_transfer(struct dwc3 *dwc, u32 epnum, int forcerm)
 
 	dep = dwc->eps[epnum];
 
-	if (dep->ebc && dep->ebc->xfer_stop)
-		dep->ebc->xfer_stop();
+	if (dep->ebc) {
+		if (dep->ebc->is_ondemand == 1) {
+			ret = dwc3_gadget_update_ebc_ep_config(dwc, dep,
+				dep->endpoint.desc, dep->comp_desc, false);
+			if (ret < 0) {
+				dev_dbg(dwc->dev,
+					"DEPCFG failed on %s\n",
+					dep->name);
+				return;
+			}
+			dev_dbg(dwc->dev,
+				"successfully udpated DEPCFG command on %s\n",
+				dep->name);
+		}
+
+		if (dep->ebc->xfer_stop)
+			dep->ebc->xfer_stop();
+		else
+			dev_dbg(dwc->dev, "%s xfer_stop() NULL\n", dep->name);
+	}
 
 	if (usb_endpoint_xfer_isoc(dep->endpoint.desc))
 		dep->resource_index = dwc3_gadget_ep_get_transfer_index(dwc,
