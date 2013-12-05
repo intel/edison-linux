@@ -792,6 +792,8 @@ struct dwc3 {
 	/* delayed work for handling Link State Change */
 	struct delayed_work	link_work;
 
+	u8			is_ebc;
+
 	struct dwc3_scratchpad_array	*scratch_array;
 	dma_addr_t		scratch_array_dma;
 	void			*scratch_buffer[DWC3_MAX_HIBER_SCRATCHBUFS];

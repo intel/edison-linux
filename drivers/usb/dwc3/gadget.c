@@ -694,8 +694,12 @@ static int __dwc3_gadget_ep_disable(struct dwc3_ep *dep)
 	struct ebc_io		*ebc = dep->ebc;
 	u32			reg;
 
-	if (ebc && ebc->is_ondemand && ebc->xfer_stop)
-		ebc->xfer_stop();
+	if (ebc) {
+		dwc->is_ebc = 0;
+
+		if (ebc->is_ondemand && ebc->xfer_stop)
+			ebc->xfer_stop();
+	}
 
 	dwc3_remove_requests(dwc, dep);
 
@@ -1318,7 +1322,7 @@ static int __dwc3_gadget_ep_queue(struct dwc3_ep *dep, struct dwc3_request *req)
 		}
 
 		if (dep->flags & DWC3_EP_BUSY) {
-			dwc3_stop_active_transfer(dwc, dep->number);
+			dwc3_stop_active_transfer(dwc, dep->number, 1);
 			dep->flags = DWC3_EP_ENABLED;
 		}
 
