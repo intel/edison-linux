@@ -267,7 +267,6 @@ int dwc3_stop_peripheral(struct usb_gadget *g)
 
 	cancel_delayed_work_sync(&dwc->link_work);
 
-	pm_runtime_put(dwc->dev);
 	wake_unlock(&_dev_data->wake_lock);
 
 	return 0;
