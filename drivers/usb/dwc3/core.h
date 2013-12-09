@@ -761,6 +761,7 @@ struct dwc3 {
 	unsigned		needs_fifo_resize:1;
 	unsigned		resize_fifos:1;
 	unsigned		pullups_connected:1;
+	unsigned		quirks_disable_irqthread:1;
 
 	enum dwc3_ep0_next	ep0_next_event;
 	enum dwc3_ep0_state	ep0state;
