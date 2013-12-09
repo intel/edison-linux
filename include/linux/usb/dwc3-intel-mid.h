@@ -24,6 +24,13 @@
 
 struct intel_dwc_otg_pdata {
 	int is_hvp;
+	enum intel_mid_pmic_type pmic_type;
+	int charger_detect_enable;
+	int gpio_cs;
+	int gpio_reset;
+	int gpio_id;
+	int id;
+	int charging_compliance;
 };
 
 #define TUSB1211_VENDOR_ID_LO					0x00
