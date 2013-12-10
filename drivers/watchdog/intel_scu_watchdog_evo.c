@@ -580,14 +580,18 @@ static const struct file_operations security_watchdog_fops = {
 	.open = open_security,
 };
 
-static int kwd_trigger_open(struct inode *inode, struct file *file)
+static int kwd_trigger_write(struct file *file, const char __user *buff,
+			     size_t count, loff_t *ppos)
 {
+	pr_debug("kwd_trigger_write\n");
 	BUG();
 	return 0;
 }
 
 static const struct file_operations kwd_trigger_fops = {
-	.open		= kwd_trigger_open,
+	.open		= nonseekable_open,
+	.write		= kwd_trigger_write,
+	.llseek		= no_llseek,
 };
 
 static int kwd_reset_type_release(struct inode *inode, struct file *file)
@@ -761,7 +765,7 @@ static int create_debugfs_entries(void)
 
 	/* /sys/kernel/debug/watchdog/kernel_watchdog/trigger */
 	dev->dfs_kwd_trigger = debugfs_create_file("trigger",
-				    S_IFREG | S_IRUGO | S_IWUSR | S_IWGRP,
+				    S_IFREG | S_IWUSR | S_IWGRP,
 				    dev->dfs_kwd, NULL,
 				    &kwd_trigger_fops);
 
