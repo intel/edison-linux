@@ -703,7 +703,7 @@ static void pmu_enumerate(void)
 	struct pci_dev *pdev = NULL;
 	unsigned int base_class;
 
-	while ((pdev = pci_get_device(PCI_ID_ANY, PCI_ID_ANY, pdev)) != NULL) {
+	for_each_pci_dev(pdev) {
 		if (platform_is(INTEL_ATOM_MRFLD) &&
 			pdev->device == MID_MRFL_HDMI_DRV_DEV_ID)
 			continue;
