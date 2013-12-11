@@ -276,9 +276,13 @@ static ssize_t show_ttarget(struct device *dev,
 	return sprintf(buf, "%d\n", pdata->core_data[attr->index]->ttarget);
 }
 
-static void update_temp(struct temp_data *tdata)
+static ssize_t show_temp(struct device *dev,
+			struct device_attribute *devattr, char *buf)
 {
 	u32 eax, edx;
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
+	struct platform_data *pdata = dev_get_drvdata(dev);
+	struct temp_data *tdata = pdata->core_data[attr->index];
 
 	mutex_lock(&tdata->update_lock);
 
@@ -296,16 +300,6 @@ static void update_temp(struct temp_data *tdata)
 	}
 
 	mutex_unlock(&tdata->update_lock);
-}
-
-static ssize_t show_temp(struct device *dev,
-			struct device_attribute *devattr, char *buf)
-{
-	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
-	struct platform_data *pdata = dev_get_drvdata(dev);
-	struct temp_data *tdata = pdata->core_data[attr->index];
-
-	update_temp(tdata);
 
 	return tdata->valid ? sprintf(buf, "%d\n", tdata->temp) : -EAGAIN;
 }
@@ -507,7 +501,7 @@ static int coretemp_interrupt(__u64 msr_val)
 static void core_threshold_work_fn(struct work_struct *work)
 {
 	u32 eax, edx;
-	int thresh, event;
+	int thresh, event, t0, t1, temp;
 	char *thermal_event[5];
 	bool notify = false;
 	unsigned int cpu = smp_processor_id();
@@ -530,7 +524,9 @@ static void core_threshold_work_fn(struct work_struct *work)
 		eax = eax & ~THERM_LOG_THRESHOLD0;
 		wrmsr_on_cpu(cpu, MSR_IA32_THERM_STATUS, eax, edx);
 
-		notify = true;
+		/* Notify only when we go below the lower threshold */
+		if (event != 1)
+			notify = true;
 
 	} else if (eax & THERM_LOG_THRESHOLD1) {
 		thresh = 1;
@@ -540,24 +536,37 @@ static void core_threshold_work_fn(struct work_struct *work)
 		eax = eax & ~THERM_LOG_THRESHOLD1;
 		wrmsr_on_cpu(cpu, MSR_IA32_THERM_STATUS, eax, edx);
 
-		notify = true;
+		/* Notify only when we go above the upper threshold */
+		if (event != 0)
+			notify = true;
 	}
-
-	if (!notify)
-		return;
 
 	/*
 	 * Read the current Temperature and send it to user land;
 	 * so that the user space can avoid a sysfs read.
 	 */
-	update_temp(tdata);
+	temp = tdata->tjmax - ((eax >> 16) & 0x7f) * 1000;
 
-	pr_info("Thermal Event: sensor: Core %u, cur_temp: %d, event: %d, level: %d\n",
-			tdata->cpu_core_id, tdata->temp, event, thresh);
+	/* Read the threshold registers (only) to print threshold values. */
+	rdmsr_on_cpu(cpu, MSR_IA32_THERM_INTERRUPT, &eax, &edx);
+	t0 = tdata->tjmax - ((eax & THERM_MASK_THRESHOLD0) >> THERM_SHIFT_THRESHOLD0) * 1000;
+	t1 = tdata->tjmax - ((eax & THERM_MASK_THRESHOLD1) >> THERM_SHIFT_THRESHOLD1) * 1000;
+
+
+	if (!notify) {
+		pr_debug("Thermal Event: Sensor: Core %u, cur_temp: %d,\
+			event: %d, level: %d, t0: %d, t1: %d\n",
+			tdata->cpu_core_id, temp, event, thresh, t0, t1);
+		return;
+	} else {
+		pr_info("Thermal Event: Sensor: Core %u, cur_temp: %d,\
+			event: %d, level: %d, t0: %d, t1: %d\n",
+			tdata->cpu_core_id, temp, event, thresh, t0, t1);
+	}
 
 	thermal_event[0] = kasprintf(GFP_KERNEL, "NAME=Core %u",
 						tdata->cpu_core_id);
-	thermal_event[1] = kasprintf(GFP_KERNEL, "TEMP=%d", tdata->temp);
+	thermal_event[1] = kasprintf(GFP_KERNEL, "TEMP=%d", temp);
 	thermal_event[2] = kasprintf(GFP_KERNEL, "EVENT=%d", event);
 	thermal_event[3] = kasprintf(GFP_KERNEL, "LEVEL=%d", thresh);
 	thermal_event[4] = NULL;
