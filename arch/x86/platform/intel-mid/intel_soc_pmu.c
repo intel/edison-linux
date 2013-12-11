@@ -218,15 +218,16 @@ int _pmu2_wait_not_busy(void)
 
 static int _pmu2_wait_not_busy_yield(void)
 {
-	int pmu_busy_retry = 50000; /* 500msec minimum */
+	int pmu_busy_retry = PMU2_BUSY_TIMEOUT;
 
-	/* wait for the latest pmu command finished */
+	/* wait max 500ms that the latest pmu command finished */
 	do {
-		usleep_range(10, 500);
-
-		if (!_pmu_read_status(PMU_BUSY_STATUS))
+		if (_pmu_read_status(PMU_BUSY_STATUS) == 0)
 			return 0;
-	} while (--pmu_busy_retry);
+
+		usleep_range(10, 12);
+		pmu_busy_retry -= 11;
+	} while (pmu_busy_retry > 0);
 
 	WARN(1, "pmu2 busy!");
 
