@@ -65,8 +65,6 @@
 #define HSU1_PCI_ID				0x81b
 #define HSI_PCI_ID				0x833
 
-#define PCI_ID_ANY	(~0)
-
 #define MODE_ID_MAGIC_NUM			1
 
 #define   LOG_ID_MASK				0x7F

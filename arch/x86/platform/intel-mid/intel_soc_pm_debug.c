@@ -820,8 +820,7 @@ static int pmu_devices_state_show(struct seq_file *s, void *unused)
 	pmu_stat_seq_printf(s, SYS_STATE_S0I3, "s0i3");
 	pmu_stat_seq_printf(s, SYS_STATE_S3, "s3");
 
-	while ((pdev = pci_get_device(PCI_ID_ANY, PCI_ID_ANY, pdev)) != NULL) {
-
+	for_each_pci_dev(pdev) {
 		/* find the base class info */
 		base_class = pdev->class >> 16;
 
@@ -993,8 +992,7 @@ static int show_pmu_dev_stats(struct seq_file *s, void *unused)
 	seq_printf(s,
 	"==================================================================\n");
 
-	while ((pdev = pci_get_device(PCI_ID_ANY, PCI_ID_ANY, pdev)) != NULL) {
-
+	for_each_pci_dev(pdev) {
 		/* find the base class info */
 		base_class = pdev->class >> 16;
 
@@ -1509,7 +1507,7 @@ static int pmu_devices_state_show(struct seq_file *s, void *unused)
 
 	seq_printf(s, "\nSOUTH COMPLEX DEVICES :\n\n");
 
-	while ((pdev = pci_get_device(PCI_ID_ANY, PCI_ID_ANY, pdev)) != NULL) {
+	for_each_pci_dev(pdev) {
 		/* find the base class info */
 		base_class = pdev->class >> 16;
 
