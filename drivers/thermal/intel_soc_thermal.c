@@ -35,7 +35,7 @@
 #include <linux/seq_file.h>
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
-
+#include <asm/msr.h>
 #include <asm/intel-mid.h>
 #include <asm/intel_mid_thermal.h>
 
@@ -81,6 +81,8 @@
 #define ENABLE_AUX_INTRPT	0x0F
 #define ENABLE_CPU0		(1 << 16)
 #define RTE_ENABLE		(1 << 9)
+
+static int tjmax_temp;
 
 static DEFINE_MUTEX(thrm_update_lock);
 
@@ -326,7 +328,7 @@ static int show_temp(struct thermal_zone_device *tzd, long *temp)
 		return 0;
 
 	/* Calibrate the temperature */
-	*temp = TJMAX_CODE - *temp + TJMAX_TEMP;
+	*temp = TJMAX_CODE - *temp + tjmax_temp;
 
 	/* Convert to mC */
 	*temp *= 1000;
@@ -352,7 +354,7 @@ static int show_trip_temp(struct thermal_zone_device *tzd,
 	*trip_temp = (aux_value >> (8 * trip)) & 0xFF;
 
 	/* Calibrate the trip point temperature */
-	*trip_temp = TJMAX_TEMP - *trip_temp;
+	*trip_temp = tjmax_temp - *trip_temp;
 
 	/* Convert to mC and report */
 	*trip_temp *= 1000;
@@ -377,7 +379,7 @@ static int store_trip_temp(struct thermal_zone_device *tzd,
 	aux_trip = trip_temp & 0xFF;
 
 	/* Calibrate w.r.t TJMAX_TEMP */
-	aux_trip = TJMAX_TEMP - aux_trip;
+	aux_trip = tjmax_temp - aux_trip;
 
 	mutex_lock(&td_info->lock_aux);
 	aux = read_soc_reg(PUNIT_AUX_REG);
@@ -699,11 +701,22 @@ static int soc_thermal_probe(struct platform_device *pdev)
 {
 	struct platform_soc_data *pdata;
 	int i, ret;
+	u32 eax, edx;
 	static char *name[SOC_THERMAL_SENSORS] = {"SoC_DTS0", "SoC_DTS1"};
 
 	pdata = kzalloc(sizeof(struct platform_soc_data), GFP_KERNEL);
 	if (!pdata)
 		return -ENOMEM;
+
+	ret = rdmsr_safe_on_cpu(0, MSR_IA32_TEMPERATURE_TARGET, &eax, &edx);
+	if (ret) {
+		tjmax_temp = TJMAX_TEMP;
+		dev_err(&pdev->dev, "TjMax read from MSR %x failed, error:%d\n",
+				MSR_IA32_TEMPERATURE_TARGET, ret);
+	} else {
+		tjmax_temp = (eax >> 16) & 0xff;
+		dev_dbg(&pdev->dev, "TjMax is %d degrees C\n", tjmax_temp);
+	}
 
 	/* Register each sensor with the generic thermal framework */
 	for (i = 0; i < SOC_THERMAL_SENSORS; i++) {
