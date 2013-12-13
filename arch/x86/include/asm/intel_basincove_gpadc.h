@@ -46,7 +46,7 @@ struct intel_basincove_gpadc_platform_data {
 	struct iio_map *gpadc_iio_maps;
 	struct gpadc_regmap_t *gpadc_regmaps;
 	struct gpadc_regs_t *gpadc_regs;
-	struct iio_chan_spec *gpadc_channels;
+	const struct iio_chan_spec *gpadc_channels;
 };
 
 struct gpadc_result {
