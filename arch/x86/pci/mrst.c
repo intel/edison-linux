@@ -214,6 +214,8 @@ static int mrst_pci_irq_enable(struct pci_dev *dev)
 	 * IOAPIC RTE entries, so we just enable RTE for the device.
 	 */
 	irq_attr.ioapic = mp_find_ioapic(dev->irq);
+	if (irq_attr.ioapic < 0)
+		return -1;
 	irq_attr.ioapic_pin = dev->irq;
 	irq_attr.trigger = 1; /* level */
 	irq_attr.polarity = 1; /* active low */
