@@ -4154,8 +4154,6 @@ int sdhci_add_host(struct sdhci_host *host)
 	ocr_avail = 0;
 	spin_lock_init(&host->lock);
 
-	sdhci_try_get_regulator(host);
-
 #ifdef CONFIG_REGULATOR
 	sdhci_try_get_regulator(host);
 	/*

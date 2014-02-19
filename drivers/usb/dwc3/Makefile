@@ -43,12 +43,7 @@ endif
 obj-$(CONFIG_USB_DWC3)		+= dwc3-omap.o
 obj-$(CONFIG_USB_DWC3)		+= dwc3-exynos.o
 
-<<<<<<< HEAD
-obj-$(CONFIG_USB_DWC3_PCI)		+= dwc3-pci.o
-=======
 ifneq ($(CONFIG_PCI),)
 	obj-$(CONFIG_USB_DWC3_OTG)	+= otg.o
 	obj-$(CONFIG_USB_DWC3)		+= dwc3-pci.o
 endif
->>>>>>> 9bc9aec5... dwc3: Support OTG mode for dwc3 controller
-

@@ -1430,7 +1430,7 @@ static int dwc3_gadget_ep_queue(struct usb_ep *ep, struct usb_request *request,
 	/* pad OUT endpoint buffer to MaxPacketSize per databook requirement*/
 	req->short_packet = false;
 	if (!IS_ALIGNED(request->length, ep->desc->wMaxPacketSize)
-				&& !(dep->number & 1)) {
+		&& !(dep->number & 1) && (dep->number != DWC3_EP_EBC_OUT_NB)) {
 		request->length = roundup(request->length,
 					(u32) ep->desc->wMaxPacketSize);
 		/* set flag for bulk-out short request */
@@ -1838,28 +1838,6 @@ static int dwc3_init_for_enumeration(struct dwc3 *dwc)
 	int			ret = 0;
 	u32			reg;
 
-	irq = platform_get_irq(to_platform_device(dwc->dev), 0);
-	ret = request_threaded_irq(irq, dwc3_interrupt, dwc3_thread_interrupt,
-			IRQF_SHARED, "dwc3", dwc);
-	if (ret) {
-		dev_err(dwc->dev, "failed to request irq #%d --> %d\n",
-				irq, ret);
-		goto err0;
-	}
-
-	spin_lock_irqsave(&dwc->lock, flags);
-
-	if (dwc->gadget_driver) {
-		dev_err(dwc->dev, "%s is already bound to %s\n",
-				dwc->gadget.name,
-				dwc->gadget_driver->driver.name);
-		ret = -EBUSY;
-		goto err1;
-	}
-
-	dwc->gadget_driver	= driver;
-
->>>>>>> 18cc6d8... [BACKPORT]usb: dwc3: gadget: get rid of IRQF_ONESHOT
 	reg = dwc3_readl(dwc->regs, DWC3_DCFG);
 	reg &= ~(DWC3_DCFG_SPEED_MASK);
 
@@ -3505,7 +3483,7 @@ int dwc3_runtime_suspend(struct device *device)
 		dep->flags = DWC3_EP_HIBERNATION;
 	}
 
-	dwc3_gadget_run_stop(dwc, 0);
+	__dwc3_gadget_run_stop(dwc, 0);
 	dwc3_gadget_keep_conn(dwc, 1);
 
 	dwc3_cache_hwregs(dwc);
@@ -3519,8 +3497,8 @@ int dwc3_runtime_suspend(struct device *device)
 
 	spin_unlock_irqrestore(&dwc->lock, flags);
 
-	__dwc3_vbus_draw(dwc, OTG_DEVICE_SUSPEND);
-	dev_dbg(dwc->dev, "%s(): suspended\n", __func__);
+	schedule_delayed_work(&dwc->link_work, msecs_to_jiffies(1000));
+	dev_info(dwc->dev, "suspended\n");
 	dev_vdbg(dwc->dev, "<--- %s()\n", __func__);
 
 	return 0;

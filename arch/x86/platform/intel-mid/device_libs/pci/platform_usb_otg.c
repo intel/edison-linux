@@ -13,6 +13,7 @@
 #include <linux/pci.h>
 #include <asm/intel-mid.h>
 #include <asm/intel_scu_ipc.h>
+#include <asm/spid.h>
 #include <linux/dma-mapping.h>
 
 #ifdef CONFIG_USB_DWC3_OTG
@@ -115,11 +116,5 @@ static void otg_pci_early_quirks(struct pci_dev *pci_dev)
 	pci_dev->dev.platform_data = get_otg_platform_data(pci_dev);
 }
 
-DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_MFD_OTG,
-			otg_pci_early_quirks);
-DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_CLV_OTG,
-			otg_pci_early_quirks);
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_MRFL_DWC3_OTG,
-			otg_pci_early_quirks);
-DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_BYT_OTG,
 			otg_pci_early_quirks);

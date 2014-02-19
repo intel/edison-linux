@@ -22,7 +22,6 @@
 
 #include <linux/usb/dwc3-intel-mid.h>
 #include <linux/usb/phy.h>
-#include <linux/wakelock.h>
 
 #include "core.h"
 #include "gadget.h"
@@ -58,7 +57,6 @@ struct dwc3_dev_data {
 	struct dwc3		*dwc;
 	void __iomem		*flis_reg;
 	u32			grxthrcfg;
-	struct wake_lock	wake_lock;
 	struct mutex		mutex;
 };
 
@@ -245,7 +243,6 @@ int dwc3_start_peripheral(struct usb_gadget *g)
 	int			irq;
 	int			ret = 0;
 
-	wake_lock(&_dev_data->wake_lock);
 	pm_runtime_get_sync(dwc->dev);
 
 	mutex_lock(&_dev_data->mutex);
@@ -352,8 +349,6 @@ int dwc3_stop_peripheral(struct usb_gadget *g)
 	mutex_unlock(&_dev_data->mutex);
 
 	cancel_delayed_work_sync(&dwc->link_work);
-
-	wake_unlock(&_dev_data->wake_lock);
 
 	return 0;
 }
@@ -582,9 +577,6 @@ static int dwc3_device_intel_probe(struct platform_device *pdev)
 	usb_put_phy(usb_phy);
 	dwc->is_otg = 1;
 
-	wake_lock_init(&_dev_data->wake_lock,
-			WAKE_LOCK_SUSPEND, "dwc_wake_lock");
-
 	dwc3_set_mode(dwc, DWC3_GCTL_PRTCAP_DEVICE);
 	ret = dwc3_gadget_init(dwc);
 	if (ret) {
@@ -619,8 +611,6 @@ err0:
 static int dwc3_device_intel_remove(struct platform_device *pdev)
 {
 	iounmap(_dev_data->flis_reg);
-
-	wake_lock_destroy(&_dev_data->wake_lock);
 
 	dwc3_remove(pdev);
 

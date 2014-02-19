@@ -116,6 +116,15 @@ void __init *bcove_adc_platform_data(void *info)
 		goto out;
 	}
 
+	bcove_adc_pdata.channel_num = GPADC_CH_NUM;
+	bcove_adc_pdata.intr = GPADC_SRAM_INTR_ADDR;
+	bcove_adc_pdata.intr_mask = MBATTEMP | MSYSTEMP | MBATT
+		| MVIBATT | MCCTICK;
+	bcove_adc_pdata.gpadc_iio_maps = basincove_iio_maps;
+	bcove_adc_pdata.gpadc_regmaps = basincove_gpadc_regmaps;
+	bcove_adc_pdata.gpadc_regs = &basincove_gpadc_regs;
+	bcove_adc_pdata.gpadc_channels = basincove_adc_channels;
+
 	pdev->dev.platform_data = &bcove_adc_pdata;
 
 	ret = platform_device_add(pdev);

@@ -1583,6 +1583,7 @@ int intel_scu_ipc_read_oshob_info(void)
 		ret = intel_scu_ipc_read_oshob_def_param(oshob_addr);
 
 		if (oshob_info->platform_type == INTEL_MID_CPU_CHIP_TANGIER) {
+			pr_debug("(default oshob) SCU buffer size is %d bytes\n",
 				OSHOB_SCU_BUF_MRFLD_DW_SIZE*4);
 		} else {
 			pr_debug("(default oshob) SCU buffer size is %d bytes\n",
@@ -1953,7 +1954,10 @@ u32 intel_scu_ipc_get_fabricerror_buf1_offset(void)
 			return offsetof(struct scu_ipc_oshob,
 					fab_err_log) + oshob_info->offs_add;
 		}
+	else {
+		pr_err("scu_ipc_get_fabricerror_buf_offset: platform not recognized!\n");
 		return 0;
+	}
 }
 
 /*

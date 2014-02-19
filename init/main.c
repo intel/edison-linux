@@ -665,11 +665,13 @@ static int __init_or_module do_one_initcall_debug(initcall_t fn)
 	int ret;
 
 	pr_debug("calling  %pF @ %i\n", fn, task_pid_nr(current));
+
 	calltime = ktime_get();
 	ret = fn();
 	rettime = ktime_get();
 	delta = ktime_sub(rettime, calltime);
 	duration = (unsigned long long) ktime_to_ns(delta) >> 10;
+
 	pr_debug("initcall %pF returned %d after %lld usecs\n",
 		 fn, ret, duration);
 
