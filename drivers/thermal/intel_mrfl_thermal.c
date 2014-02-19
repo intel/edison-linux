@@ -666,6 +666,11 @@ static struct thermal_zone_device_ops tzd_ops = {
 #endif
 };
 
+static irqreturn_t mrfl_thermal_intrpt_handler(int irq, void* dev_data)
+{
+	return IRQ_WAKE_THREAD;
+}
+
 static int mrfl_thermal_probe(struct platform_device *pdev)
 {
 	int ret, i;
@@ -749,7 +754,7 @@ static int mrfl_thermal_probe(struct platform_device *pdev)
 	}
 
 	/* Register for Interrupt Handler */
-	ret = request_threaded_irq(tdata->irq, NULL, thermal_intrpt,
+	ret = request_threaded_irq(tdata->irq, mrfl_thermal_intrpt_handler, thermal_intrpt,
 						IRQF_TRIGGER_RISING,
 						DRIVER_NAME, tdata);
 	if (ret) {

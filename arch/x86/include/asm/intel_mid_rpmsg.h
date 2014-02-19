@@ -2,8 +2,11 @@
 #define _INTEL_MID_RPMSG_H_
 
 #include <asm/scu_ipc_rpmsg.h>
-#include <linux/wakelock.h>
 #include <linux/rpmsg.h>
+
+#ifdef ANDROID_BUILD
+#include <linux/wakelock.h>
+#endif
 
 #define RPMSG_TX_TIMEOUT   (5 * HZ)
 

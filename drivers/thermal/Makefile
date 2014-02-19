@@ -12,6 +12,7 @@ thermal_sys-y			+= thermal_core.o
 obj-$(CONFIG_INTEL_MFLD_THERMAL) += intel_mid_thermal.o
 obj-$(CONFIG_INTEL_BYT_THERMAL)  += intel_byt_thermal.o
 obj-$(CONFIG_SENSORS_THERMAL_MRFLD)     += intel_mrfl_thermal.o
+obj-$(CONFIG_SOC_THERMAL)     += intel_soc_thermal.o
 
 # governors
 thermal_sys-$(CONFIG_THERMAL_GOV_FAIR_SHARE)	+= fair_share.o

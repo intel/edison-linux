@@ -51,6 +51,7 @@
 
 char intel_platform_ssn[INTEL_PLATFORM_SSN_SIZE + 1];
 struct soft_platform_id spid;
+EXPORT_SYMBOL(spid);
 
 #ifdef CONFIG_ACPI
 struct platform_id pidv;
@@ -95,6 +96,7 @@ static void populate_spid_cmdline(void)
 	} else
 		pr_err("SPID not found in kernel command line.\n");
 }
+
 static ssize_t customer_id_show(struct kobject *kobj,
 				struct kobj_attribute *attr, char *buf)
 {
@@ -167,17 +169,19 @@ static struct attribute_group spid_attr_group = {
 static ssize_t iafw_version_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
-	return sprintf(buf, "%02X.%02X\n", pidv.iafw_major, pidv.iafw_minor);
+	return sprintf(buf, "%04X.%04X\n", pidv.iafwrevvalues[iarevmajor],
+		pidv.iafwrevvalues[iarevminor]);
 }
 pidv_attr(iafw_version);
 
 static ssize_t secfw_version_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
-	return sprintf(buf, "%02X.%02X\n", pidv.secfw_major, pidv.secfw_minor);
+	return sprintf(buf, "%02d.%02d\n",
+		(pidv.secrevvalues[secrev] / 100),
+		(pidv.secrevvalues[secrev] % 100));
 }
 pidv_attr(secfw_version);
-
 
 static struct attribute *pidv_attrs[] = {
 	&iafw_version_attr.attr,
@@ -208,10 +212,30 @@ static int __init acpi_parse_pidv(struct acpi_table_header *table)
 	/*
 	 * FIXME: add ssn accessor, instead of memcpy
 	 */
-	memcpy(&intel_platform_ssn, &(pidv_tbl->pidv.part_number),
+	memcpy(intel_platform_ssn, &(pidv_tbl->pidv.part_number),
 			INTEL_PLATFORM_SSN_SIZE);
 	intel_platform_ssn[INTEL_PLATFORM_SSN_SIZE] = '\0';
 
+	pr_info("SPID updated according to ACPI Table:\n");
+	pr_info("\tspid customer id : %04x\n"
+			"\tspid vendor id : %04x\n"
+			"\tspid manufacturer id : %04x\n"
+			"\tspid platform family id : %04x\n"
+			"\tspid product line id : %04x\n"
+			"\tspid hardware id : %04x\n"
+			"\tspid fru[4..0] : %02x %02x %02x %02x %02x\n"
+			"\tspid fru[9..5] : %02x %02x %02x %02x %02x\n"
+			"\tssn : %s\n",
+			spid.customer_id,
+			spid.vendor_id,
+			spid.manufacturer_id,
+			spid.platform_family_id,
+			spid.product_line_id,
+			spid.hardware_id,
+			spid.fru[4], spid.fru[3], spid.fru[2], spid.fru[1],
+			spid.fru[0], spid.fru[9], spid.fru[8], spid.fru[7],
+			spid.fru[6], spid.fru[5],
+			intel_platform_ssn);
 	return 0;
 }
 
@@ -272,6 +296,24 @@ err_sysfs_spid:
 arch_initcall(acpi_spid_init);
 #endif
 
+/**
+ * Check if buffer contains printable character, from SPACE(0x20) to
+ * TILDE (0x7E), until \0 or maxlen characters occur.
+ * param char *str_buf buffer of characters to look for
+ * param int maxlen max number of characters to look for
+ * return true if valid, otherwise false
+ * */
+static bool chk_prt_validity(char *strbuf, int max_len)
+{
+	int idx = 0;
+	while ((idx < max_len) && (strbuf[idx] != '\0')) {
+		if ((strbuf[idx] < 0x20) || (strbuf[idx] > 0x7E))
+			return false;
+		idx++;
+	}
+	return true;
+}
+
 int __init sfi_handle_spid(struct sfi_table_header *table)
 {
 	struct sfi_table_oemb *oemb;
@@ -301,21 +343,30 @@ int __init sfi_handle_spid(struct sfi_table_header *table)
 	memcpy(&spid, &oemb->spid, sizeof(struct soft_platform_id));
 
 	if (oemb->header.len <
-			(char *)oemb->ssn + INTEL_PLATFORM_SSN_SIZE - (char *)oemb) {
+			(char *)oemb->ssn + INTEL_PLATFORM_SSN_SIZE -
+			(char *)oemb) {
 		pr_err("SFI OEMB does not contains SSN\n");
 		intel_platform_ssn[0] = '\0';
 	} else {
-		memcpy(intel_platform_ssn, oemb->ssn, INTEL_PLATFORM_SSN_SIZE);
-		intel_platform_ssn[INTEL_PLATFORM_SSN_SIZE] = '\0';
+		if (!chk_prt_validity(oemb->ssn, INTEL_PLATFORM_SSN_SIZE)) {
+			pr_err("SSN contains non printable character\n");
+			intel_platform_ssn[0] = '\0';
+		} else {
+			memcpy(intel_platform_ssn, oemb->ssn,
+				INTEL_PLATFORM_SSN_SIZE);
+			intel_platform_ssn[INTEL_PLATFORM_SSN_SIZE] = '\0';
+		}
 	}
 
 	/* Populate command line with SPID values */
 	populate_spid_cmdline();
+
+	return 0;
 
 err_sfi_oemb_tbl:
 	sysfs_remove_group(spid_kobj, &spid_attr_group);
 err_sfi_sysfs_spid:
 	kobject_put(spid_kobj);
 
-	return 0;
+	return ret;
 }

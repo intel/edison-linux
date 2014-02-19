@@ -34,7 +34,6 @@
 #include <linux/atomic.h>
 #include <linux/notifier.h>
 #include <linux/suspend.h>
-#include <linux/wakelock.h>
 
 enum {
 	SCU_IPC_LINCROFT,
@@ -104,31 +103,6 @@ static struct notifier_block scu_ipc_pm_notifier = {
  *    message handler is called within firmware.
  */
 
-=======
-
-static struct notifier_block scu_ipc_pm_notifier = {
-	.notifier_call = scu_ipc_pm_callback,
-	.priority = 1,
-};
-
-/*
- * IPC register summary
- *
- * IPC register blocks are memory mapped at fixed address of 0xFF11C000
- * To read or write information to the SCU, driver writes to IPC-1 memory
- * mapped registers (base address 0xFF11C000). The following is the IPC
- * mechanism
- *
- * 1. IA core cDMI interface claims this transaction and converts it to a
- *    Transaction Layer Packet (TLP) message which is sent across the cDMI.
- *
- * 2. South Complex cDMI block receives this message and writes it to
- *    the IPC-1 register block, causing an interrupt to the SCU
- *
- * 3. SCU firmware decodes this interrupt and IPC message and the appropriate
- *    message handler is called within firmware.
- */
-
 #define IPC_STATUS_ADDR		0X04
 #define IPC_SPTR_ADDR		0x08
 #define IPC_DPTR_ADDR		0x0C
@@ -167,14 +141,6 @@ static char *ipc_err_sources[] = {
 	[IPC_ERR_UNSIGNEDKERNEL] =
 		"Unsigned kernel",
 };
-
-/* Suspend status get */
-bool suspend_in_progress(void)
-{
-	return suspend_status;
-}
-
-static struct wake_lock ipc_wake_lock;
 
 /* PM Qos struct */
 static struct pm_qos_request *qos;
@@ -318,17 +284,12 @@ void intel_scu_ipc_lock(void)
 	/* Prevent S3 */
 	mutex_lock(&scu_suspend_lock);
 
-	if (!suspend_in_progress())
-		wake_lock(&ipc_wake_lock);
 }
 EXPORT_SYMBOL_GPL(intel_scu_ipc_lock);
 
 void intel_scu_ipc_unlock(void)
 {
 	/* Re-enable S3 */
-	if (!suspend_in_progress())
-		wake_unlock(&ipc_wake_lock);
-
 	mutex_unlock(&scu_suspend_lock);
 
 	/* Re-enable Deeper C-states beyond C6 */
@@ -469,11 +430,15 @@ static irqreturn_t ioc(int irq, void *dev_id)
  */
 static int ipc_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	int err;
+	int err, pid;
+	struct intel_scu_ipc_pdata_t *pdata;
 	resource_size_t pci_resource;
 
 	if (ipcdev.pdev)		/* We support only one SCU */
 		return -EBUSY;
+
+	pid = id->driver_data;
+	pdata = &intel_scu_ipc_pdata[pid];
 
 	ipcdev.pdev = pci_dev_get(dev);
 
@@ -495,11 +460,11 @@ static int ipc_probe(struct pci_dev *dev, const struct pci_device_id *id)
 		&ipcdev))
 		return -EBUSY;
 
-	ipcdev.ipc_base = ioremap_nocache(IPC_BASE_ADDR, IPC_MAX_ADDR);
+	ipcdev.ipc_base = ioremap_nocache(pdata->ipc_base, pdata->ipc_len);
 	if (!ipcdev.ipc_base)
 		return -ENOMEM;
 
-	ipcdev.i2c_base = ioremap_nocache(IPC_I2C_BASE, IPC_I2C_MAX_ADDR);
+	ipcdev.i2c_base = ioremap_nocache(pdata->i2c_base, pdata->i2c_len);
 	if (!ipcdev.i2c_base) {
 		iounmap(ipcdev.ipc_base);
 		return -ENOMEM;
@@ -561,8 +526,6 @@ static int intel_scu_ipc_init(void)
 
 	register_pm_notifier(&scu_ipc_pm_notifier);
 
-	wake_lock_init(&ipc_wake_lock, WAKE_LOCK_SUSPEND, "intel_scu_ipc");
-
 	return  pci_register_driver(&ipc_driver);
 }
 
@@ -577,5 +540,5 @@ MODULE_AUTHOR("Sreedhara DS <sreedhara.ds@intel.com>");
 MODULE_DESCRIPTION("Intel SCU IPC driver");
 MODULE_LICENSE("GPL");
 
-module_init(intel_scu_ipc_init);
+fs_initcall(intel_scu_ipc_init);
 module_exit(intel_scu_ipc_exit);

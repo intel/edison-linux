@@ -323,7 +323,7 @@ static int get_id(struct dwc_otg2 *otg)
 }
 
 static int dwc_otg_notify_charger_type(struct dwc_otg2 *otg,
-		enum usb_charger_state state)
+		enum power_supply_charger_event event)
 {
 	if (dwc3_otg_pdata->notify_charger_type)
 		return dwc3_otg_pdata->notify_charger_type(otg, event);
@@ -513,6 +513,8 @@ static enum dwc_otg_state do_charger_detection(struct dwc_otg2 *otg)
 		ma = 1500;
 		break;
 	case POWER_SUPPLY_CHARGER_TYPE_USB_SDP:
+		/* Notify SDP current is 100ma before enumeration. */
+		ma = 100;
 		break;
 	default:
 		otg_err(otg, "Charger type is not valid to notify battery\n");

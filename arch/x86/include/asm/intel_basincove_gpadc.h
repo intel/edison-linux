@@ -43,6 +43,7 @@ struct iio_dev;
 struct intel_basincove_gpadc_platform_data {
 	int channel_num;
 	unsigned long intr;
+	u8 intr_mask;
 	struct iio_map *gpadc_iio_maps;
 	struct gpadc_regmap_t *gpadc_regmaps;
 	struct gpadc_regs_t *gpadc_regs;

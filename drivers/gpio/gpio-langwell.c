@@ -760,6 +760,7 @@ static void lnw_irq_handler(unsigned irq, struct irq_desc *desc)
 	enum GPIO_REG reg_type;
 	struct irq_desc *lnw_irq_desc;
 	unsigned int lnw_irq;
+
 	lnw = irq_data_get_irq_handler_data(data);
 
 	debug = lnw->debug;

@@ -2420,12 +2420,7 @@ void mmc_rescan(struct work_struct *work)
 
  out:
 	mmc_emergency_setup(host);
-	if (extend_wakelock)
-		wake_lock_timeout(&host->detect_wake_lock, HZ / 2);
-	else
-		wake_unlock(&host->detect_wake_lock);
-	if (host->caps & MMC_CAP_NEEDS_POLL) {
-		wake_lock(&host->detect_wake_lock);
+	if (host->caps & MMC_CAP_NEEDS_POLL) 
 		mmc_schedule_delayed_work(&host->detect, HZ);
 }
 

@@ -49,7 +49,7 @@ static void xhci_dwc3_quirks(struct device *dev, struct xhci_hcd *xhci)
 	 * Synopsys DWC3 controller will generate PLC when link transfer to
 	 * compliance/loopback mode.
 	 */
-	xhci->quirks |= XHCI_PLAT | XHCI_COMP_PLC_QUIRK;
+	xhci->quirks |= XHCI_PLAT; 
 }
 
 /* called during probe() after chip reset completes */
@@ -473,9 +473,6 @@ static int xhci_dwc_drv_probe(struct platform_device *pdev)
 
 
 	usb_put_phy(usb_phy);
-
-	/* Enable wakeup irq */
-	hcd->has_wakeup_irq = 1;
 
 	platform_set_drvdata(pdev, hcd);
 	pm_runtime_enable(hcd->self.controller);
