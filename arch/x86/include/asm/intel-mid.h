@@ -16,7 +16,6 @@
 #include <linux/sfi.h>
 #include <linux/pci.h>
 #include <linux/platform_device.h>
-#include <asm/spid.h>
 #include <asm/intel_mid_pcihelpers.h>
 
 #ifdef CONFIG_SFI
@@ -42,6 +41,24 @@ extern struct sfi_rtc_table_entry sfi_mrtc_array[];
 extern void *get_oem0_table(void);
 extern void register_rpmsg_service(char *name, int id, u32 addr);
 extern int sdhci_pci_request_regulators(void);
+
+/* Define soft platform ID to comply with the OEMB table format. But SPID is not supported */
+#define INTEL_PLATFORM_SSN_SIZE 32
+struct soft_platform_id {
+        u16 customer_id; /*Defines the final customer for the product */
+        u16 vendor_id; /* Defines who owns the final product delivery */
+        u16 manufacturer_id; /* Defines who build the hardware. This can be
+                              * different for the same product */
+        u16 platform_family_id; /* Defined by vendor and defines the family of
+                                 * the product with the same root components */
+        u16 product_line_id; /* Defined by vendor and defines the name of the
+                              * product. This can be used to differentiate the
+                              * feature set for the same product family (low
+                              * cost vs full feature). */
+        u16 hardware_id; /* Defined by vendor and defines the physical hardware
+                          * component set present on the PCB/FAB */
+        u8  fru[SPID_FRU_SIZE]; /* Field Replaceabl Unit */
+} __packed;
 
 /* OEMB table */
 struct sfi_table_oemb {

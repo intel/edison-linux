@@ -815,35 +815,14 @@ static void hsu_platform_clk(enum intel_mid_cpu_type cpu_type)
 static __init int hsu_dev_platform_data(void)
 {
 	switch (intel_mid_identify_cpu()) {
-	case INTEL_MID_CPU_CHIP_CLOVERVIEW:
-		platform_hsu_info = &hsu_port_cfgs[hsu_clv][0];
-		if (INTEL_MID_BOARD(2, PHONE, CLVTP, VB, PRO))
-			hsu_port_gpio_mux =
-				&hsu_port_pin_cfgs[hsu_clv][hsu_pid_vtb_pro][0];
-		else if (INTEL_MID_BOARD(2, PHONE, CLVTP, VB, ENG))
-			hsu_port_gpio_mux =
-				&hsu_port_pin_cfgs[hsu_clv][hsu_pid_vtb_eng][0];
-		else
-			hsu_port_gpio_mux =
-				&hsu_port_pin_cfgs[hsu_clv][hsu_pid_rhb][0];
-		break;
-
 	case INTEL_MID_CPU_CHIP_TANGIER:
 		platform_hsu_info = &hsu_port_cfgs[hsu_tng][0];
 		hsu_port_gpio_mux = &hsu_port_pin_cfgs[hsu_tng][hsu_pid_def][0];
 		break;
 
-	case INTEL_MID_CPU_CHIP_PENWELL:
 	default:
-		hsu_register_board_info(&hsu_port_cfgs[hsu_pnw][0]);
-		platform_hsu_info = &hsu_port_cfgs[hsu_pnw][0];
-		hsu_port_gpio_mux = &hsu_port_pin_cfgs[hsu_pnw][hsu_pid_def][0];
-		break;
-	default:
-		/* FIXME: VALLEYVIEW2? */
-		platform_hsu_info = &hsu_port_cfgs[hsu_vlv2][0];
-		hsu_port_gpio_mux =
-			&hsu_port_pin_cfgs[hsu_vlv2][hsu_pid_def][0];
+		platform_hsu_info = NULL; 
+		hsu_port_gpio_mux = NULL;
 		break;
 	}
 
