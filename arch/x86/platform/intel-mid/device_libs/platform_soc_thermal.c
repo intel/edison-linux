@@ -131,9 +131,6 @@ static int __init byt_soc_thermal_init(void)
 
 static int __init platform_soc_thermal_init(void)
 {
-	if (INTEL_MID_BOARD(1, TABLET, BYT))
-		return byt_soc_thermal_init();
-
 	return 0;
 }
 device_initcall(platform_soc_thermal_init);

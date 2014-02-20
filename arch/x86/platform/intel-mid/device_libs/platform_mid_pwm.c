@@ -88,14 +88,8 @@ static struct intel_mid_pwm_platform_data pdata[] = {
 
 static void *get_pwm_platform_data(void)
 {
-	if (INTEL_MID_BOARD(1, PHONE, CLVTP) ||
-		(INTEL_MID_BOARD(1, TABLET, CLVT))) {
-		pr_info("%s, CLV board detected\n", __func__);
-		return &pdata[ctp_pwm];
-	} else {
-		pr_info("%s, MFLD board detected\n", __func__);
-		return &pdata[mfld_pwm];
-	}
+	pr_info("%s, MFLD board detected\n", __func__);
+	return &pdata[mfld_pwm];
 }
 
 static int __init intel_mid_pwm_init(void)

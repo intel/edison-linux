@@ -43,7 +43,6 @@
 #include <asm/apb_timer.h>
 #include <asm/reboot.h>
 #include "intel_mid_weak_decls.h"
-#include <asm/spid.h>
 
 #define	SFI_SIG_OEM0	"OEM0"
 #define MAX_IPCDEVS	24
@@ -529,9 +528,6 @@ static int __init sfi_parse_oemb(struct sfi_table_header *table)
 	u8 sig[SFI_SIGNATURE_SIZE + 1] = {'\0'};
 	u8 oem_id[SFI_OEM_ID_SIZE + 1] = {'\0'};
 	u8 oem_table_id[SFI_OEM_TABLE_ID_SIZE + 1] = {'\0'};
-
-	/* parse SPID and SSN out from OEMB table */
-	sfi_handle_spid(table);
 
 	oemb = (struct sfi_table_oemb *) table;
 	if (!oemb) {

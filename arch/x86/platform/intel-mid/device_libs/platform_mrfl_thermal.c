@@ -125,11 +125,7 @@ void __init *mrfl_thermal_platform_data(void *info)
 		return NULL;
 	}
 
-	if (INTEL_MID_BOARD(2, PHONE, MRFL, BB, ENG) ||
-			(INTEL_MID_BOARD(2, PHONE, MRFL, BB, PRO)))
-		pdev->dev.platform_data = &pdata[bdgb_thermal];
-	else
-		pdev->dev.platform_data = &pdata[mrfl_thermal];
+	pdev->dev.platform_data = &pdata[mrfl_thermal];
 
 	install_irq_resource(pdev, entry->irq);
 	register_rpmsg_service("rpmsg_mrfl_thermal", RPROC_SCU,

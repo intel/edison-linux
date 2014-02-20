@@ -177,17 +177,7 @@ void __init *msic_thermal_platform_data(void *info)
 		return NULL;
 	}
 
-	if (INTEL_MID_BOARD(2, PHONE, CLVTP, VB, PRO) ||
-		INTEL_MID_BOARD(2, PHONE, CLVTP, VB, ENG))
-		pdev->dev.platform_data = &pdata[vb_thermal];
-	else if (INTEL_MID_BOARD(1, PHONE, CLVTP) ||
-			(INTEL_MID_BOARD(1, TABLET, CLVT)))
-		pdev->dev.platform_data = &pdata[ctp_thermal];
-	else if (INTEL_MID_BOARD(2, PHONE, MFLD, LEX, ENG) ||
-			(INTEL_MID_BOARD(2, PHONE, MFLD, LEX, PRO)))
-		pdev->dev.platform_data = &pdata[lex_thermal];
-	else
-		pdev->dev.platform_data = &pdata[mfld_thermal];
+	pdev->dev.platform_data = &pdata[mfld_thermal];
 
 	register_rpmsg_service("rpmsg_mid_thermal", RPROC_SCU, RP_MSIC_THERMAL);
 

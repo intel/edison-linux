@@ -13,7 +13,6 @@
 #include <linux/pci.h>
 #include <asm/intel-mid.h>
 #include <asm/intel_scu_ipc.h>
-#include <asm/spid.h>
 #include <linux/dma-mapping.h>
 
 #ifdef CONFIG_USB_DWC3_OTG
@@ -38,23 +37,12 @@ static struct intel_dwc_otg_pdata *get_otg_platform_data(struct pci_dev *pdev)
 {
 	switch (pdev->device) {
 	case PCI_DEVICE_ID_INTEL_MRFL_DWC3_OTG:
-		if (INTEL_MID_BOARD(1, PHONE, MOOR)) {
-			dwc_otg_pdata.pmic_type = SHADY_COVE;
-			dwc_otg_pdata.charger_detect_enable = 0;
+		dwc_otg_pdata.pmic_type = BASIN_COVE;
+		dwc_otg_pdata.charger_detect_enable = 1;
 
-		} else if (INTEL_MID_BOARD(1, PHONE, MRFL)) {
-			dwc_otg_pdata.pmic_type = BASIN_COVE;
-			dwc_otg_pdata.charger_detect_enable = 1;
+		dwc_otg_pdata.charging_compliance =
+			dwc_otg_get_usbspecoverride();
 
-			dwc_otg_pdata.charging_compliance =
-				dwc_otg_get_usbspecoverride();
-
-		} else if (intel_mid_identify_sim() ==
-				INTEL_MID_CPU_SIMULATION_HVP) {
-			dwc_otg_pdata.pmic_type = NO_PMIC;
-			dwc_otg_pdata.is_hvp = 1;
-			dwc_otg_pdata.charger_detect_enable = 0;
-		}
 		return &dwc_otg_pdata;
 	default:
 		break;
@@ -80,28 +68,13 @@ static struct intel_mid_otg_pdata *get_otg_platform_data(struct pci_dev *pdev)
 	struct intel_mid_otg_pdata *pdata = &otg_pdata;
 
 	switch (pdev->device) {
-	case PCI_DEVICE_ID_INTEL_MFD_OTG:
-		if (INTEL_MID_BOARD(2, TABLET, MFLD, SLP, PRO) ||
-			INTEL_MID_BOARD(2, TABLET, MFLD, SLP, ENG))
-			pdata->gpio_vbus = 54;
+	case PCI_DEVICE_ID_INTEL_MRFL_DWC3_OTG:
+		dwc_otg_pdata.pmic_type = BASIN_COVE;
+		dwc_otg_pdata.charger_detect_enable = 1;
 
-		if (!INTEL_MID_BOARD(2, TABLET, MFLD, RR, PRO) &&
-			!INTEL_MID_BOARD(2, TABLET, MFLD, RR, ENG))
-			pdata->power_budget = 200;
-		break;
-
-	case PCI_DEVICE_ID_INTEL_CLV_OTG:
-		pdata->gpio_cs = get_gpio_by_name("usb_otg_phy_cs");
-		if (pdata->gpio_cs == -1) {
-			pr_err("%s: No gpio pin usb_otg_phy_cs\n", __func__);
-			return NULL;
-		}
-		pdata->gpio_reset = get_gpio_by_name("usb_otg_phy_rst");
-		if (pdata->gpio_reset == -1) {
-			pr_err("%s: No gpio pin usb_otg_phy_rst\n", __func__);
-			return NULL;
-		}
-		break;
+		dwc_otg_pdata.charging_compliance =
+			dwc_otg_get_usbspecoverride();
+		return &dwc_otg_pdata;
 
 	default:
 		break;
