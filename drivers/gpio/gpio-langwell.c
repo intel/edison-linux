@@ -393,9 +393,18 @@ static void __iomem *gpio_reg_2bit(struct gpio_chip *chip, unsigned offset,
 
 static int lnw_gpio_request(struct gpio_chip *chip, unsigned offset)
 {
-	void __iomem *gafr = gpio_reg_2bit(chip, offset, GAFR);
-	u32 value = readl(gafr);
-	int shift = (offset % 16) << 1, af = (value >> shift) & 3;
+	struct lnw_gpio *lnw = to_lnw_priv(chip);
+	u32 value;
+	void __iomem *gafr;
+	int shift, af;
+
+	if (lnw->type > CLOVERVIEW_GPIO_CORE)
+		return 0;
+
+	gafr = gpio_reg_2bit(chip, offset, GAFR);
+	value = readl(gafr);
+	shift = (offset % 16) << 1;
+	af = (value >> shift) & 3;
 
 	if (af) {
 		value &= ~(3 << shift);
