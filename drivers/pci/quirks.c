@@ -3043,7 +3043,11 @@ static int __init pci_apply_final_quirks(void)
 
 	pci_apply_fixup_final_quirks = true;
 	for_each_pci_dev(dev) {
-		pci_fixup_device(pci_fixup_final, dev);
+		if (dev->device==0x119d)
+			printk("Ignore USB EHCI Tanhier (HSIC) since we do not have the driver in the kernel\n");
+		else
+			pci_fixup_device(pci_fixup_final, dev);
+
 		/*
 		 * If arch hasn't set it explicitly yet, use the CLS
 		 * value shared by all PCI devices.  If there's a
