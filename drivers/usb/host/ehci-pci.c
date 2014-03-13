@@ -412,7 +412,7 @@ static struct pci_driver ehci_pci_driver = {
 
 static int __init ehci_pci_init(void)
 {
-	if (usb_disabled())
+	//if (usb_disabled())
 		return -ENODEV;
 
 	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
