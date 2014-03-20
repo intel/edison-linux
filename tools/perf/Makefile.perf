@@ -787,6 +787,7 @@ $(patsubst perf-%,%.o,$(PROGRAMS)): $(LIB_H) $(wildcard */*.h)
 # we compile into subdirectories. if the target directory is not the source directory, they might not exists. So
 # we depend the various files onto their directories.
 DIRECTORY_DEPS = $(LIB_OBJS) $(BUILTIN_OBJS) $(GTK_OBJS)
+DIRECTORY_DEPS += $(OUTPUT)util/parse-events-flex.c $(OUTPUT)util/parse-events-bison.c $(OUTPUT)util/pmu-flex.c $(OUTPUT)util/pmu-bison.c
 DIRECTORY_DEPS += $(OUTPUT)PERF-VERSION-FILE $(OUTPUT)common-cmds.h
 # no need to add flex objects, because they depend on bison ones
 DIRECTORY_DEPS += $(OUTPUT)util/parse-events-bison.c
