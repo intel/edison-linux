@@ -21,6 +21,7 @@ obj-$(CONFIG_ATOM_SOC_POWER) += intel_soc_pmu.o intel_soc_pm_debug.o intel_soc_d
 obj-$(CONFIG_REMOVEME_INTEL_ATOM_MDFLD_POWER) += intel_soc_mdfld.o intel_soc_mdfld_clv_common.o
 obj-$(CONFIG_REMOVEME_INTEL_ATOM_CLV_POWER) += intel_soc_clv.o intel_soc_mdfld_clv_common.o
 obj-$(CONFIG_REMOVEME_INTEL_ATOM_MRFLD_POWER) += intel_soc_mrfld.o
+obj-$(CONFIG_REMOVEME_INTEL_ATOM_MRFLD_POWER) += pmu_tng.o
 
 # Debug features driver
 obj-$(CONFIG_INTEL_DEBUG_FEATURE) += intel_soc_debug.o
