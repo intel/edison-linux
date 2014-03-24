@@ -209,6 +209,8 @@ static int __init pmu_nc_poweroff(void) {
 	pmu_set_power_state_tng (DSP_SS_PM, DPA_SSC, TNG_COMPOSITE_D3);
 	/* Power off MIO */
 	pmu_set_power_state_tng (MIO_SS_PM, MIO_SSC, TNG_COMPOSITE_D3);
+	/* Power off ISP */
+	pmu_set_power_state_tng (ISP_SS_PM0, ISP_SSC, TNG_COMPOSITE_D3);
 	return 0;
 }
 
