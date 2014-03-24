@@ -207,6 +207,8 @@ int pmu_set_power_state_tng(u32 reg_pm0, u32 si_mask, u32 ns_mask)
 static int __init pmu_nc_poweroff(void) {
 	/* Power off DPA */
 	pmu_set_power_state_tng (DSP_SS_PM, DPA_SSC, TNG_COMPOSITE_D3);
+	/* Power off MIO */
+	pmu_set_power_state_tng (MIO_SS_PM, MIO_SSC, TNG_COMPOSITE_D3);
 	return 0;
 }
 
