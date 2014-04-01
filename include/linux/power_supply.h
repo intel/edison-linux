@@ -213,7 +213,7 @@ enum power_supply_charger_cable_type {
 struct power_supply_cable_props {
 	enum power_supply_charger_event	chrg_evt;
 	enum power_supply_charger_cable_type chrg_type;
-	unsigned int mA;   /* input current limit */
+	unsigned int ma;   /* input current limit */
 };
 
 #define POWER_SUPPLY_CHARGER_TYPE_USB \

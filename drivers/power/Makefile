@@ -57,3 +57,6 @@ obj-$(CONFIG_POWER_AVS)		+= avs/
 obj-$(CONFIG_CHARGER_SMB347)	+= smb347-charger.o
 obj-$(CONFIG_CHARGER_TPS65090)	+= tps65090-charger.o
 obj-$(CONFIG_POWER_RESET)	+= reset/
+
+obj-$(CONFIG_BQ24261_CHARGER)	+= bq24261_charger.o
+obj-$(CONFIG_PMIC_CCSM) += pmic_ccsm.o
