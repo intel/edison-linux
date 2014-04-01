@@ -47,7 +47,7 @@ struct ps_pse_mod_prof {
 	u16 capacity;
 	u16 voltage_max;
 	/* charge termination current */
-	u16 chrg_term_mA;
+	u16 chrg_term_ma;
 	/* Low battery level voltage */
 	u16 low_batt_mV;
 	/* upper and lower temperature limits on discharging */

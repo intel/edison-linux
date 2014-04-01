@@ -72,6 +72,7 @@
 #include "device_libs/platform_lis331.h"
 #include "device_libs/platform_mpu3050.h"
 #include "device_libs/platform_tc35876x.h"
+#include "device_libs/platform_bq24261.h"
 
 /*
  * SPI devices
@@ -95,6 +96,9 @@ struct devs_id __initconst device_ids[] = {
 	{"iwlwifi_clk_vmmc", SFI_DEV_TYPE_SD, 0, &wifi_platform_data, NULL},
 	{"WLAN_FAST_IRQ", SFI_DEV_TYPE_SD, 0, &no_platform_data,
 	 &wifi_platform_data_fastirq},
+
+	/* I2C devices*/
+	{"bq24261_charger", SFI_DEV_TYPE_I2C, 1, &bq24261_platform_data, NULL},
 
 	/* SPI devices */
 	{"bma023", SFI_DEV_TYPE_I2C, 1, &no_platform_data, NULL},
@@ -142,8 +146,6 @@ struct devs_id __initconst device_ids[] = {
 						&ipc_device_handler},
 	{"i2c_pmic_adap", SFI_DEV_TYPE_IPC, 1, &mrfl_pmic_i2c_platform_data,
 						&ipc_device_handler},
-
-	/* IPC devices */
 	{"soc_thrm", SFI_DEV_TYPE_IPC, 1, &no_platform_data,
 						&soc_thrm_device_handler},
 	{},

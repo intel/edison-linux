@@ -22,6 +22,8 @@
 #include "platform_ipc.h"
 #include "platform_bq24261.h"
 
+#define BOOST_CUR_LIM 500
+
 static struct power_supply_throttle bq24261_throttle_states[] = {
 	{
 		.throttle_action = PSY_THROTTLE_CC_LIMIT,
@@ -62,14 +64,14 @@ void __init *bq24261_platform_data(void *info)
 	bq24261_pdata.enable_charger = NULL;
 #ifdef CONFIG_PMIC_CCSM
 	bq24261_pdata.enable_charging = pmic_enable_charging;
-	bq24261_pdata.set_inlmt = pmic_set_ilimmA;
+	bq24261_pdata.set_inlmt = pmic_set_ilimma;
 	bq24261_pdata.set_cc = pmic_set_cc;
 	bq24261_pdata.set_cv = pmic_set_cv;
 	bq24261_pdata.dump_master_regs = dump_pmic_regs;
 	bq24261_pdata.enable_vbus = pmic_enable_vbus;
 #endif
 	bq24261_pdata.set_iterm = NULL;
-	bq24261_pdata.boost_mode_mA = 1000;
+	bq24261_pdata.boost_mode_ma = BOOST_CUR_LIM;
 
 	return &bq24261_pdata;
 }

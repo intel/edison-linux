@@ -34,6 +34,7 @@ obj-$(subst m,y,$(CONFIG_SENSORS_LIS3LV02D)) += platform_lis331.o
 obj-$(subst m,y,$(CONFIG_GPIO_PCA953X)) += platform_max7315.o
 obj-$(subst m,y,$(CONFIG_SENSORS_MPU3050)) += platform_mpu3050.o
 obj-$(subst m,y,$(CONFIG_GPIO_PCA953X)) += platform_tca6416.o
+obj-$(subst m,y,$(CONFIG_BQ24261_CHARGER)) += platform_bq24261.o
 # SPI Devices
 obj-$(subst m,y,$(CONFIG_SERIAL_MRST_MAX3110)) += platform_max3111.o
 # MISC Devices
