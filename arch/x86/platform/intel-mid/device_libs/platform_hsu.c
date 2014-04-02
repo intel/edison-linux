@@ -260,6 +260,26 @@ hsu_port_pin_cfg hsu_port_pin_cfgs[][hsu_pid_max][hsu_port_max] = {
 			},
 		},
 	},
+	[hsu_vlv2] = {
+		[hsu_pid_def] = {
+			[hsu_port0] = {
+				.id = 0,
+				.name = HSU_BT_PORT,
+				.rts_gpio = 72,
+				.rts_alt = 1,
+			},
+			[hsu_port1] = {
+				.id = 1,
+				.name = HSU_GPS_PORT,
+				.wake_gpio = 74,
+				.rx_gpio = 74,
+				.rx_alt = 1,
+				.rts_gpio = 76,
+				.rts_alt = 1,
+			},
+		},
+	},
+
 };
 
 static struct hsu_port_cfg hsu_port_cfgs[][hsu_port_max] = {
@@ -602,14 +622,11 @@ void intel_mid_hsu_suspend(int port, struct device *dev, irq_handler_t wake_isr)
 
 	info->dev = dev;
 	info->wake_isr = wake_isr;
-	if (info->rts_gpio) {
-		gpio_direction_output(info->rts_gpio, 1);
-		lnw_gpio_set_alt(info->rts_gpio, LNW_GPIO);
-	}
+
 	if (info->wake_gpio) {
 		lnw_gpio_set_alt(info->wake_gpio, LNW_GPIO);
 		gpio_direction_input(info->wake_gpio);
-		udelay(100);
+		udelay(10);
 		ret = request_irq(gpio_to_irq(info->wake_gpio), info->wake_isr,
 				IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING,
 				info->name, info->dev);
@@ -635,7 +652,11 @@ void intel_mid_hsu_resume(int port, struct device *dev)
 		usleep_range(10, 10);
 		gpio_direction_output(info->tx_gpio, 0);
 
-	hsu_port_enable(port);
+	}
+	if (info->cts_gpio) {
+		lnw_gpio_set_alt(info->cts_gpio, info->cts_alt);
+		gpio_direction_input(info->cts_gpio);
+	}
 }
 
 void intel_mid_hsu_switch(int port)
@@ -714,7 +735,6 @@ int intel_mid_hsu_func_to_port(unsigned int func)
 	case INTEL_MID_CPU_CHIP_ANNIEDALE:
 		tbl = &hsu_port_func_id_tlb[hsu_tng][0];
 		break;
-
 	case INTEL_MID_CPU_CHIP_PENWELL:
 		tbl = &hsu_port_func_id_tlb[hsu_pnw][0];
 		break;
@@ -766,6 +786,7 @@ static void hsu_platform_clk(enum intel_mid_cpu_type cpu_type)
 
 	switch (cpu_type) {
 	case INTEL_MID_CPU_CHIP_TANGIER:
+	case INTEL_MID_CPU_CHIP_ANNIEDALE:
 		clock = 100000;
 		clkctl = ioremap_nocache(TNG_CLOCK_CTL, 4);
 		if (!clkctl) {
@@ -815,14 +836,34 @@ static void hsu_platform_clk(enum intel_mid_cpu_type cpu_type)
 static __init int hsu_dev_platform_data(void)
 {
 	switch (intel_mid_identify_cpu()) {
+	case INTEL_MID_CPU_CHIP_CLOVERVIEW:
+		platform_hsu_info = &hsu_port_cfgs[hsu_clv][0];
+		/*if (INTEL_MID_BOARD(2, PHONE, CLVTP, VB, PRO))
+			hsu_port_gpio_mux =
+				&hsu_port_pin_cfgs[hsu_clv][hsu_pid_vtb_pro][0];
+		else if (INTEL_MID_BOARD(2, PHONE, CLVTP, VB, ENG))
+			hsu_port_gpio_mux =
+				&hsu_port_pin_cfgs[hsu_clv][hsu_pid_vtb_eng][0];
+		else*/
+			hsu_port_gpio_mux =
+				&hsu_port_pin_cfgs[hsu_clv][hsu_pid_rhb][0];
+		break;
+
 	case INTEL_MID_CPU_CHIP_TANGIER:
+	case INTEL_MID_CPU_CHIP_ANNIEDALE:
 		platform_hsu_info = &hsu_port_cfgs[hsu_tng][0];
 		hsu_port_gpio_mux = &hsu_port_pin_cfgs[hsu_tng][hsu_pid_def][0];
 		break;
 
+	case INTEL_MID_CPU_CHIP_PENWELL:
+		platform_hsu_info = &hsu_port_cfgs[hsu_pnw][0];
+		hsu_port_gpio_mux = &hsu_port_pin_cfgs[hsu_pnw][hsu_pid_def][0];
+		break;
 	default:
-		platform_hsu_info = NULL; 
-		hsu_port_gpio_mux = NULL;
+		/* FIXME: VALLEYVIEW2? */
+		platform_hsu_info = &hsu_port_cfgs[hsu_vlv2][0];
+		hsu_port_gpio_mux =
+			&hsu_port_pin_cfgs[hsu_vlv2][hsu_pid_def][0];
 		break;
 	}
 
