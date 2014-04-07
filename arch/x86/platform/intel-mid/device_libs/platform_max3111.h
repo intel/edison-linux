@@ -12,5 +12,9 @@
 #ifndef _PLATFORM_MAX3111_H_
 #define _PLATFORM_MAX3111_H_
 
+/* REVERT ME workaround[MRFL] for invalid bus number in IAFW .25 */
+#define FORCE_SPI_BUS_NUM	5
+#define FORCE_CHIP_SELECT	0
+
 extern void *max3111_platform_data(void *info) __attribute__((weak));
 #endif
