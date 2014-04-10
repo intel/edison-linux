@@ -2114,11 +2114,8 @@ void pmu_power_off(void)
 	if (!_pmu2_wait_not_busy())
 		writel(S5_VALUE, &mid_pmu_cxt->pmu_reg->pm_cmd);
 
-	else {
-		/* If PM_BUSY bit is not clear issue COLD_OFF */
-		WARN(1, "%s: pmu busy bit not cleared.\n", __func__);
-		rpmsg_send_generic_simple_command(IPCMSG_COLD_RESET, 1);
-	}
+	if (!_pmu2_wait_not_busy())
+		rpmsg_send_generic_simple_command(IPCMSG_COLD_OFF, 1);
 }
 
 static void __exit mid_pci_cleanup(void)
