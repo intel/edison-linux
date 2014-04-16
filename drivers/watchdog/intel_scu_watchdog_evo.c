@@ -234,7 +234,7 @@ static int watchdog_keepalive(void)
 {
 	int ret, error = 0;
 
-	pr_info("%s\n", __func__);
+	pr_debug("%s\n", __func__);
 
 	if (unlikely(!kicking_active)) {
 		/* Close our eyes */
@@ -298,7 +298,7 @@ static int watchdog_config_and_start(u32 newtimeout, u32 newpretimeout)
 	timeout = newtimeout;
 	pre_timeout = newpretimeout;
 
-	pr_info("timeout=%ds, pre_timeout=%ds\n", timeout, pre_timeout);
+	pr_debug("timeout=%ds, pre_timeout=%ds\n", timeout, pre_timeout);
 
 	/* Configure the watchdog */
 	ret = watchdog_set_timeouts_and_start(pre_timeout, timeout);
@@ -420,14 +420,14 @@ static long intel_scu_ioctl(struct file *file, unsigned int cmd,
 	case WDIOC_GETBOOTSTATUS:
 		return put_user(0, p);
 	case WDIOC_KEEPALIVE:
-		pr_warn("%s: KeepAlive ioctl\n", __func__);
+		pr_debug("%s: KeepAlive ioctl\n", __func__);
 		if (!watchdog_device.started)
 			return -EINVAL;
 
 		watchdog_keepalive();
 		return 0;
 	case WDIOC_SETTIMEOUT:
-		pr_warn("%s: SetTimeout ioctl\n", __func__);
+		pr_debug("%s: SetTimeout ioctl\n", __func__);
 
 		if (watchdog_device.started)
 			return -EBUSY;
@@ -450,13 +450,13 @@ static long intel_scu_ioctl(struct file *file, unsigned int cmd,
 			return -EFAULT;
 
 		if (options & WDIOS_DISABLECARD) {
-			pr_warn("%s: Stopping the watchdog\n", __func__);
+			pr_debug("%s: Stopping the watchdog\n", __func__);
 			watchdog_stop();
 			return 0;
 		}
 
 		if (options & WDIOS_ENABLECARD) {
-			pr_warn("%s: Starting the watchdog\n", __func__);
+			pr_debug("%s: Starting the watchdog\n", __func__);
 
 			if (watchdog_device.started)
 				return -EBUSY;
