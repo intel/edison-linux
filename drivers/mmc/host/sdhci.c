@@ -2168,6 +2168,11 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 	sdhci_clear_set_irqs(host, ier, SDHCI_INT_DATA_AVAIL);
 
 	/*
+	 * set the data timeout register to be max value
+	 */
+	sdhci_writeb(host, 0xe, SDHCI_TIMEOUT_CONTROL);
+
+	/*
 	 * Issue CMD19 repeatedly till Execute Tuning is set to 0 or the number
 	 * of loops reaches 40 times or a timeout of 150ms occurs.
 	 */
