@@ -107,18 +107,13 @@ MODULE_PARM_DESC(disable_kernel_watchdog,
 #endif
 
 static int pre_timeout = DEFAULT_PRETIMEOUT;
-module_param(pre_timeout, int, S_IRUGO | S_IWUSR);
-MODULE_PARM_DESC(pre_timeout,
-		"Watchdog pre timeout"
-		"Time between interrupt and resetting the system"
-		"The range is from 1 to 160");
 
 static int timeout = DEFAULT_TIMEOUT;
 module_param(timeout, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(timeout,
 		"Default Watchdog timer setting"
 		"Complete cycle time"
-		"The range is from 1 to 170"
+		"The range is from 35 to 170"
 		"This is the time for all keep alives to arrive");
 
 static bool reset_on_release = true;
@@ -195,9 +190,9 @@ static int check_timeouts(int pre_timeout_time, int timeout_time)
 {
 	if (pre_timeout_time >= timeout_time)
 		return -EINVAL;
-	if (pre_timeout_time > 160 || pre_timeout_time < 1)
+	if (pre_timeout_time > 155 || pre_timeout_time < 1)
 		return -EINVAL;
-	if (timeout_time > 170 || timeout_time < 1)
+	if (timeout_time > 170 || timeout_time < 35)
 		return -EINVAL;
 
 	return 0;
@@ -406,6 +401,7 @@ static long intel_scu_ioctl(struct file *file, unsigned int cmd,
 	void __user *argp = (void __user *)arg;
 	u32 __user *p = argp;
 	u32 val;
+	u32 new_pre_timeout;
 	int options;
 
 	static const struct watchdog_info ident = {
@@ -430,23 +426,6 @@ static long intel_scu_ioctl(struct file *file, unsigned int cmd,
 
 		watchdog_keepalive();
 		return 0;
-	case WDIOC_SETPRETIMEOUT:
-		pr_warn("%s: SetPreTimeout ioctl\n", __func__);
-
-		if (watchdog_device.started)
-			return -EBUSY;
-
-		/* Timeout to warn */
-		if (get_user(val, p))
-			return -EFAULT;
-
-		if (check_timeouts(val, timeout)) {
-			pr_warn("%s: Invalid timeout thresholds (timeout: %d, pretimeout: %d) \n", __func__, timeout, val);
-			return -EINVAL;
-		}
-
-		pre_timeout = val;
-		return 0;
 	case WDIOC_SETTIMEOUT:
 		pr_warn("%s: SetTimeout ioctl\n", __func__);
 
@@ -455,12 +434,13 @@ static long intel_scu_ioctl(struct file *file, unsigned int cmd,
 
 		if (get_user(val, p))
 			return -EFAULT;
-
-		if (check_timeouts(pre_timeout, val)) {
-			pr_warn("%s: Invalid timeout thresholds (timeout: %d, pretimeout: %d) \n", __func__, val, pre_timeout);
+		new_pre_timeout = val-15;
+		if (check_timeouts(new_pre_timeout, val)) {
+			pr_warn("%s: Invalid timeout thresholds (timeout: %d, pretimeout: %d) \n", __func__, val, new_pre_timeout);
 			return -EINVAL;
 		}
 
+		pre_timeout = new_pre_timeout;
 		timeout = val;
 		return 0;
 	case WDIOC_GETTIMEOUT:
@@ -1215,6 +1195,9 @@ static int intel_scu_watchdog_init(void)
 
 	/* Initially, we are not in shutdown mode */
 	watchdog_device.shutdown_flag = false;
+
+	/* Since timeout can be set by MODULE_PARAM, need to reset pre_timeout */
+	pre_timeout = timeout-15;
 
 	/* Check timeouts boot parameter */
 	if (check_timeouts(pre_timeout, timeout)) {
