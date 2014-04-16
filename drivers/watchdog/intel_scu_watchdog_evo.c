@@ -190,12 +190,17 @@ static void dump_softlock_debug(unsigned long data)
 #endif /* CONFIG_INTEL_SCU_SOFT_LOCKUP */
 
 /* Check current timeouts */
+/* Timeout bounds come from the MODULE_PARAM_DESC description */
 static int check_timeouts(int pre_timeout_time, int timeout_time)
 {
-	if (pre_timeout_time < timeout_time)
-		return 0;
+	if (pre_timeout_time >= timeout_time)
+		return -EINVAL;
+	if (pre_timeout_time > 160 || pre_timeout_time < 1)
+		return -EINVAL;
+	if (timeout_time > 170 || timeout_time < 1)
+		return -EINVAL;
 
-	return -EINVAL;
+	return 0;
 }
 
 /* Set the different timeouts needed by the SCU FW and start the
@@ -435,6 +440,11 @@ static long intel_scu_ioctl(struct file *file, unsigned int cmd,
 		if (get_user(val, p))
 			return -EFAULT;
 
+		if (check_timeouts(val, timeout)) {
+			pr_warn("%s: Invalid timeout thresholds (timeout: %d, pretimeout: %d) \n", __func__, timeout, val);
+			return -EINVAL;
+		}
+
 		pre_timeout = val;
 		return 0;
 	case WDIOC_SETTIMEOUT:
@@ -445,6 +455,11 @@ static long intel_scu_ioctl(struct file *file, unsigned int cmd,
 
 		if (get_user(val, p))
 			return -EFAULT;
+
+		if (check_timeouts(pre_timeout, val)) {
+			pr_warn("%s: Invalid timeout thresholds (timeout: %d, pretimeout: %d) \n", __func__, val, pre_timeout);
+			return -EINVAL;
+		}
 
 		timeout = val;
 		return 0;
