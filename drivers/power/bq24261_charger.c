@@ -1513,12 +1513,10 @@ static void bq24261_irq_worker(struct work_struct *work)
 
 	ret = bq24261_read_reg(chip->client, BQ24261_STAT_CTRL0_ADDR);
 	if (ret < 0) {
-		printk(KERN_ERR "LOIC bq24261_irq_worker RET < 0\n");
 		dev_err(&chip->client->dev,
 			"Error (%d) in reading BQ24261_STAT_CTRL0_ADDR\n", ret);
 	}
 	else {
-		printk(KERN_ERR "LOIC bq24261_irq_worker handle_irq(chip,ret))\n");
 		bq24261_handle_irq(chip, ret);
 	}
 	mutex_unlock(&chip->lock);
@@ -1659,8 +1657,6 @@ static int bq24261_probe(struct i2c_client *client,
 	int bq2426x_rev;
 	enum bq2426x_model_num bq24261_rev_index;
 
-	printk(KERN_ERR "welcome in the bq24261_probe\n");
-
 	adapter = to_i2c_adapter(client->dev.parent);
 
 	if (!client->dev.platform_data) {
@@ -1781,8 +1777,6 @@ static int bq24261_probe(struct i2c_client *client,
 	bq24261_client = client;
 	power_supply_changed(&chip->psy_usb);
 	bq24261_debugfs_init();
-
-	printk(KERN_ERR "Welcome in the bq24261_probe SUCCESS OUT\n ");
 
 	return 0;
 }
