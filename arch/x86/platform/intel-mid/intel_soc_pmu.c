@@ -814,7 +814,7 @@ static bool update_nc_device_states(int i, pci_power_t state)
 void init_nc_device_states(void)
 {
 #if !IS_ENABLED(CONFIG_VIDEO_ATOMISP)
-	mid_pmu_cxt->camera_off = false;
+	mid_pmu_cxt->camera_off = true;
 #endif
 
 #ifndef GFX_ENABLE
