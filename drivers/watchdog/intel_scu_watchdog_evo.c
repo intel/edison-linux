@@ -579,7 +579,7 @@ static int kwd_trigger_write(struct file *file, const char __user *buff,
 			     size_t count, loff_t *ppos)
 {
 	pr_debug("kwd_trigger_write\n");
-	BUG();
+	panic("Kernel watchdog triggered\n");
 	return 0;
 }
 
