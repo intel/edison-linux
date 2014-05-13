@@ -1583,7 +1583,7 @@ CONFIG_SPI_DW_MID_DMA=y
 #
 # SPI Protocol Masters
 #
-# CONFIG_SPI_SPIDEV is not set
+CONFIG_SPI_SPIDEV=y
 # CONFIG_SPI_TLE62X0 is not set
 
 #
