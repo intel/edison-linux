@@ -51,6 +51,7 @@ static int mrfld_pmu_init(void)
 	/* Put all unused LSS in D0i3 */
 	mid_pmu_cxt->os_sss[0] = (SSMSK(D0I3_MASK, PMU_RESERVED_LSS_03)	|
 				SSMSK(D0I3_MASK, PMU_HSI_LSS_05)	|
+				SSMSK(D0I3_MASK, PMU_SECURITY_LSS_06)	|
 				SSMSK(D0I3_MASK, PMU_RESERVED_LSS_07)	|
 				SSMSK(D0I3_MASK, PMU_RESERVED_LSS_11)	|
 				SSMSK(D0I3_MASK, PMU_RESERVED_LSS_12)	|
@@ -233,6 +234,7 @@ void platform_update_all_lss_states(struct pmu_ss_states *pmu_config,
 	pmu_config->pmu2_states[0] =
 				(SSMSK(D0I3_MASK, PMU_RESERVED_LSS_03)	|
 				SSMSK(D0I3_MASK, PMU_HSI_LSS_05)	|
+				SSMSK(D0I3_MASK, PMU_SECURITY_LSS_06)	|
 				SSMSK(D0I3_MASK, PMU_RESERVED_LSS_07)	|
 				SSMSK(D0I3_MASK, PMU_RESERVED_LSS_11)	|
 				SSMSK(D0I3_MASK, PMU_RESERVED_LSS_12)	|
