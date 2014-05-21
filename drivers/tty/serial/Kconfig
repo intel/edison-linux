@@ -455,14 +455,14 @@ config SERIAL_MRST_MAX3110
 	  driver.
 
 config SERIAL_MFD_HSU
-	tristate "Medfield High Speed UART support"
-	depends on PCI
-	select SERIAL_CORE
+        tristate "Medfield High Speed UART support"
+        depends on PCI
+        select SERIAL_CORE
 
 config SERIAL_MFD_HSU_CONSOLE
-	boolean "Medfile HSU serial console support"
-	depends on SERIAL_MFD_HSU=y
-	select SERIAL_CORE_CONSOLE
+        boolean "Medfield HSU serial console support"
+        depends on SERIAL_MFD_HSU=y
+        select SERIAL_CORE_CONSOLE
 
 config SERIAL_BFIN
 	tristate "Blackfin serial port support"

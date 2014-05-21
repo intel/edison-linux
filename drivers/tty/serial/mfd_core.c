@@ -760,8 +760,8 @@ static inline void receive_chars(struct uart_hsu_port *up, int *status)
 
 			/* Mask off conditions which should be ignored. */
 			*status &= up->port.read_status_mask;
-#define CONFIG_SERIAL_MFD_HSU_EXT_CONSOLE
-#ifdef CONFIG_SERIAL_MFD_HSU_EXT_CONSOLE
+
+#ifdef CONFIG_SERIAL_MFD_HSU_CONSOLE
 			if (up->port.cons &&
 				up->port.cons->index == up->port.line) {
 				/* Recover the break flag from console xmit */
@@ -1687,7 +1687,7 @@ static void serial_hsu_put_poll_char(struct uart_port *port,
 }
 #endif
 
-#ifdef CONFIG_SERIAL_MFD_HSU_EXT_CONSOLE
+#ifdef CONFIG_SERIAL_MFD_HSU_CONSOLE
 static void serial_hsu_console_putchar(struct uart_port *port, int ch)
 {
 	struct uart_hsu_port *up =

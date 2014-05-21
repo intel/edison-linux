@@ -35,193 +35,6 @@ static struct hsu_port_cfg *platform_hsu_info;
 
 static struct
 hsu_port_pin_cfg hsu_port_pin_cfgs[][hsu_pid_max][hsu_port_max] = {
-	[hsu_pnw] = {
-		[hsu_pid_def] = {
-			[hsu_port0] = {
-				.id = 0,
-				.name = HSU_BT_PORT,
-				.wake_gpio = 13,
-				.rx_gpio = 96+26,
-				.rx_alt = 1,
-				.tx_gpio = 96+27,
-				.tx_alt = 1,
-				.cts_gpio = 96+28,
-				.cts_alt = 1,
-				.rts_gpio = 96+29,
-				.rts_alt = 1,
-			},
-			[hsu_port1] = {
-				.id = 1,
-				.name = HSU_MODEM_PORT,
-				.wake_gpio = 64,
-				.rx_gpio = 64,
-				.rx_alt = 1,
-				.tx_gpio = 65,
-				.tx_alt = 1,
-				.cts_gpio = 68,
-				.cts_alt = 1,
-				.rts_gpio = 66,
-				.rts_alt = 2,
-			},
-			[hsu_port2] = {
-				.id = 2,
-				.name = HSU_GPS_PORT,
-			},
-			[hsu_port_share] = {
-				.id = 1,
-				.name = HSU_DEBUG_PORT,
-				.wake_gpio = 96+30,
-				.rx_gpio = 96+30,
-				.rx_alt = 1,
-				.tx_gpio = 96+31,
-				.tx_alt = 1,
-			},
-		},
-	},
-	[hsu_clv] = {
-		[hsu_pid_rhb] = {
-			[hsu_port0] = {
-				.id = 0,
-				.name = HSU_BT_PORT,
-				.wake_gpio = 42,
-				.rx_gpio = 96+26,
-				.rx_alt = 1,
-				.tx_gpio = 96+27,
-				.tx_alt = 1,
-				.cts_gpio = 96+28,
-				.cts_alt = 1,
-				.rts_gpio = 96+29,
-				.rts_alt = 1,
-			},
-			[hsu_port1] = {
-				.id = 1,
-				.name = HSU_MODEM_PORT,
-				.wake_gpio = 64,
-				.rx_gpio = 64,
-				.rx_alt = 1,
-				.tx_gpio = 65,
-				.tx_alt = 1,
-				.cts_gpio = 68,
-				.cts_alt = 1,
-				.rts_gpio = 66,
-				.rts_alt = 2,
-			},
-			[hsu_port2] = {
-				.id = 2,
-				.name = HSU_DEBUG_PORT,
-				.wake_gpio = 67,
-				.rx_gpio = 67,
-				.rx_alt = 1,
-			},
-			[hsu_port_share] = {
-				.id = 1,
-				.name = HSU_GPS_PORT,
-				.wake_gpio = 96+30,
-				.rx_gpio = 96+30,
-				.rx_alt = 1,
-				.tx_gpio = 96+31,
-				.tx_alt = 1,
-				.cts_gpio = 96+33,
-				.cts_alt = 1,
-				.rts_gpio = 96+32,
-				.rts_alt = 2,
-			},
-		},
-		[hsu_pid_vtb_pro] = {
-			[hsu_port0] = {
-				.id = 0,
-				.name = HSU_BT_PORT,
-				.rx_gpio = 96+26,
-				.rx_alt = 1,
-				.tx_gpio = 96+27,
-				.tx_alt = 1,
-				.cts_gpio = 96+28,
-				.cts_alt = 1,
-				.rts_gpio = 96+29,
-				.rts_alt = 1,
-			},
-			[hsu_port1] = {
-				.id = 1,
-				.name = HSU_MODEM_PORT,
-				.wake_gpio = 96+30,
-				.rx_gpio = 96+30,
-				.rx_alt = 1,
-				.tx_gpio = 96+31,
-				.tx_alt = 1,
-				.cts_gpio = 96+33,
-				.cts_alt = 1,
-				.rts_gpio = 96+32,
-				.rts_alt = 2,
-			},
-			[hsu_port2] = {
-				.id = 2,
-				.name = HSU_DEBUG_PORT,
-				.wake_gpio = 67,
-				.rx_gpio = 67,
-				.rx_alt = 1,
-			},
-			[hsu_port_share] = {
-				.id = 1,
-				.name = HSU_GPS_PORT,
-				.wake_gpio = 64,
-				.rx_gpio = 64,
-				.rx_alt = 1,
-				.tx_gpio = 65,
-				.tx_alt = 1,
-				.cts_gpio = 68,
-				.cts_alt = 1,
-				.rts_gpio = 66,
-				.rts_alt = 2,
-			},
-		},
-		[hsu_pid_vtb_eng] = {
-			[hsu_port0] = {
-				.id = 0,
-				.name = HSU_BT_PORT,
-				.rx_gpio = 96+26,
-				.rx_alt = 1,
-				.tx_gpio = 96+27,
-				.tx_alt = 1,
-				.cts_gpio = 96+28,
-				.cts_alt = 1,
-				.rts_gpio = 96+29,
-				.rts_alt = 1,
-			},
-			[hsu_port1] = {
-				.id = 1,
-				.name = HSU_MODEM_PORT,
-				.wake_gpio = 64,
-				.rx_gpio = 64,
-				.rx_alt = 1,
-				.tx_gpio = 65,
-				.tx_alt = 1,
-				.cts_gpio = 68,
-				.cts_alt = 1,
-				.rts_gpio = 66,
-				.rts_alt = 2,
-			},
-			[hsu_port2] = {
-				.id = 2,
-				.name = HSU_DEBUG_PORT,
-				.wake_gpio = 67,
-				.rx_gpio = 67,
-				.rx_alt = 1,
-			},
-			[hsu_port_share] = {
-				.id = 1,
-				.name = HSU_GPS_PORT,
-				.wake_gpio = 96+30,
-				.rx_gpio = 96+30,
-				.rx_alt = 1,
-				.tx_gpio = 96+31,
-				.tx_alt = 1,
-				.cts_gpio = 96+33,
-				.cts_alt = 1,
-				.rts_gpio = 96+32,
-				.rts_alt = 2,
-			},
-		},
-	},
 	[hsu_tng] = {
 		[hsu_pid_def] = {
 			[hsu_port0] = {
@@ -260,151 +73,10 @@ hsu_port_pin_cfg hsu_port_pin_cfgs[][hsu_pid_max][hsu_port_max] = {
 			},
 		},
 	},
-	[hsu_vlv2] = {
-		[hsu_pid_def] = {
-			[hsu_port0] = {
-				.id = 0,
-				.name = HSU_BT_PORT,
-				.rts_gpio = 72,
-				.rts_alt = 1,
-			},
-			[hsu_port1] = {
-				.id = 1,
-				.name = HSU_GPS_PORT,
-				.wake_gpio = 74,
-				.rx_gpio = 74,
-				.rx_alt = 1,
-				.rts_gpio = 76,
-				.rts_alt = 1,
-			},
-		},
-	},
 
 };
 
 static struct hsu_port_cfg hsu_port_cfgs[][hsu_port_max] = {
-	[hsu_pnw] = {
-		[hsu_port0] = {
-			.type = bt_port,
-			.hw_ip = hsu_intel,
-			.index = 0,
-			.name = HSU_BT_PORT,
-			.idle = 20,
-			.hw_init = intel_mid_hsu_init,
-			.hw_set_alt = intel_mid_hsu_switch,
-			.hw_set_rts = intel_mid_hsu_rts,
-			.hw_suspend = intel_mid_hsu_suspend,
-			.hw_resume = intel_mid_hsu_resume,
-			.hw_get_clk = intel_mid_hsu_get_clk,
-		},
-		[hsu_port1] = {
-			.type = modem_port,
-			.hw_ip = hsu_intel,
-			.index = 1,
-			.name = HSU_MODEM_PORT,
-			.idle = 100,
-			.hw_init = intel_mid_hsu_init,
-			.hw_set_alt = intel_mid_hsu_switch,
-			.hw_set_rts = intel_mid_hsu_rts,
-			.hw_suspend = intel_mid_hsu_suspend,
-			.hw_resume = intel_mid_hsu_resume,
-			.hw_get_clk = intel_mid_hsu_get_clk,
-			.has_alt = 1,
-			.alt = hsu_port_share,
-			.force_suspend = 0,
-		},
-		[hsu_port2] = {
-			.type = gps_port,
-			.hw_ip = hsu_intel,
-			.index = 2,
-			.name = HSU_GPS_PORT,
-			.idle = 30,
-			.preamble = 1,
-			.hw_init = intel_mid_hsu_init,
-			.hw_set_alt = intel_mid_hsu_switch,
-			.hw_set_rts = intel_mid_hsu_rts,
-			.hw_suspend = intel_mid_hsu_suspend,
-			.hw_suspend_post = intel_mid_hsu_suspend_post,
-			.hw_resume = intel_mid_hsu_resume,
-			.hw_get_clk = intel_mid_hsu_get_clk,
-		},
-		[hsu_port_share] = {
-			.type = debug_port,
-			.hw_ip = hsu_intel,
-			.index = 3,
-			.name = HSU_DEBUG_PORT,
-			.idle = 2000,
-			.hw_init = intel_mid_hsu_init,
-			.hw_set_alt = intel_mid_hsu_switch,
-			.hw_suspend = intel_mid_hsu_suspend,
-			.hw_resume = intel_mid_hsu_resume,
-			.hw_get_clk = intel_mid_hsu_get_clk,
-			.has_alt = 1,
-			.alt = hsu_port1,
-			.force_suspend = 1,
-		},
-	},
-	[hsu_clv] = {
-		[hsu_port0] = {
-			.type = bt_port,
-			.hw_ip = hsu_intel,
-			.index = 0,
-			.name = HSU_BT_PORT,
-			.idle = 20,
-			.hw_init = intel_mid_hsu_init,
-			.hw_set_alt = intel_mid_hsu_switch,
-			.hw_set_rts = intel_mid_hsu_rts,
-			.hw_suspend = intel_mid_hsu_suspend,
-			.hw_resume = intel_mid_hsu_resume,
-			.hw_get_clk = intel_mid_hsu_get_clk,
-		},
-		[hsu_port1] = {
-			.type = modem_port,
-			.hw_ip = hsu_intel,
-			.index = 1,
-			.name = HSU_MODEM_PORT,
-			.idle = 100,
-			.hw_init = intel_mid_hsu_init,
-			.hw_set_alt = intel_mid_hsu_switch,
-			.hw_set_rts = intel_mid_hsu_rts,
-			.hw_suspend = intel_mid_hsu_suspend,
-			.hw_resume = intel_mid_hsu_resume,
-			.hw_get_clk = intel_mid_hsu_get_clk,
-			.has_alt = 1,
-			.alt = hsu_port_share,
-			.force_suspend = 0,
-		},
-		[hsu_port2] = {
-			.type = debug_port,
-			.hw_ip = hsu_intel,
-			.index = 2,
-			.name = HSU_DEBUG_PORT,
-			.idle = 2000,
-			.hw_init = intel_mid_hsu_init,
-			.hw_set_alt = intel_mid_hsu_switch,
-			.hw_suspend = intel_mid_hsu_suspend,
-			.hw_resume = intel_mid_hsu_resume,
-			.hw_get_clk = intel_mid_hsu_get_clk,
-		},
-		[hsu_port_share] = {
-			.type = gps_port,
-			.hw_ip = hsu_intel,
-			.index = 3,
-			.name = HSU_GPS_PORT,
-			.idle = 30,
-			.preamble = 1,
-			.hw_init = intel_mid_hsu_init,
-			.hw_set_alt = intel_mid_hsu_switch,
-			.hw_set_rts = intel_mid_hsu_rts,
-			.hw_suspend = intel_mid_hsu_suspend,
-			.hw_suspend_post = intel_mid_hsu_suspend_post,
-			.hw_resume = intel_mid_hsu_resume,
-			.hw_get_clk = intel_mid_hsu_get_clk,
-			.has_alt = 1,
-			.alt = hsu_port1,
-			.force_suspend = 1,
-		},
-	},
 	[hsu_tng] = {
 		[hsu_port0] = {
 			.type = bt_port,
@@ -450,84 +122,9 @@ static struct hsu_port_cfg hsu_port_cfgs[][hsu_port_max] = {
 			.hw_context_save = 1,
 		},
 	},
-	[hsu_vlv2] = {
-		[hsu_port0] = {
-			.type = bt_port,
-			.hw_ip = hsu_dw,
-			.index = 0,
-			.name = HSU_BT_PORT,
-			.idle = 100,
-			.hw_reset = intel_mid_hsu_reset,
-			.set_clk = intel_mid_hsu_set_clk,
-			.hw_ctrl_cts = 1,
-			.hw_init = intel_mid_hsu_init,
-			/* Trust FW has set it correctly */
-			.hw_set_alt = NULL,
-			.hw_set_rts = intel_mid_hsu_rts,
-			.hw_suspend = intel_mid_hsu_suspend,
-			.hw_resume = intel_mid_hsu_resume,
-			.hw_context_save = 1,
-		},
-		[hsu_port1] = {
-			.type = gps_port,
-			.hw_ip = hsu_dw,
-			.index = 1,
-			.name = HSU_GPS_PORT,
-			.idle = 30,
-			.preamble = 1,
-			.hw_reset = intel_mid_hsu_reset,
-			.set_clk = intel_mid_hsu_set_clk,
-			.hw_ctrl_cts = 1,
-			.hw_init = intel_mid_hsu_init,
-			/* Trust FW has set it correctly */
-			.hw_set_alt = NULL,
-			.hw_set_rts = intel_mid_hsu_rts,
-			.hw_suspend = intel_mid_hsu_suspend,
-			.hw_suspend_post = intel_mid_hsu_suspend_post,
-			.hw_resume = intel_mid_hsu_resume,
-			.hw_context_save = 1,
-		},
-	},
-
 };
 
 static struct hsu_func2port hsu_port_func_id_tlb[][hsu_port_func_max] = {
-	[hsu_pnw] = {
-		[0] = {
-			.func = 0,
-			.port = hsu_port0,
-		},
-		[1] = {
-			.func = 1,
-			.port = hsu_port1,
-		},
-		[2] = {
-			.func = 2,
-			.port = hsu_port2,
-		},
-		[3] = {
-			.func = -1,
-			.port = -1,
-		},
-	},
-	[hsu_clv] = {
-		[0] = {
-			.func = 0,
-			.port = hsu_port0,
-		},
-		[1] = {
-			.func = 1,
-			.port = hsu_port1,
-		},
-		[2] = {
-			.func = 2,
-			.port = hsu_port2,
-		},
-		[3] = {
-			.func = -1,
-			.port = -1,
-		},
-	},
 	[hsu_tng] = {
 		[0] = {
 			.func = 0,
@@ -544,24 +141,6 @@ static struct hsu_func2port hsu_port_func_id_tlb[][hsu_port_func_max] = {
 		[3] = {
 			.func = 3,
 			.port = hsu_port2,
-		},
-	},
-	[hsu_vlv2] = {
-		[0] = {
-			.func = 3,
-			.port = hsu_port0,
-		},
-		[1] = {
-			.func = 4,
-			.port = hsu_port1,
-		},
-		[2] = {
-			.func = -1,
-			.port = -1,
-		},
-		[3] = {
-			.func = -1,
-			.port = -1,
 		},
 	},
 };
@@ -728,15 +307,8 @@ int intel_mid_hsu_func_to_port(unsigned int func)
 	struct hsu_func2port *tbl = NULL;
 
 	switch (intel_mid_identify_cpu()) {
-	case INTEL_MID_CPU_CHIP_CLOVERVIEW:
-		tbl = &hsu_port_func_id_tlb[hsu_clv][0];
-		break;
 	case INTEL_MID_CPU_CHIP_TANGIER:
-	case INTEL_MID_CPU_CHIP_ANNIEDALE:
 		tbl = &hsu_port_func_id_tlb[hsu_tng][0];
-		break;
-	case INTEL_MID_CPU_CHIP_PENWELL:
-		tbl = &hsu_port_func_id_tlb[hsu_pnw][0];
 		break;
 	default:
 		/* FIXME: VALLEYVIEW2? */
@@ -786,7 +358,6 @@ static void hsu_platform_clk(enum intel_mid_cpu_type cpu_type)
 
 	switch (cpu_type) {
 	case INTEL_MID_CPU_CHIP_TANGIER:
-	case INTEL_MID_CPU_CHIP_ANNIEDALE:
 		clock = 100000;
 		clkctl = ioremap_nocache(TNG_CLOCK_CTL, 4);
 		if (!clkctl) {
@@ -820,10 +391,6 @@ static void hsu_platform_clk(enum intel_mid_cpu_type cpu_type)
 		iounmap(clksc);
 		break;
 
-	case INTEL_MID_CPU_CHIP_PENWELL:
-	case INTEL_MID_CPU_CHIP_CLOVERVIEW:
-		clock = 50000;
-		break;
 	default:
 		/* FIXME: VALLEYVIEW2? */
 		clock = 100000;
@@ -836,34 +403,13 @@ static void hsu_platform_clk(enum intel_mid_cpu_type cpu_type)
 static __init int hsu_dev_platform_data(void)
 {
 	switch (intel_mid_identify_cpu()) {
-	case INTEL_MID_CPU_CHIP_CLOVERVIEW:
-		platform_hsu_info = &hsu_port_cfgs[hsu_clv][0];
-		/*if (INTEL_MID_BOARD(2, PHONE, CLVTP, VB, PRO))
-			hsu_port_gpio_mux =
-				&hsu_port_pin_cfgs[hsu_clv][hsu_pid_vtb_pro][0];
-		else if (INTEL_MID_BOARD(2, PHONE, CLVTP, VB, ENG))
-			hsu_port_gpio_mux =
-				&hsu_port_pin_cfgs[hsu_clv][hsu_pid_vtb_eng][0];
-		else*/
-			hsu_port_gpio_mux =
-				&hsu_port_pin_cfgs[hsu_clv][hsu_pid_rhb][0];
-		break;
-
 	case INTEL_MID_CPU_CHIP_TANGIER:
-	case INTEL_MID_CPU_CHIP_ANNIEDALE:
 		platform_hsu_info = &hsu_port_cfgs[hsu_tng][0];
 		hsu_port_gpio_mux = &hsu_port_pin_cfgs[hsu_tng][hsu_pid_def][0];
 		break;
-
-	case INTEL_MID_CPU_CHIP_PENWELL:
-		platform_hsu_info = &hsu_port_cfgs[hsu_pnw][0];
-		hsu_port_gpio_mux = &hsu_port_pin_cfgs[hsu_pnw][hsu_pid_def][0];
-		break;
 	default:
-		/* FIXME: VALLEYVIEW2? */
-		platform_hsu_info = &hsu_port_cfgs[hsu_vlv2][0];
-		hsu_port_gpio_mux =
-			&hsu_port_pin_cfgs[hsu_vlv2][hsu_pid_def][0];
+		platform_hsu_info = NULL;
+		hsu_port_gpio_mux = NULL;
 		break;
 	}
 
