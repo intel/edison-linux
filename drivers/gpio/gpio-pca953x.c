@@ -29,6 +29,10 @@
 #define PCA953X_INVERT		2
 #define PCA953X_DIRECTION	3
 
+#define PCAL953X_IN_LATCH	34
+#define PCAL953X_INT_MASK	37
+#define PCAL953X_INT_STAT	38
+
 #define REG_ADDR_AI		0x80
 
 #define PCA957X_IN		0
@@ -44,30 +48,34 @@
 #define PCA_INT			0x0100
 #define PCA953X_TYPE		0x1000
 #define PCA957X_TYPE		0x2000
+#define PCAL953X_TYPE		0x4000
 
 static const struct i2c_device_id pca953x_id[] = {
-	{ "pca9505", 40 | PCA953X_TYPE | PCA_INT, },
-	{ "pca9534", 8  | PCA953X_TYPE | PCA_INT, },
-	{ "pca9535", 16 | PCA953X_TYPE | PCA_INT, },
-	{ "pca9536", 4  | PCA953X_TYPE, },
-	{ "pca9537", 4  | PCA953X_TYPE | PCA_INT, },
-	{ "pca9538", 8  | PCA953X_TYPE | PCA_INT, },
-	{ "pca9539", 16 | PCA953X_TYPE | PCA_INT, },
-	{ "pca9554", 8  | PCA953X_TYPE | PCA_INT, },
-	{ "pca9555", 16 | PCA953X_TYPE | PCA_INT, },
-	{ "pca9556", 8  | PCA953X_TYPE, },
-	{ "pca9557", 8  | PCA953X_TYPE, },
-	{ "pca9574", 8  | PCA957X_TYPE | PCA_INT, },
-	{ "pca9575", 16 | PCA957X_TYPE | PCA_INT, },
+	{ "pca9505",   40 | PCA953X_TYPE | PCA_INT, },
+	{ "pca9534",   8  | PCA953X_TYPE | PCA_INT, },
+	{ "pca9535",   16 | PCA953X_TYPE | PCA_INT, },
+	{ "pca9536",   4  | PCA953X_TYPE, },
+	{ "pca9537",   4  | PCA953X_TYPE | PCA_INT, },
+	{ "pca9538",   8  | PCA953X_TYPE | PCA_INT, },
+	{ "pca9539",   16 | PCA953X_TYPE | PCA_INT, },
+	{ "pca9554",   8  | PCA953X_TYPE | PCA_INT, },
+	{ "pca9555",   16 | PCA953X_TYPE | PCA_INT, },
+	{ "pca9556",   8  | PCA953X_TYPE, },
+	{ "pca9557",   8  | PCA953X_TYPE, },
+	{ "pca9574",   8  | PCA957X_TYPE | PCA_INT, },
+	{ "pca9575",   16 | PCA957X_TYPE | PCA_INT, },
 
-	{ "max7310", 8  | PCA953X_TYPE, },
-	{ "max7312", 16 | PCA953X_TYPE | PCA_INT, },
-	{ "max7313", 16 | PCA953X_TYPE | PCA_INT, },
-	{ "max7315", 8  | PCA953X_TYPE | PCA_INT, },
-	{ "pca6107", 8  | PCA953X_TYPE | PCA_INT, },
-	{ "tca6408", 8  | PCA953X_TYPE | PCA_INT, },
-	{ "tca6416", 16 | PCA953X_TYPE | PCA_INT, },
-	{ "tca6424", 24 | PCA953X_TYPE | PCA_INT, },
+	{ "pcal9535a", 16 | PCAL953X_TYPE | PCA_INT, },
+	{ "pcal9555a", 16 | PCAL953X_TYPE | PCA_INT, },
+
+	{ "max7310",   8  | PCA953X_TYPE, },
+	{ "max7312",   16 | PCA953X_TYPE | PCA_INT, },
+	{ "max7313",   16 | PCA953X_TYPE | PCA_INT, },
+	{ "max7315",   8  | PCA953X_TYPE | PCA_INT, },
+	{ "pca6107",   8  | PCA953X_TYPE | PCA_INT, },
+	{ "tca6408",   8  | PCA953X_TYPE | PCA_INT, },
+	{ "tca6416",   16 | PCA953X_TYPE | PCA_INT, },
+	{ "tca6424",   24 | PCA953X_TYPE | PCA_INT, },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, pca953x_id);
@@ -148,6 +156,7 @@ static int pca953x_write_regs(struct pca953x_chip *chip, int reg, u8 *val)
 					NBANK(chip), val);
 	} else {
 		switch (chip->chip_type) {
+		case PCAL953X_TYPE:
 		case PCA953X_TYPE:
 			ret = i2c_smbus_write_word_data(chip->client,
 							reg << 1, (u16) *val);
@@ -210,6 +219,7 @@ static int pca953x_gpio_direction_input(struct gpio_chip *gc, unsigned off)
 	reg_val = chip->reg_direction[off / BANK_SZ] | (1u << (off % BANK_SZ));
 
 	switch (chip->chip_type) {
+	case PCAL953X_TYPE:
 	case PCA953X_TYPE:
 		offset = PCA953X_DIRECTION;
 		break;
@@ -247,6 +257,7 @@ static int pca953x_gpio_direction_output(struct gpio_chip *gc,
 			& ~(1u << (off % BANK_SZ));
 
 	switch (chip->chip_type) {
+	case PCAL953X_TYPE:
 	case PCA953X_TYPE:
 		offset = PCA953X_OUTPUT;
 		break;
@@ -263,6 +274,7 @@ static int pca953x_gpio_direction_output(struct gpio_chip *gc,
 	/* then direction */
 	reg_val = chip->reg_direction[off / BANK_SZ] & ~(1u << (off % BANK_SZ));
 	switch (chip->chip_type) {
+	case PCAL953X_TYPE:
 	case PCA953X_TYPE:
 		offset = PCA953X_DIRECTION;
 		break;
@@ -291,6 +303,7 @@ static int pca953x_gpio_get_value(struct gpio_chip *gc, unsigned off)
 
 	mutex_lock(&chip->i2c_lock);
 	switch (chip->chip_type) {
+	case PCAL953X_TYPE:
 	case PCA953X_TYPE:
 		offset = PCA953X_INPUT;
 		break;
@@ -328,6 +341,7 @@ static void pca953x_gpio_set_value(struct gpio_chip *gc, unsigned off, int val)
 			& ~(1u << (off % BANK_SZ));
 
 	switch (chip->chip_type) {
+	case PCAL953X_TYPE:
 	case PCA953X_TYPE:
 		offset = PCA953X_OUTPUT;
 		break;
@@ -411,6 +425,17 @@ static void pca953x_irq_bus_sync_unlock(struct irq_data *d)
 							level + (BANK_SZ * i));
 			new_irqs &= ~(1 << level);
 		}
+
+		if (chip->chip_type == PCAL953X_TYPE) {
+			/* Enable latch on interrupt-enabled inputs */
+			pca953x_write_single(chip, PCAL953X_IN_LATCH,
+						chip->irq_mask[i],
+						BANK_SZ * i);
+			/* Unmask enabled interrupts */
+			pca953x_write_single(chip, PCAL953X_INT_MASK,
+						~chip->irq_mask[i],
+						BANK_SZ * i);
+		}
 	}
 
 	mutex_unlock(&chip->irq_lock);
@@ -459,6 +484,7 @@ static u8 pca953x_irq_pending(struct pca953x_chip *chip, u8 *pending)
 	int ret, i, offset = 0;
 
 	switch (chip->chip_type) {
+	case PCAL953X_TYPE:
 	case PCA953X_TYPE:
 		offset = PCA953X_INPUT;
 		break;
@@ -496,14 +522,45 @@ static u8 pca953x_irq_pending(struct pca953x_chip *chip, u8 *pending)
 	return pendings;
 }
 
+static u32 pcal953x_irq_pending(struct pca953x_chip *chip, u8 *pending)
+{
+	u8 cur_stat[MAX_BANK];
+	int ret, i = 0;
+	u8 pendings = 0;
+
+	/* Read the current interrupt status from the device */
+	ret = pca953x_read_regs(chip, PCAL953X_INT_STAT, pending);
+	if (ret)
+		return 0;
+
+	/* Check latched inputs and clear interrupt status */
+	ret = pca953x_read_regs(chip, PCA953X_INPUT, cur_stat);
+	if (ret)
+		return 0;
+
+	/* Apply filter for rising/falling edge selection */
+	for (i = 0; i < NBANK(chip); i++) {
+		pending[i] &= (~cur_stat[i] & chip->irq_trig_fall[i]) |
+			(cur_stat[i] & chip->irq_trig_raise[i]);
+		pendings += pending[i];
+	}
+
+	return pendings;
+}
+
 static irqreturn_t pca953x_irq_handler(int irq, void *devid)
 {
 	struct pca953x_chip *chip = devid;
 	u8 pending[MAX_BANK];
 	u8 level;
-	int i;
+	int i, pendings;
 
-	if (!pca953x_irq_pending(chip, pending))
+	if (chip->chip_type == PCAL953X_TYPE)
+		pendings = pcal953x_irq_pending(chip, pending);
+	else
+		pendings = pca953x_irq_pending(chip, pending);
+
+	if (!pendings)
 		return IRQ_HANDLED;
 
 	for (i = 0; i < NBANK(chip); i++) {
@@ -549,25 +606,27 @@ static int pca953x_irq_setup(struct pca953x_chip *chip,
 	if (irq_base != -1
 			&& (id->driver_data & PCA_INT)) {
 
-		switch (chip->chip_type) {
-		case PCA953X_TYPE:
-			offset = PCA953X_INPUT;
-			break;
-		case PCA957X_TYPE:
-			offset = PCA957X_IN;
-			break;
-		}
-		ret = pca953x_read_regs(chip, offset, chip->irq_stat);
-		if (ret)
-			return ret;
+		if (chip->chip_type != PCAL953X_TYPE) {
+			switch (chip->chip_type) {
+			case PCA953X_TYPE:
+				offset = PCA953X_INPUT;
+				break;
+			case PCA957X_TYPE:
+				offset = PCA957X_IN;
+				break;
+			}
+			ret = pca953x_read_regs(chip, offset, chip->irq_stat);
+			if (ret)
+				return ret;
 
-		/*
-		 * There is no way to know which GPIO line generated the
-		 * interrupt.  We have to rely on the previous read for
-		 * this purpose.
-		 */
-		for (i = 0; i < NBANK(chip); i++)
-			chip->irq_stat[i] &= chip->reg_direction[i];
+			/*
+			 * There is no way to know which GPIO line generated the
+			 * interrupt.  We have to rely on the previous read for
+			 * this purpose.
+			 */
+			for (i = 0; i < NBANK(chip); i++)
+				chip->irq_stat[i] &= chip->reg_direction[i];
+		}
 		mutex_init(&chip->irq_lock);
 
 		chip->domain = irq_domain_add_simple(client->dev.of_node,
@@ -748,7 +807,8 @@ static int pca953x_probe(struct i2c_client *client,
 
 	chip->client = client;
 
-	chip->chip_type = id->driver_data & (PCA953X_TYPE | PCA957X_TYPE);
+	chip->chip_type = id->driver_data &
+		(PCAL953X_TYPE | PCA953X_TYPE | PCA957X_TYPE);
 
 	mutex_init(&chip->i2c_lock);
 
@@ -757,7 +817,7 @@ static int pca953x_probe(struct i2c_client *client,
 	 */
 	pca953x_setup_gpio(chip, id->driver_data & PCA_GPIO_MASK);
 
-	if (chip->chip_type == PCA953X_TYPE)
+	if (chip->chip_type & (PCA953X_TYPE | PCAL953X_TYPE))
 		ret = device_pca953x_init(chip, invert);
 	else
 		ret = device_pca957x_init(chip, invert);
@@ -823,6 +883,9 @@ static const struct of_device_id pca953x_dt_ids[] = {
 	{ .compatible = "nxp,pca9557", },
 	{ .compatible = "nxp,pca9574", },
 	{ .compatible = "nxp,pca9575", },
+
+	{ .compatible = "nxp,pcal9535a", },
+	{ .compatible = "nxp,pcal9555a", },
 
 	{ .compatible = "maxim,max7310", },
 	{ .compatible = "maxim,max7312", },
