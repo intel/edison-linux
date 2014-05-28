@@ -204,6 +204,8 @@ static enum hrtimer_restart enter_lpm(struct hrtimer *timer)
 {
 	pr_debug("%s\n", __func__);
 
+	set_wake_locked(0);
+
 	return HRTIMER_NORESTART;
 }
 
