@@ -1780,7 +1780,7 @@ struct uart_ops serial_hsu_pops = {
 	.request_port	= serial_hsu_request_port,
 	.config_port	= serial_hsu_config_port,
 	.verify_port	= serial_hsu_verify_port,
-	/* .wake_peer	= serial_hsu_wake_peer,*/
+	.wake_peer	= serial_hsu_wake_peer,
 #ifdef CONFIG_CONSOLE_POLL
 	.poll_get_char = serial_hsu_get_poll_char,
 	.poll_put_char = serial_hsu_put_poll_char,
