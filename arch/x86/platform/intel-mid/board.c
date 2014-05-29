@@ -73,6 +73,7 @@
 #include "device_libs/platform_mpu3050.h"
 #include "device_libs/platform_tc35876x.h"
 #include "device_libs/platform_bq24261.h"
+#include "device_libs/platform_pcal9555a.h"
 
 /*
  * SPI devices
@@ -99,6 +100,10 @@ struct devs_id __initconst device_ids[] = {
 
 	/* I2C devices*/
 	{"bq24261_charger", SFI_DEV_TYPE_I2C, 1, &bq24261_platform_data, NULL},
+	{"pcal9555a-1", SFI_DEV_TYPE_I2C, 1, &pcal9555a_platform_data, NULL},
+	{"pcal9555a-2", SFI_DEV_TYPE_I2C, 1, &pcal9555a_platform_data, NULL},
+	{"pcal9555a-3", SFI_DEV_TYPE_I2C, 1, &pcal9555a_platform_data, NULL},
+	{"pcal9555a-4", SFI_DEV_TYPE_I2C, 1, &pcal9555a_platform_data, NULL},
 
 	/* SPI devices */
 	{"bma023", SFI_DEV_TYPE_I2C, 1, &no_platform_data, NULL},
