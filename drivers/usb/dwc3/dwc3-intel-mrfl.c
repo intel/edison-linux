@@ -428,12 +428,12 @@ static int dwc3_intel_set_power(struct usb_phy *_otg,
 		return -EINVAL;
 	}
 
-	spin_lock_irqsave(&otg->lock, flags);
-	otg->charging_cap.ma = ma;
-	spin_unlock_irqrestore(&otg->lock, flags);
-
-	dwc3_intel_notify_charger_type(otg,
-			POWER_SUPPLY_CHARGER_EVENT_CONNECT);
+	if (ma == OTG_DEVICE_SUSPEND) {
+		spin_lock_irqsave(&otg->lock, flags);
+		cap.chrg_type = otg->charging_cap.chrg_type;
+		cap.ma = otg->charging_cap.ma;
+		cap.chrg_evt = POWER_SUPPLY_CHARGER_EVENT_SUSPEND;
+		spin_unlock_irqrestore(&otg->lock, flags);
 
 		/* mA is zero mean D+/D- opened cable.
 		 * If SMIP set, then notify 500mA.
@@ -454,15 +454,17 @@ static int dwc3_intel_set_power(struct usb_phy *_otg,
 		else
 			cap.ma = 0;
 
-int dwc3_intel_enable_vbus(struct dwc_otg2 *otg, int enable)
-{
-	int ret = 0;
-	u8 ovrwr;
+		atomic_notifier_call_chain(&otg->usb2_phy.notifier,
+				USB_EVENT_CHARGER, &cap);
+		otg_dbg(otg, "Notify EM");
+		otg_dbg(otg, "POWER_SUPPLY_CHARGER_EVENT_SUSPEND\n");
 
-	if (enable)
-		ovrwr = 0x40;
-	else
-		ovrwr = 0x00;
+		return 0;
+	} else if (ma == OTG_DEVICE_RESUME) {
+		otg_dbg(otg, "Notify EM");
+		otg_dbg(otg, "POWER_SUPPLY_CHARGER_EVENT_CONNECT\n");
+		dwc3_intel_notify_charger_type(otg,
+				POWER_SUPPLY_CHARGER_EVENT_CONNECT);
 
 		return 0;
 	}
