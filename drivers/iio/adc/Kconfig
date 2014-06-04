@@ -143,6 +143,18 @@ config TI_ADC081C
 	  This driver can also be built as a module. If so, the module will be
 	  called ti-adc081c.
 
+config TI_ADS7955_ADC
+	tristate "Texas Instruments ADS7955 ADC driver"
+	depends on SPI
+	select IIO_BUFFER
+	select IIO_TRIGGERED_BUFFER
+	help
+	  Say yes here to build support for Texas Instruments ADS7955
+	  8 Channel ADC.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ti-ads7955.
+
 config TI_AM335X_ADC
 	tristate "TI's ADC driver"
 	depends on MFD_TI_AM335X_TSCADC
