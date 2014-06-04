@@ -2038,8 +2038,6 @@ int serial_hsu_do_runtime_idle(struct uart_hsu_port *up)
 		 * have finished booting
 		 */
 		pm_schedule_suspend(up->dev, 30000);
-	else if (!test_and_clear_bit(flag_active, &up->flags))
-		pm_schedule_suspend(up->dev, 20);
 	else
 		pm_schedule_suspend(up->dev, cfg->idle);
 	trace_hsu_func_end(up->index, __func__, "");
