@@ -55,3 +55,4 @@ obj-$(CONFIG_VMWARE_VMCI)	+= vmw_vmci/
 obj-$(CONFIG_LATTICE_ECP3_CONFIG)	+= lattice-ecp3-config.o
 obj-$(CONFIG_SRAM)		+= sram.o
 obj-$(CONFIG_BCM_BT_LPM)	+=bcm-lpm/
+obj-$(CONFIG_EMMC_IPANIC)	+= emmc_ipanic.o

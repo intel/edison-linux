@@ -539,6 +539,13 @@ config SRAM
 	  the genalloc API. It is supposed to be used for small on-chip SRAM
 	  areas found on many SoCs.
 
+config EMMC_IPANIC
+	bool "Intel kernel panic diagnostics driver FOR EMMC"
+	default n
+	---help---
+	  Driver which handles kernel panics and attempts to write
+	  critical debugging data to EMMC.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
