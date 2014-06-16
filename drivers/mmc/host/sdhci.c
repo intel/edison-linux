@@ -4194,6 +4194,8 @@ int sdhci_add_host(struct sdhci_host *host)
 	/* Initial value for re-tuning timer count */
 	host->tuning_count = (caps[1] & SDHCI_RETUNING_TIMER_COUNT_MASK) >>
 			      SDHCI_RETUNING_TIMER_COUNT_SHIFT;
+	if (host->tuning_count == 0 && host->ops->get_tuning_count)
+		host->tuning_count = host->ops->get_tuning_count(host);
 
 	/*
 	 * In case Re-tuning Timer is not disabled, the actual value of
