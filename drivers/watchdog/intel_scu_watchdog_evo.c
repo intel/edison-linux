@@ -50,7 +50,7 @@
 #define STRING_COLD_RESET           "COLD_RESET"
 #define STRING_COLD_BOOT            "COLD_BOOT"
 
-#define EXT_TIMER0_MSI 15
+#define EXT_TIMER0_MSI 12
 
 #define IPC_WATCHDOG 0xF8
 
@@ -1228,7 +1228,7 @@ static int intel_scu_watchdog_init(void)
 		}
 	}
 
-	/* MSI #15 handler to dump registers */
+	/* MSI #12 handler to dump registers */
 	handle_mrfl_dev_ioapic(EXT_TIMER0_MSI);
 	ret = request_irq((unsigned int)EXT_TIMER0_MSI,
 		watchdog_warning_interrupt,
