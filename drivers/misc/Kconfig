@@ -546,6 +546,13 @@ config EMMC_IPANIC
 	  Driver which handles kernel panics and attempts to write
 	  critical debugging data to EMMC.
 
+config EMMC_IPANIC_PLABEL
+	string "Intel kernel panic driver (EMMC_IPANIC) partition label"
+	depends on EMMC_IPANIC
+	default "panic"
+	---help---
+	  Set the default mmc partition label for EMMC_IPANIC driver.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"

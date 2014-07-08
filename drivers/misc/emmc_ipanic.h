@@ -28,13 +28,7 @@
 #include <linux/genhd.h>
 #include <linux/version.h>
 
-#if !(LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0))
-extern int log_buf_copy(char *dest, int idx, int len);
-#endif
 extern void log_buf_clear(void);
-
-#define EMMC_PANIC_PART_NUM 5
-#define EMMC_PANIC_BLOCK_NAME "mmcblk0"
 
 #define SECTOR_SIZE_SHIFT (9)
 
@@ -48,19 +42,16 @@ extern void log_buf_clear(void);
 #define IPANIC_LOG_THREADS       1
 #define IPANIC_LOG_GBUFFER       2
 #define IPANIC_LOG_MAX           3
+#define IPANIC_LOG_HEADER        IPANIC_LOG_MAX
+
 
 struct mmc_emergency_info {
 #define DISK_NAME_LENGTH 20
-	/* Default emmc disk name */
-	char emmc_disk_name[DISK_NAME_LENGTH];
-	/* panic partition number */
-	int part_number;
-	/* emmc_panic_label */
-	char name[DISK_NAME_LENGTH];
+	/* emmc panic partition label */
+	char part_label[PARTITION_META_INFO_VOLNAMELTH];
 
 	struct block_device *bdev;
-	struct device *disk_device;
-	struct gendisk *disk;
+	struct device *part_dev;
 	struct hd_struct *part;
 
 	/*panic partition start block */
@@ -79,6 +70,7 @@ struct panic_header {
 
 	u32 version;
 #define PHDR_VERSION   0x01
+	u32 log_size;
 
 	char panic[SECTOR_SIZE];
 };
