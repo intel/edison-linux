@@ -149,6 +149,7 @@ static void dwc_xhci_enable_phy_auto_resume(struct usb_hcd *hcd, bool enable)
 	u32 val;
 
 	val = readl(hcd->regs + GUSB2PHYCFG0);
+	val |= GUSB2PHYCFG_ULPI_EXT_VBUS_DRV;
 	if (enable)
 		val |= GUSB2PHYCFG_ULPI_AUTO_RESUME;
 	else
