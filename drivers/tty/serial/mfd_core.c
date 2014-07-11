@@ -2302,7 +2302,6 @@ static int serial_port_setup(struct uart_hsu_port *up,
 		serial_hsu_reg.cons = SERIAL_HSU_CONSOLE;
 		if (serial_hsu_reg.cons)
 			serial_hsu_reg.cons->index = index;
-		up->use_dma = 0;
 	} else
 		serial_hsu_reg.cons = NULL;
 	uart_add_one_port(&serial_hsu_reg, &up->port);
