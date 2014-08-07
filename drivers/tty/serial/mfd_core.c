@@ -2274,6 +2274,15 @@ static int serial_port_setup(struct uart_hsu_port *up,
 	spin_lock_init(&up->cl_lock);
 	set_bit(flag_cmd_off, &up->flags);
 
+	if (cfg->type == debug_port) {
+		serial_hsu_reg.cons = SERIAL_HSU_CONSOLE;
+		if (serial_hsu_reg.cons)
+			serial_hsu_reg.cons->index = index;
+	} else
+		serial_hsu_reg.cons = NULL;
+
+	uart_add_one_port(&serial_hsu_reg, &up->port);
+
 	if (phsu->irq_port_and_dma) {
 		up->dma_irq = up->port.irq;
 		ret = request_irq(up->dma_irq, hsu_dma_irq, IRQF_SHARED,
@@ -2298,13 +2307,6 @@ static int serial_port_setup(struct uart_hsu_port *up,
 		}
 	}
 
-	if (cfg->type == debug_port) {
-		serial_hsu_reg.cons = SERIAL_HSU_CONSOLE;
-		if (serial_hsu_reg.cons)
-			serial_hsu_reg.cons->index = index;
-	} else
-		serial_hsu_reg.cons = NULL;
-	uart_add_one_port(&serial_hsu_reg, &up->port);
 	return 0;
 }
 
