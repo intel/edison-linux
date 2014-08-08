@@ -174,7 +174,7 @@ static int serial_hsu_pci_port_probe(struct pci_dev *pdev,
 	pci_set_drvdata(pdev, up);
 
 	pm_runtime_put_noidle(&pdev->dev);
-	pm_runtime_allow(&pdev->dev);
+	pm_runtime_forbid(&pdev->dev);
 	return 0;
 err:
 	pci_disable_device(pdev);
