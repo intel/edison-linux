@@ -110,8 +110,6 @@ void __init *mrfl_thermal_platform_data(void *info)
 	struct platform_device *pdev;
 	struct sfi_device_table_entry *entry = info;
 
-	pr_err("inside mrfl_thermal_platform_data\n");
-
 	pdev = platform_device_alloc(MRFL_THERM_DEV_NAME, -1);
 	if (!pdev) {
 		pr_err("out of memory for SFI platform dev %s\n",
