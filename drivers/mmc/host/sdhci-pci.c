@@ -652,6 +652,8 @@ static int intel_mrfl_mmc_probe_slot(struct sdhci_pci_slot *slot)
 		break;
 	case INTEL_MRFL_SD:
 		slot->host->quirks2 |= SDHCI_QUIRK2_WAIT_FOR_IDLE;
+		/* Force 3.3V signal voltage */
+		slot->host->quirks2 |= SDHCI_QUIRK2_NO_1_8_V;
 		slot->host->mmc->caps2 |= MMC_CAP2_FIXED_NCRC;
 		break;
 	case INTEL_MRFL_SDIO:
