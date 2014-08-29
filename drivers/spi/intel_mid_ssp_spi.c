@@ -1111,6 +1111,7 @@ static int setup(struct spi_device *spi)
 	u32 tx_fifo_threshold;
 	u32 burst_size;
 	u32 clk_div;
+	static u32 one_time_setup = 1;
 
 	if (!spi->bits_per_word)
 		spi->bits_per_word = DFLT_BITS_PER_WORD;
@@ -1151,6 +1152,15 @@ static int setup(struct spi_device *spi)
 
 		chip->dma_enabled = chip_info->dma_enabled;
 		chip->cs_control = chip_info->cs_control;
+
+		/* Request platform-specific gpio and pinmux here since
+		 * it is not possible to get the intel_mid_ssp_spi_chip
+		 * structure in probe */
+		if (one_time_setup && !chip_info->dma_enabled
+				&& chip_info->platform_pinmux) {
+			chip_info->platform_pinmux();
+			one_time_setup = 0;
+		}
 
 	} else {
 		/* if no chip_info provided by protocol driver, */
