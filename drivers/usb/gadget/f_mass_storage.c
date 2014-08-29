@@ -2871,7 +2871,7 @@ static void fsg_unbind(struct usb_configuration *c, struct usb_function *f)
 		fsg->common->new_fsg = NULL;
 		raise_exception(fsg->common, FSG_STATE_CONFIG_CHANGE);
 		/* FIXME: make interruptible or killable somehow? */
-		wait_event(common->fsg_wait, common->fsg != fsg);
+		wait_event_timeout(common->fsg_wait, common->fsg != fsg, msecs_to_jiffies(1000));
 	}
 
 	fsg_common_put(common);
