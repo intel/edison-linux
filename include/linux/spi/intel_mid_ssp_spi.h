@@ -335,6 +335,7 @@ struct intel_mid_ssp_spi_chip {
 	u8 enable_loopback;
 	u8 dma_enabled;
 	void (*cs_control)(u32 command);
+	void (*platform_pinmux)(void);
 };
 
 #define SPI_DIB_NAME_LEN  16
