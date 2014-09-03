@@ -47,7 +47,7 @@ static void tng_ssp_spi_platform_pinmux(void)
 	err = gpio_request_one(tng_ssp_spi2_FS_gpio,
 			GPIOF_DIR_OUT|GPIOF_INIT_HIGH, "Arduino Shield SS");
 	if (err) {
-		pr_err("%s: unable to get Chip Select GPIO,
+		pr_err("%s: unable to get Chip Select GPIO,\
 				fallback to legacy CS mode \n", __func__);
 		lnw_gpio_set_alt(tng_ssp_spi2_FS_gpio, saved_muxing);
 		chip.cs_control = NULL;
