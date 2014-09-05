@@ -945,10 +945,12 @@ static int handle_message(struct ssp_drv_context *sspc)
 	struct chip_data *chip = NULL;
 	struct spi_transfer *transfer = NULL;
 	void *reg = sspc->ioaddr;
-	u32 cr1;
+	u32 cr0, cr1;
 	struct device *dev = &sspc->pdev->dev;
 	struct spi_message *msg = sspc->cur_msg;
 	u32 clk_div;
+	u32 mask = 0;
+	int bits_per_word;
 
 	chip = spi_get_ctldata(msg->spi);
 
@@ -971,14 +973,74 @@ static int handle_message(struct ssp_drv_context *sspc)
 		return 0;
 	}
 
+	/* If the bits_per_word field in non-zero in the spi_transfer provided
+	 * by the user-space, consider this value. Otherwise consider the
+	 * default bits_per_word field from the spi setting. */
+	if (transfer->bits_per_word) {
+		bits_per_word = transfer->bits_per_word;
+		cr0 = chip->cr0;
+		cr0 &= ~(SSCR0_EDSS | SSCR0_DSS);
+		cr0 |= SSCR0_DataSize(bits_per_word > 16 ?
+				bits_per_word - 16 : bits_per_word)
+			| (bits_per_word > 16 ? SSCR0_EDSS : 0);
+	} else {
+		/* Use default value. */
+		bits_per_word = msg->spi->bits_per_word;
+		cr0 = chip->cr0;
+	}
+
+	/* Check message length and bit per words consistency */
+	if (bits_per_word <= 8)
+		mask = 0;
+	else if (bits_per_word <= 16)
+		mask = 1;
+	else if (bits_per_word <= 32)
+		mask = 3;
+
+	if (transfer->len & mask) {
+		dev_warn(dev,
+			"message rejected : data length %d not multiple of %d "
+			"while in %d bits mode\n",
+			transfer->len,
+			mask + 1,
+			(mask == 1) ? 16 : 32);
+		msg->status = -EINVAL;
+		if (msg->complete)
+			msg->complete(msg->context);
+		complete(&sspc->msg_done);
+		return 0;
+	}
+
 	/* Flush any remaining data (in case of failed previous transfer) */
 	flush(sspc);
 
+	dev_dbg(dev, "%d bits/word, mode %d\n",
+		bits_per_word, msg->spi->mode & 0x3);
+	if (bits_per_word <= 8) {
+		sspc->n_bytes = 1;
+		sspc->read = u8_reader;
+		sspc->write = u8_writer;
+	} else if (bits_per_word <= 16) {
+		sspc->n_bytes = 2;
+		sspc->read = u16_reader;
+		sspc->write = u16_writer;
+	} else if (bits_per_word <= 32) {
+		if (!ssp_timing_wr)
+			chip->cr0 |= SSCR0_EDSS;
+		sspc->n_bytes = 4;
+		sspc->read = u32_reader;
+		sspc->write = u32_writer;
+	} else {
+		dev_warn(dev, "invalid wordsize\n");
+		msg->status = -EINVAL;
+		if (msg->complete)
+			msg->complete(msg->context);
+		complete(&sspc->msg_done);
+		return 0;
+	}
 	sspc->tx  = (void *)transfer->tx_buf;
 	sspc->rx  = (void *)transfer->rx_buf;
 	sspc->len = transfer->len;
-	sspc->write = chip->write;
-	sspc->read = chip->read;
 	sspc->cs_control = chip->cs_control;
 	sspc->cs_change = transfer->cs_change;
 
@@ -987,8 +1049,8 @@ static int handle_message(struct ssp_drv_context *sspc)
 		if (unlikely(!sspc->dma_mapped))
 			return 0;
 	} else {
-		sspc->write = sspc->tx ? chip->write : null_writer;
-		sspc->read  = sspc->rx ? chip->read : null_reader;
+		sspc->write = sspc->tx ? sspc->write : null_writer;
+		sspc->read  = sspc->rx ? sspc->read : null_reader;
 	}
 	sspc->tx_end = sspc->tx + transfer->len;
 	sspc->rx_end = sspc->rx + transfer->len;
@@ -1023,7 +1085,7 @@ static int handle_message(struct ssp_drv_context *sspc)
 	}
 
 	dev_dbg(dev, "transfer len:%d  n_bytes:%d  cr0:%x  cr1:%x",
-		sspc->len, sspc->n_bytes, chip->cr0, cr1);
+		sspc->len, sspc->n_bytes, cr0, cr1);
 
 	/* first set CR1 */
 	write_SSCR1(cr1, reg);
@@ -1033,7 +1095,7 @@ static int handle_message(struct ssp_drv_context *sspc)
 
 	/* recalculate the frequency for each transfer */
 	clk_div = ssp_get_clk_div(sspc, transfer->speed_hz);
-	chip->cr0 |= clk_div << 8;
+	cr0 |= clk_div << 8;
 
 	/* Do bitbanging only if SSP not-enabled or not-synchronized */
 	if (unlikely(((read_SSSR(reg) & SSP_NOT_SYNC) ||
@@ -1044,17 +1106,17 @@ static int handle_message(struct ssp_drv_context *sspc)
 		/* (re)start the SSP */
 		if (ssp_timing_wr) {
 			dev_dbg(dev, "original cr0 before reset:%x",
-				chip->cr0);
+				cr0);
 			/*we should not disable TUM and RIM interrup*/
 			write_SSCR0(0x0000000F, reg);
-			chip->cr0 &= ~(SSCR0_SSE);
-			dev_dbg(dev, "reset ssp:cr0:%x", chip->cr0);
-			write_SSCR0(chip->cr0, reg);
-			chip->cr0 |= SSCR0_SSE;
-			dev_dbg(dev, "reset ssp:cr0:%x", chip->cr0);
-			write_SSCR0(chip->cr0, reg);
+			cr0 &= ~(SSCR0_SSE);
+			dev_dbg(dev, "reset ssp:cr0:%x", cr0);
+			write_SSCR0(cr0, reg);
+			cr0 |= SSCR0_SSE;
+			dev_dbg(dev, "reset ssp:cr0:%x", cr0);
+			write_SSCR0(cr0, reg);
 		} else
-			write_SSCR0(chip->cr0, reg);
+			write_SSCR0(cr0, reg);
 	}
 
 	if (sspc->cs_control)
@@ -1203,22 +1265,12 @@ static int setup(struct spi_device *spi)
 		chip->cr1 |= SSCR1_SCLKDIR | SSCR1_SFRMDIR;
 	chip->cr1 |= SSCR1_SCFR;        /* clock is not free running */
 
-	dev_dbg(&spi->dev, "%d bits/word, mode %d\n",
-		spi->bits_per_word, spi->mode & 0x3);
 	if (spi->bits_per_word <= 8) {
 		chip->n_bytes = 1;
-		chip->read = u8_reader;
-		chip->write = u8_writer;
 	} else if (spi->bits_per_word <= 16) {
 		chip->n_bytes = 2;
-		chip->read = u16_reader;
-		chip->write = u16_writer;
 	} else if (spi->bits_per_word <= 32) {
-		if (!ssp_timing_wr)
-			chip->cr0 |= SSCR0_EDSS;
 		chip->n_bytes = 4;
-		chip->read = u32_reader;
-		chip->write = u32_writer;
 	} else {
 		dev_err(&spi->dev, "invalid wordsize\n");
 		return -EINVAL;
@@ -1237,9 +1289,9 @@ static int setup(struct spi_device *spi)
 	spi_set_ctldata(spi, chip);
 
 	/* setup of sspc members that will not change across transfers */
-	sspc->n_bytes = chip->n_bytes;
 
 	if (chip->dma_enabled) {
+		sspc->n_bytes = chip->n_bytes;
 		intel_mid_ssp_spi_dma_init(sspc);
 		sspc->cr1_sig = SSCR1_TSRE | SSCR1_RSRE;
 		sspc->mask_sr = SSSR_ROR | SSSR_TUR;
