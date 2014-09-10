@@ -751,8 +751,6 @@ static void poll_transfer_complete(struct ssp_drv_context *sspc)
 	sspc->cur_msg->actual_length += sspc->len - (sspc->rx_end - sspc->rx);
 
 	sspc->cur_msg->status = 0;
-	if (sspc->cs_control)
-		sspc->cs_control(CS_DEASSERT);
 }
 
 /**
@@ -1162,6 +1160,12 @@ static int handle_message(struct ssp_drv_context *sspc)
 		} else {
 			/* Do the transfer syncronously */
 			poll_transfer((unsigned long)sspc);
+		}
+
+		if (list_is_last(&transfer->transfer_list, &msg->transfers)
+				|| sspc->cs_change) {
+			if (sspc->cs_control)
+				sspc->cs_control(CS_DEASSERT);
 		}
 
 	} /* end of list_for_each_entry */
