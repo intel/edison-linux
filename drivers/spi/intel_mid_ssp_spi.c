@@ -747,19 +747,12 @@ static void int_transfer_complete_work(struct work_struct *work)
 
 static void poll_transfer_complete(struct ssp_drv_context *sspc)
 {
-	struct spi_message *msg;
-
 	/* Update total byte transfered return count actual bytes read */
 	sspc->cur_msg->actual_length += sspc->len - (sspc->rx_end - sspc->rx);
 
 	sspc->cur_msg->status = 0;
 	if (sspc->cs_control)
 		sspc->cs_control(CS_DEASSERT);
-
-	msg = sspc->cur_msg;
-	if (likely(msg->complete))
-		msg->complete(msg->context);
-	complete(&sspc->msg_done);
 }
 
 /**
@@ -802,6 +795,9 @@ static irqreturn_t ssp_int(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+/*
+ * Perform a single transfer.
+ */
 static void poll_transfer(unsigned long data)
 {
 	struct ssp_drv_context *sspc = (void *)data;
@@ -954,19 +950,32 @@ static int handle_message(struct ssp_drv_context *sspc)
 	struct chip_data *chip = NULL;
 	struct spi_transfer *transfer = NULL;
 	void *reg = sspc->ioaddr;
-	u32 cr0, cr1;
+	u32 cr0, saved_cr0, cr1, saved_cr1;
 	struct device *dev = &sspc->pdev->dev;
 	struct spi_message *msg = sspc->cur_msg;
-	u32 clk_div;
+	u32 clk_div, saved_speed_hz;
+	u8 dma_enabled;
+	u32 timeout;
+	u8 chip_select;
 	u32 mask = 0;
-	int bits_per_word;
+	int bits_per_word, saved_bits_per_word;
+	unsigned long flags;
 
 	chip = spi_get_ctldata(msg->spi);
 
-	/* We handle only one transfer message since the protocol module has to
-	   control the out of band signaling. */
-	transfer = list_entry(msg->transfers.next, struct spi_transfer,
-					transfer_list);
+	/* get every chip data we need to handle atomically the full message */
+	spin_lock_irqsave(&sspc->lock, flags);
+	saved_cr0 = chip->cr0;
+	saved_cr1 = chip->cr1;
+	saved_bits_per_word = msg->spi->bits_per_word;
+	saved_speed_hz = chip->speed_hz;
+	sspc->cs_control = chip->cs_control;
+	timeout = chip->timeout;
+	chip_select = chip->chip_select;
+	dma_enabled = chip->dma_enabled;
+	spin_unlock_irqrestore(&sspc->lock, flags);
+
+	list_for_each_entry(transfer, &msg->transfers, transfer_list) {
 
 	/* Check transfer length */
 	if (unlikely((transfer->len > MAX_SPI_TRANSFER_SIZE) ||
@@ -987,15 +996,15 @@ static int handle_message(struct ssp_drv_context *sspc)
 	 * default bits_per_word field from the spi setting. */
 	if (transfer->bits_per_word) {
 		bits_per_word = transfer->bits_per_word;
-		cr0 = chip->cr0;
+		cr0 = saved_cr0;
 		cr0 &= ~(SSCR0_EDSS | SSCR0_DSS);
 		cr0 |= SSCR0_DataSize(bits_per_word > 16 ?
 				bits_per_word - 16 : bits_per_word)
 			| (bits_per_word > 16 ? SSCR0_EDSS : 0);
 	} else {
 		/* Use default value. */
-		bits_per_word = msg->spi->bits_per_word;
-		cr0 = chip->cr0;
+		bits_per_word = saved_bits_per_word;
+		cr0 = saved_cr0;
 	}
 
 	/* Check message length and bit per words consistency */
@@ -1035,7 +1044,7 @@ static int handle_message(struct ssp_drv_context *sspc)
 		sspc->write = u16_writer;
 	} else if (bits_per_word <= 32) {
 		if (!ssp_timing_wr)
-			chip->cr0 |= SSCR0_EDSS;
+			cr0 |= SSCR0_EDSS;
 		sspc->n_bytes = 4;
 		sspc->read = u32_reader;
 		sspc->write = u32_writer;
@@ -1050,10 +1059,9 @@ static int handle_message(struct ssp_drv_context *sspc)
 	sspc->tx  = (void *)transfer->tx_buf;
 	sspc->rx  = (void *)transfer->rx_buf;
 	sspc->len = transfer->len;
-	sspc->cs_control = chip->cs_control;
 	sspc->cs_change = transfer->cs_change;
 
-	if (likely(chip->dma_enabled)) {
+	if (likely(dma_enabled)) {
 		sspc->dma_mapped = map_dma_buffers(sspc);
 		if (unlikely(!sspc->dma_mapped))
 			return 0;
@@ -1074,7 +1082,7 @@ static int handle_message(struct ssp_drv_context *sspc)
 		write_SSSR(sspc->clear_sr, reg);
 
 	/* setup the CR1 control register */
-	cr1 = chip->cr1 | sspc->cr1_sig;
+	cr1 = saved_cr1 | sspc->cr1_sig;
 
 	if (likely(sspc->quirks & QUIRKS_DMA_USE_NO_TRAIL)) {
 		/* in case of len smaller than burst size, adjust the RX     */
@@ -1090,7 +1098,7 @@ static int handle_message(struct ssp_drv_context *sspc)
 			cr1 &= ~(SSCR1_RFT);
 			cr1 |= SSCR1_RxTresh(rx_fifo_threshold) & SSCR1_RFT;
 		} else
-			write_SSTO(chip->timeout, reg);
+			write_SSTO(timeout, reg);
 	}
 
 	dev_dbg(dev, "transfer len:%d  n_bytes:%d  cr0:%x  cr1:%x",
@@ -1100,13 +1108,13 @@ static int handle_message(struct ssp_drv_context *sspc)
 	write_SSCR1(cr1, reg);
 
 	if (intel_mid_identify_cpu() == INTEL_MID_CPU_CHIP_TANGIER)
-		write_SSFS((1 << chip->chip_select), reg);
+		write_SSFS((1 << chip_select), reg);
 
 	/* recalculate the frequency for each transfer */
 	if (transfer->speed_hz)
 		clk_div = ssp_get_clk_div(sspc, transfer->speed_hz);
 	else
-		clk_div = ssp_get_clk_div(sspc, chip->speed_hz);
+		clk_div = ssp_get_clk_div(sspc, saved_speed_hz);
 
 	cr0 &= ~SSCR0_SCR;
 	cr0 |= (clk_div & 0xFFF) << 8;
@@ -1136,13 +1144,24 @@ static int handle_message(struct ssp_drv_context *sspc)
 	if (sspc->cs_control)
 		sspc->cs_control(CS_ASSERT);
 
-	if (likely(chip->dma_enabled)) {
+	if (likely(dma_enabled)) {
 		if (unlikely(sspc->quirks & QUIRKS_USE_PM_QOS))
 			pm_qos_update_request(&sspc->pm_qos_req,
 				MIN_EXIT_LATENCY);
 		dma_transfer(sspc);
-	} else
-		tasklet_schedule(&sspc->poll_transfer);
+		} else {
+		/* Do the transfer syncronously */
+		poll_transfer((unsigned long)sspc);
+	}
+
+	} /* end of list_for_each_entry */
+
+	/* Now we are done with this entire message */
+	if (!dma_enabled) {
+		if (likely(msg->complete))
+			msg->complete(msg->context);
+		complete(&sspc->msg_done);
+	}
 
 	return 0;
 }
@@ -1188,13 +1207,17 @@ static int setup(struct spi_device *spi)
 	u32 burst_size;
 	u32 clk_div;
 	static u32 one_time_setup = 1;
+	unsigned long flags;
 
+	spin_lock_irqsave(&sspc->lock, flags);
 	if (!spi->bits_per_word)
 		spi->bits_per_word = DFLT_BITS_PER_WORD;
 
 	if ((spi->bits_per_word < MIN_BITS_PER_WORD
-		|| spi->bits_per_word > MAX_BITS_PER_WORD))
+		|| spi->bits_per_word > MAX_BITS_PER_WORD)) {
+		spin_unlock_irqrestore(&sspc->lock, flags);
 		return -EINVAL;
+	}
 
 	chip = spi_get_ctldata(spi);
 	if (!chip) {
@@ -1202,6 +1225,7 @@ static int setup(struct spi_device *spi)
 		if (!chip) {
 			dev_err(&spi->dev,
 			"failed setup: can't allocate chip data\n");
+			spin_unlock_irqrestore(&sspc->lock, flags);
 			return -ENOMEM;
 		}
 	}
@@ -1287,6 +1311,7 @@ static int setup(struct spi_device *spi)
 		chip->n_bytes = 4;
 	} else {
 		dev_err(&spi->dev, "invalid wordsize\n");
+		spin_unlock_irqrestore(&sspc->lock, flags);
 		return -EINVAL;
 	}
 
@@ -1318,6 +1343,7 @@ static int setup(struct spi_device *spi)
 	}
 	sspc->clear_sr = SSSR_TUR | SSSR_ROR | SSSR_TINT;
 
+	spin_unlock_irqrestore(&sspc->lock, flags);
 	return 0;
 }
 
@@ -1495,7 +1521,6 @@ static int intel_mid_ssp_spi_probe(struct pci_dev *pdev,
 	INIT_LIST_HEAD(&sspc->queue);
 	init_completion(&sspc->msg_done);
 	spin_lock_init(&sspc->lock);
-	tasklet_init(&sspc->poll_transfer, poll_transfer, (unsigned long)sspc);
 	INIT_WORK(&sspc->pump_messages, pump_messages);
 	sspc->workqueue = create_singlethread_workqueue(dev_name(&pdev->dev));
 
