@@ -1094,7 +1094,12 @@ static int handle_message(struct ssp_drv_context *sspc)
 		write_SSFS((1 << chip->chip_select), reg);
 
 	/* recalculate the frequency for each transfer */
-	clk_div = ssp_get_clk_div(sspc, transfer->speed_hz);
+	if (transfer->speed_hz)
+		clk_div = ssp_get_clk_div(sspc, transfer->speed_hz);
+	else
+		clk_div = ssp_get_clk_div(sspc, chip->speed_hz);
+
+	cr0 &= ~SSCR0_SCR;
 	cr0 |= clk_div << 8;
 
 	/* Do bitbanging only if SSP not-enabled or not-synchronized */
