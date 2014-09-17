@@ -920,6 +920,15 @@ static unsigned int ssp_get_clk_div(struct ssp_drv_context *sspc, int speed)
 		return clamp(100000000 / speed - 1, 3, 4095);
 }
 
+
+static int ssp_get_speed(struct ssp_drv_context *sspc, int clk_div)
+{
+	if (sspc->quirks & QUIRKS_PLATFORM_MRFL)
+		return 25000000 / (clk_div + 1);
+	else
+		return 100000000 / (clk_div + 1);
+}
+
 /**
  * transfer() - Start a SPI transfer
  * @spi:	Pointer to the spi_device struct
@@ -1283,9 +1292,10 @@ static int setup(struct spi_device *spi)
 	}
 
 	if ((sspc->quirks & QUIRKS_SPI_SLAVE_CLOCK_MODE) == 0) {
-		chip->speed_hz = spi->max_speed_hz;
-		clk_div = ssp_get_clk_div(sspc, chip->speed_hz);
+		clk_div = ssp_get_clk_div(sspc, spi->max_speed_hz);
 		chip->cr0 |= (clk_div & 0xFFF) << 8;
+		spi->max_speed_hz = ssp_get_speed(sspc, clk_div);
+		chip->speed_hz = spi->max_speed_hz;
 		dev_dbg(&spi->dev, "spi->max_speed_hz:%d clk_div:%x cr0:%x",
 			spi->max_speed_hz, clk_div, chip->cr0);
 	}
