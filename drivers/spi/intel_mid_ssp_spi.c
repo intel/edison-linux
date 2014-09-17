@@ -813,25 +813,24 @@ static void poll_transfer(unsigned long data)
 		delay = true;
 	}
 
-	if (sspc->tx)
-		while (sspc->tx != sspc->tx_end) {
-			/* [REVERT ME] Tangier simulator requires a delay */
-			if (delay)
-				udelay(10);
-			if (ssp_timing_wr) {
-				int timeout = 100;
-				/* It is used as debug UART on Tangier. Since
-				   baud rate = 115200, it needs at least 312us
-				   for one word transferring. Becuase of silicon
-				   issue, it MUST check SFIFOL here instead of
-				   TNF. It is the workaround for A0 stepping*/
-				while (--timeout &&
+	while (sspc->tx < sspc->tx_end) {
+		/* [REVERT ME] Tangier simulator requires a delay */
+		if (delay)
+			udelay(10);
+		if (ssp_timing_wr) {
+			int timeout = 100;
+			/* It is used as debug UART on Tangier. Since
+			   baud rate = 115200, it needs at least 312us
+			   for one word transferring. Becuase of silicon
+			   issue, it MUST check SFIFOL here instead of
+			   TNF. It is the workaround for A0 stepping*/
+			while (--timeout &&
 					((read_SFIFOL(sspc->ioaddr)) & 0xFFFF))
-					udelay(10);
-			}
-			sspc->write(sspc);
-			sspc->read(sspc);
+				udelay(10);
 		}
+		sspc->write(sspc);
+		sspc->read(sspc);
+	}
 
 	while (!sspc->read(sspc))
 		cpu_relax();
