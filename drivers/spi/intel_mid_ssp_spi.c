@@ -913,10 +913,11 @@ static void start_bitbanging(struct ssp_drv_context *sspc)
 
 static unsigned int ssp_get_clk_div(struct ssp_drv_context *sspc, int speed)
 {
+	/* The clock divider shall stay between 3 and 4095 as specified in TRM. */
 	if (sspc->quirks & QUIRKS_PLATFORM_MRFL)
-		return max(25000000 / speed, 4) - 1;
+		return clamp(25000000 / speed - 1, 3, 4095);
 	else
-		return max(100000000 / speed, 4) - 1;
+		return clamp(100000000 / speed - 1, 3, 4095);
 }
 
 /**
@@ -1100,7 +1101,7 @@ static int handle_message(struct ssp_drv_context *sspc)
 		clk_div = ssp_get_clk_div(sspc, chip->speed_hz);
 
 	cr0 &= ~SSCR0_SCR;
-	cr0 |= clk_div << 8;
+	cr0 |= (clk_div & 0xFFF) << 8;
 
 	/* Do bitbanging only if SSP not-enabled or not-synchronized */
 	if (unlikely(((read_SSSR(reg) & SSP_NOT_SYNC) ||
@@ -1284,7 +1285,7 @@ static int setup(struct spi_device *spi)
 	if ((sspc->quirks & QUIRKS_SPI_SLAVE_CLOCK_MODE) == 0) {
 		chip->speed_hz = spi->max_speed_hz;
 		clk_div = ssp_get_clk_div(sspc, chip->speed_hz);
-		chip->cr0 |= clk_div << 8;
+		chip->cr0 |= (clk_div & 0xFFF) << 8;
 		dev_dbg(&spi->dev, "spi->max_speed_hz:%d clk_div:%x cr0:%x",
 			spi->max_speed_hz, clk_div, chip->cr0);
 	}
