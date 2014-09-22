@@ -316,6 +316,26 @@ void intel_scu_devices_destroy(void)
 }
 EXPORT_SYMBOL_GPL(intel_scu_devices_destroy);
 
+static struct platform_device *psh_ipc;
+void intel_psh_devices_create(void)
+{
+	psh_ipc = platform_device_alloc("intel_psh_ipc", 0);
+	if (psh_ipc == NULL) {
+		pr_err("out of memory for platform device psh_ipc.\n");
+		return;
+	}
+
+	platform_device_add(psh_ipc);
+}
+EXPORT_SYMBOL_GPL(intel_psh_devices_create);
+
+void intel_psh_devices_destroy(void)
+{
+	if (psh_ipc)
+		platform_device_del(psh_ipc);
+}
+EXPORT_SYMBOL_GPL(intel_psh_devices_destroy);
+
 void __init install_irq_resource(struct platform_device *pdev, int irq)
 {
 	/* Single threaded */

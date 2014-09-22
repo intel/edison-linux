@@ -838,6 +838,15 @@ config MSIC_GPADC
 	help
 	  Say Y here to enable MSIC GPADC driver on Intel Medfield Platform
 
+config INTEL_MCU
+	tristate "Intel generic MCU control interface"
+	help
+	  Say Y here to enable control interface for intel mcu
+
+	  This driver provide userspace tty interface for the control and
+	  message output.
+	  You could use normal read/write to complete those operation.
+
 config SENSORS_MAX1111
 	tristate "Maxim MAX1111 Serial 8-bit ADC chip and compatibles"
 	depends on SPI_MASTER
