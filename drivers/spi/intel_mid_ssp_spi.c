@@ -977,182 +977,192 @@ static int handle_message(struct ssp_drv_context *sspc)
 
 	list_for_each_entry(transfer, &msg->transfers, transfer_list) {
 
-	/* Check transfer length */
-	if (unlikely((transfer->len > MAX_SPI_TRANSFER_SIZE) ||
-		(transfer->len == 0))) {
-		dev_warn(dev, "transfer length null or greater than %d\n",
-			MAX_SPI_TRANSFER_SIZE);
-		dev_warn(dev, "length = %d\n", transfer->len);
-		msg->status = -EINVAL;
+		/* Check transfer length */
+		if (unlikely((transfer->len > MAX_SPI_TRANSFER_SIZE) ||
+					(transfer->len == 0))) {
+			dev_warn(dev, "transfer length null or greater than %d\n",
+					MAX_SPI_TRANSFER_SIZE);
+			dev_warn(dev, "length = %d\n", transfer->len);
+			msg->status = -EINVAL;
 
-		if (msg->complete)
-			msg->complete(msg->context);
-		complete(&sspc->msg_done);
-		return 0;
-	}
-
-	/* If the bits_per_word field in non-zero in the spi_transfer provided
-	 * by the user-space, consider this value. Otherwise consider the
-	 * default bits_per_word field from the spi setting. */
-	if (transfer->bits_per_word) {
-		bits_per_word = transfer->bits_per_word;
-		cr0 = saved_cr0;
-		cr0 &= ~(SSCR0_EDSS | SSCR0_DSS);
-		cr0 |= SSCR0_DataSize(bits_per_word > 16 ?
-				bits_per_word - 16 : bits_per_word)
-			| (bits_per_word > 16 ? SSCR0_EDSS : 0);
-	} else {
-		/* Use default value. */
-		bits_per_word = saved_bits_per_word;
-		cr0 = saved_cr0;
-	}
-
-	/* Check message length and bit per words consistency */
-	if (bits_per_word <= 8)
-		mask = 0;
-	else if (bits_per_word <= 16)
-		mask = 1;
-	else if (bits_per_word <= 32)
-		mask = 3;
-
-	if (transfer->len & mask) {
-		dev_warn(dev,
-			"message rejected : data length %d not multiple of %d "
-			"while in %d bits mode\n",
-			transfer->len,
-			mask + 1,
-			(mask == 1) ? 16 : 32);
-		msg->status = -EINVAL;
-		if (msg->complete)
-			msg->complete(msg->context);
-		complete(&sspc->msg_done);
-		return 0;
-	}
-
-	/* Flush any remaining data (in case of failed previous transfer) */
-	flush(sspc);
-
-	dev_dbg(dev, "%d bits/word, mode %d\n",
-		bits_per_word, msg->spi->mode & 0x3);
-	if (bits_per_word <= 8) {
-		sspc->n_bytes = 1;
-		sspc->read = u8_reader;
-		sspc->write = u8_writer;
-	} else if (bits_per_word <= 16) {
-		sspc->n_bytes = 2;
-		sspc->read = u16_reader;
-		sspc->write = u16_writer;
-	} else if (bits_per_word <= 32) {
-		if (!ssp_timing_wr)
-			cr0 |= SSCR0_EDSS;
-		sspc->n_bytes = 4;
-		sspc->read = u32_reader;
-		sspc->write = u32_writer;
-	} else {
-		dev_warn(dev, "invalid wordsize\n");
-		msg->status = -EINVAL;
-		if (msg->complete)
-			msg->complete(msg->context);
-		complete(&sspc->msg_done);
-		return 0;
-	}
-	sspc->tx  = (void *)transfer->tx_buf;
-	sspc->rx  = (void *)transfer->rx_buf;
-	sspc->len = transfer->len;
-	sspc->cs_change = transfer->cs_change;
-
-	if (likely(dma_enabled)) {
-		sspc->dma_mapped = map_dma_buffers(sspc);
-		if (unlikely(!sspc->dma_mapped))
+			if (msg->complete)
+				msg->complete(msg->context);
+			complete(&sspc->msg_done);
 			return 0;
-	} else {
-		sspc->write = sspc->tx ? sspc->write : null_writer;
-		sspc->read  = sspc->rx ? sspc->read : null_reader;
-	}
-	sspc->tx_end = sspc->tx + transfer->len;
-	sspc->rx_end = sspc->rx + transfer->len;
+		}
 
-	/* [REVERT ME] Bug in status register clear for Tangier simulation */
-	if ((intel_mid_identify_cpu() == INTEL_MID_CPU_CHIP_TANGIER) ||
-	    (intel_mid_identify_cpu() == INTEL_MID_CPU_CHIP_ANNIEDALE)) {
-		if ((intel_mid_identify_sim() != INTEL_MID_CPU_SIMULATION_VP &&
-		    (intel_mid_identify_sim() != INTEL_MID_CPU_SIMULATION_HVP)))
-			write_SSSR(sspc->clear_sr, reg);
-	} else /* Clear status  */
-		write_SSSR(sspc->clear_sr, reg);
-
-	/* setup the CR1 control register */
-	cr1 = saved_cr1 | sspc->cr1_sig;
-
-	if (likely(sspc->quirks & QUIRKS_DMA_USE_NO_TRAIL)) {
-		/* in case of len smaller than burst size, adjust the RX     */
-		/* threshold. All other cases will use the default threshold */
-		/* value. The RX fifo threshold must be aligned with the DMA */
-		/* RX transfer size, which may be limited to a multiple of 4 */
-		/* bytes due to 32bits DDR access.                           */
-		if  (sspc->len / sspc->n_bytes <= sspc->rx_fifo_threshold) {
-			u32 rx_fifo_threshold;
-
-			rx_fifo_threshold = (sspc->len & ~(4 - 1)) /
-						sspc->n_bytes;
-			cr1 &= ~(SSCR1_RFT);
-			cr1 |= SSCR1_RxTresh(rx_fifo_threshold) & SSCR1_RFT;
-		} else
-			write_SSTO(timeout, reg);
-	}
-
-	dev_dbg(dev, "transfer len:%d  n_bytes:%d  cr0:%x  cr1:%x",
-		sspc->len, sspc->n_bytes, cr0, cr1);
-
-	/* first set CR1 */
-	write_SSCR1(cr1, reg);
-
-	if (intel_mid_identify_cpu() == INTEL_MID_CPU_CHIP_TANGIER)
-		write_SSFS((1 << chip_select), reg);
-
-	/* recalculate the frequency for each transfer */
-	if (transfer->speed_hz)
-		clk_div = ssp_get_clk_div(sspc, transfer->speed_hz);
-	else
-		clk_div = ssp_get_clk_div(sspc, saved_speed_hz);
-
-	cr0 &= ~SSCR0_SCR;
-	cr0 |= (clk_div & 0xFFF) << 8;
-
-	/* Do bitbanging only if SSP not-enabled or not-synchronized */
-	if (unlikely(((read_SSSR(reg) & SSP_NOT_SYNC) ||
-		(!(read_SSCR0(reg) & SSCR0_SSE))) &&
-		(sspc->quirks & QUIRKS_BIT_BANGING))) {
-			start_bitbanging(sspc);
-	} else {
-		/* (re)start the SSP */
-		if (ssp_timing_wr) {
-			dev_dbg(dev, "original cr0 before reset:%x",
-				cr0);
-			/*we should not disable TUM and RIM interrup*/
-			write_SSCR0(0x0000000F, reg);
-			cr0 &= ~(SSCR0_SSE);
-			dev_dbg(dev, "reset ssp:cr0:%x", cr0);
-			write_SSCR0(cr0, reg);
-			cr0 |= SSCR0_SSE;
-			dev_dbg(dev, "reset ssp:cr0:%x", cr0);
-			write_SSCR0(cr0, reg);
-		} else
-			write_SSCR0(cr0, reg);
-	}
-
-	if (sspc->cs_control)
-		sspc->cs_control(CS_ASSERT);
-
-	if (likely(dma_enabled)) {
-		if (unlikely(sspc->quirks & QUIRKS_USE_PM_QOS))
-			pm_qos_update_request(&sspc->pm_qos_req,
-				MIN_EXIT_LATENCY);
-		dma_transfer(sspc);
+		/* If the bits_per_word field in non-zero in the spi_transfer provided
+		 * by the user-space, consider this value. Otherwise consider the
+		 * default bits_per_word field from the spi setting. */
+		if (transfer->bits_per_word) {
+			bits_per_word = transfer->bits_per_word;
+			cr0 = saved_cr0;
+			cr0 &= ~(SSCR0_EDSS | SSCR0_DSS);
+			cr0 |= SSCR0_DataSize(bits_per_word > 16 ?
+					bits_per_word - 16 : bits_per_word)
+				| (bits_per_word > 16 ? SSCR0_EDSS : 0);
 		} else {
-		/* Do the transfer syncronously */
-		poll_transfer((unsigned long)sspc);
-	}
+			/* Use default value. */
+			bits_per_word = saved_bits_per_word;
+			cr0 = saved_cr0;
+		}
+
+		/* Check message length and bit per words consistency */
+		if (bits_per_word <= 8)
+			mask = 0;
+		else if (bits_per_word <= 16)
+			mask = 1;
+		else if (bits_per_word <= 32)
+			mask = 3;
+
+		if (transfer->len & mask) {
+			dev_warn(dev,
+					"message rejected : data length %d not multiple of %d "
+					"while in %d bits mode\n",
+					transfer->len,
+					mask + 1,
+					(mask == 1) ? 16 : 32);
+			msg->status = -EINVAL;
+			if (msg->complete)
+				msg->complete(msg->context);
+			complete(&sspc->msg_done);
+			return 0;
+		}
+
+		/* Flush any remaining data (in case of failed previous transfer) */
+		flush(sspc);
+
+		dev_dbg(dev, "%d bits/word, mode %d\n",
+				bits_per_word, msg->spi->mode & 0x3);
+		if (bits_per_word <= 8) {
+			sspc->n_bytes = 1;
+			sspc->read = u8_reader;
+			sspc->write = u8_writer;
+		} else if (bits_per_word <= 16) {
+			sspc->n_bytes = 2;
+			sspc->read = u16_reader;
+			sspc->write = u16_writer;
+		} else if (bits_per_word <= 32) {
+			if (!ssp_timing_wr)
+				cr0 |= SSCR0_EDSS;
+			sspc->n_bytes = 4;
+			sspc->read = u32_reader;
+			sspc->write = u32_writer;
+		} else {
+			dev_warn(dev, "invalid wordsize\n");
+			msg->status = -EINVAL;
+			if (msg->complete)
+				msg->complete(msg->context);
+			complete(&sspc->msg_done);
+			return 0;
+		}
+		sspc->tx  = (void *)transfer->tx_buf;
+		sspc->rx  = (void *)transfer->rx_buf;
+		sspc->len = transfer->len;
+		sspc->cs_change = transfer->cs_change;
+
+		if (likely(dma_enabled)) {
+			sspc->dma_mapped = map_dma_buffers(sspc);
+			if (unlikely(!sspc->dma_mapped))
+				return 0;
+		}
+		sspc->tx  = (void *)transfer->tx_buf;
+		sspc->rx  = (void *)transfer->rx_buf;
+		sspc->len = transfer->len;
+		sspc->cs_control = chip->cs_control;
+		sspc->cs_change = transfer->cs_change;
+
+		if (likely(chip->dma_enabled)) {
+			sspc->dma_mapped = map_dma_buffers(sspc);
+			if (unlikely(!sspc->dma_mapped))
+				return 0;
+		} else {
+			sspc->write = sspc->tx ? sspc->write : null_writer;
+			sspc->read  = sspc->rx ? sspc->read : null_reader;
+		}
+		sspc->tx_end = sspc->tx + transfer->len;
+		sspc->rx_end = sspc->rx + transfer->len;
+
+		/* [REVERT ME] Bug in status register clear for Tangier simulation */
+		if ((intel_mid_identify_cpu() == INTEL_MID_CPU_CHIP_TANGIER) ||
+				(intel_mid_identify_cpu() == INTEL_MID_CPU_CHIP_ANNIEDALE)) {
+			if ((intel_mid_identify_sim() != INTEL_MID_CPU_SIMULATION_VP &&
+						(intel_mid_identify_sim() != INTEL_MID_CPU_SIMULATION_HVP)))
+				write_SSSR(sspc->clear_sr, reg);
+		} else /* Clear status  */
+			write_SSSR(sspc->clear_sr, reg);
+
+		/* setup the CR1 control register */
+		cr1 = saved_cr1 | sspc->cr1_sig;
+
+		if (likely(sspc->quirks & QUIRKS_DMA_USE_NO_TRAIL)) {
+			/* in case of len smaller than burst size, adjust the RX     */
+			/* threshold. All other cases will use the default threshold */
+			/* value. The RX fifo threshold must be aligned with the DMA */
+			/* RX transfer size, which may be limited to a multiple of 4 */
+			/* bytes due to 32bits DDR access.                           */
+			if  (sspc->len / sspc->n_bytes <= sspc->rx_fifo_threshold) {
+				u32 rx_fifo_threshold;
+
+				rx_fifo_threshold = (sspc->len & ~(4 - 1)) /
+					sspc->n_bytes;
+				cr1 &= ~(SSCR1_RFT);
+				cr1 |= SSCR1_RxTresh(rx_fifo_threshold) & SSCR1_RFT;
+			} else
+				write_SSTO(timeout, reg);
+		}
+		dev_dbg(dev, "transfer len:%d  n_bytes:%d  cr0:%x  cr1:%x",
+				sspc->len, sspc->n_bytes, cr0, cr1);
+
+		/* first set CR1 */
+		write_SSCR1(cr1, reg);
+
+		if (intel_mid_identify_cpu() == INTEL_MID_CPU_CHIP_TANGIER)
+			write_SSFS((1 << chip_select), reg);
+
+		/* recalculate the frequency for each transfer */
+		if (transfer->speed_hz)
+			clk_div = ssp_get_clk_div(sspc, transfer->speed_hz);
+		else
+			clk_div = ssp_get_clk_div(sspc, saved_speed_hz);
+
+		cr0 &= ~SSCR0_SCR;
+		cr0 |= (clk_div & 0xFFF) << 8;
+
+		/* Do bitbanging only if SSP not-enabled or not-synchronized */
+		if (unlikely(((read_SSSR(reg) & SSP_NOT_SYNC) ||
+						(!(read_SSCR0(reg) & SSCR0_SSE))) &&
+					(sspc->quirks & QUIRKS_BIT_BANGING))) {
+			start_bitbanging(sspc);
+		} else {
+			/* (re)start the SSP */
+			if (ssp_timing_wr) {
+				dev_dbg(dev, "original cr0 before reset:%x",
+						cr0);
+				/*we should not disable TUM and RIM interrup*/
+				write_SSCR0(0x0000000F, reg);
+				cr0 &= ~(SSCR0_SSE);
+				dev_dbg(dev, "reset ssp:cr0:%x", cr0);
+				write_SSCR0(cr0, reg);
+				cr0 |= SSCR0_SSE;
+				dev_dbg(dev, "reset ssp:cr0:%x", cr0);
+				write_SSCR0(cr0, reg);
+			} else
+				write_SSCR0(cr0, reg);
+		}
+
+		if (sspc->cs_control)
+			sspc->cs_control(CS_ASSERT);
+
+		if (likely(dma_enabled)) {
+			if (unlikely(sspc->quirks & QUIRKS_USE_PM_QOS))
+				pm_qos_update_request(&sspc->pm_qos_req,
+						MIN_EXIT_LATENCY);
+			dma_transfer(sspc);
+		} else {
+			/* Do the transfer syncronously */
+			poll_transfer((unsigned long)sspc);
+		}
 
 	} /* end of list_for_each_entry */
 
