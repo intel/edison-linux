@@ -1005,6 +1005,16 @@ static int handle_message(struct ssp_drv_context *sspc)
 			cr0 = saved_cr0;
 		}
 
+		if ((bits_per_word < MIN_BITS_PER_WORD
+					|| bits_per_word > MAX_BITS_PER_WORD)) {
+			dev_warn(dev, "invalid wordsize\n");
+			msg->status = -EINVAL;
+			if (msg->complete)
+				msg->complete(msg->context);
+			complete(&sspc->msg_done);
+			return 0;
+		}
+
 		/* Check message length and bit per words consistency */
 		if (bits_per_word <= 8)
 			mask = 0;
@@ -1046,13 +1056,6 @@ static int handle_message(struct ssp_drv_context *sspc)
 			sspc->n_bytes = 4;
 			sspc->read = u32_reader;
 			sspc->write = u32_writer;
-		} else {
-			dev_warn(dev, "invalid wordsize\n");
-			msg->status = -EINVAL;
-			if (msg->complete)
-				msg->complete(msg->context);
-			complete(&sspc->msg_done);
-			return 0;
 		}
 		sspc->tx  = (void *)transfer->tx_buf;
 		sspc->rx  = (void *)transfer->rx_buf;
