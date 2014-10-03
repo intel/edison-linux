@@ -1207,7 +1207,8 @@ static void pump_messages(struct work_struct *work)
 		sspc->cur_msg = NULL;
 	}
 	spin_unlock_irqrestore(&sspc->lock, flags);
-	pm_runtime_put(dev);
+	pm_runtime_mark_last_busy(dev);
+	pm_runtime_put_autosuspend(dev);
 }
 
 /**
@@ -1558,6 +1559,12 @@ static int intel_mid_ssp_spi_probe(struct pci_dev *pdev,
 		pm_qos_add_request(&sspc->pm_qos_req, PM_QOS_CPU_DMA_LATENCY,
 				PM_QOS_DEFAULT_VALUE);
 
+	pm_runtime_set_autosuspend_delay(&pdev->dev, 25);
+	pm_runtime_use_autosuspend(&pdev->dev);
+	pm_runtime_set_active(&pdev->dev);
+	pm_runtime_enable(&pdev->dev);
+	if (!pm_runtime_enabled(&pdev->dev))
+		dev_err(&pdev->dev, "spi runtime pm not enabled!\n");
 	pm_runtime_put_noidle(&pdev->dev);
 	pm_runtime_allow(&pdev->dev);
 
