@@ -58,6 +58,18 @@ static void l2cap_send_disconn_req(struct l2cap_chan *chan, int err);
 static void l2cap_tx(struct l2cap_chan *chan, struct l2cap_ctrl *control,
 		     struct sk_buff_head *skbs, u8 event);
 
+static inline __u8 bdaddr_type(struct hci_conn *hcon, __u8 type)
+{
+	if (hcon->type == LE_LINK) {
+		if (type == ADDR_LE_DEV_PUBLIC)
+			return BDADDR_LE_PUBLIC;
+		else
+			return BDADDR_LE_RANDOM;
+	}
+
+	return BDADDR_BREDR;
+}
+
 /* ---- L2CAP channels ---- */
 
 static struct l2cap_chan *__l2cap_get_chan_by_dcid(struct l2cap_conn *conn,
@@ -1364,6 +1376,8 @@ static void l2cap_le_conn_ready(struct l2cap_conn *conn)
 
 	bacpy(&bt_sk(sk)->src, conn->src);
 	bacpy(&bt_sk(sk)->dst, conn->dst);
+	chan->src_type = bdaddr_type(conn->hcon, conn->hcon->src_type);
+	chan->dst_type = bdaddr_type(conn->hcon, conn->hcon->dst_type);
 
 	l2cap_chan_add(conn, chan);
 
@@ -1785,6 +1799,7 @@ int l2cap_chan_connect(struct l2cap_chan *chan, __le16 psm, u16 cid,
 	/* Set destination address and psm */
 	lock_sock(sk);
 	bacpy(&bt_sk(sk)->dst, dst);
+	chan->dst_type = dst_type;
 	release_sock(sk);
 
 	chan->psm = psm;
@@ -1792,7 +1807,7 @@ int l2cap_chan_connect(struct l2cap_chan *chan, __le16 psm, u16 cid,
 
 	auth_type = l2cap_get_auth_type(chan);
 
-	if (chan->dcid == L2CAP_CID_LE_DATA)
+	if (bdaddr_type_is_le(dst_type))
 		hcon = hci_connect(hdev, LE_LINK, dst, dst_type,
 				   chan->sec_level, auth_type);
 	else
@@ -1825,6 +1840,7 @@ int l2cap_chan_connect(struct l2cap_chan *chan, __le16 psm, u16 cid,
 
 	/* Update source addr of the socket */
 	bacpy(src, conn->src);
+	chan->src_type = bdaddr_type(hcon, hcon->src_type);
 
 	l2cap_chan_unlock(chan);
 	l2cap_chan_add(conn, chan);
@@ -3755,6 +3771,8 @@ static struct l2cap_chan *l2cap_connect(struct l2cap_conn *conn,
 
 	bacpy(&bt_sk(sk)->src, conn->src);
 	bacpy(&bt_sk(sk)->dst, conn->dst);
+	chan->src_type = bdaddr_type(conn->hcon, conn->hcon->src_type);
+	chan->dst_type = bdaddr_type(conn->hcon, conn->hcon->dst_type);
 	chan->psm  = psm;
 	chan->dcid = scid;
 	chan->local_amp_id = amp_id;
