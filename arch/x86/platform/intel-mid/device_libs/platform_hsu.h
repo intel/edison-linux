@@ -13,9 +13,9 @@
 #define _PLATFORM_HSU_H_
 
 #define HSU_BT_PORT "hsu_bt_port"
-#define HSU_MODEM_PORT "hsu_modem_port"
-#define HSU_GPS_PORT "hsu_gps_port"
-#define HSU_DEBUG_PORT "hsu_debug_port"
+#define HSU_UART0_PORT "hsu_uart0_port"
+#define HSU_UART1_PORT "hsu_uart1_port"
+#define HSU_UART2_PORT "hsu_uart2_port"
 
 enum hsu_core {
 	hsu_pnw,
