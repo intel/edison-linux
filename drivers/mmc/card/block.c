@@ -96,6 +96,7 @@ struct mmc_blk_data {
 #define MMC_BLK_CMD23	(1 << 0)	/* Can do SET_BLOCK_COUNT for multiblock */
 #define MMC_BLK_REL_WR	(1 << 1)	/* MMC Reliable write support */
 #define MMC_BLK_PACKED_CMD	(1 << 2)	/* MMC packed command support */
+#define MMC_BLK_SUSPENDED	(1 << 3)	/* MMC block device suspended */
 
 	unsigned int	usage;
 	unsigned int	read_only;
@@ -106,7 +107,8 @@ struct mmc_blk_data {
 #define MMC_BLK_WRITE		BIT(1)
 #define MMC_BLK_DISCARD		BIT(2)
 #define MMC_BLK_SECDISCARD	BIT(3)
-
+#define MMC_BLK_RPMB		BIT(4)
+#define MMC_BLK_USER		BIT(5)
 	/*
 	 * Only set in main mmc_blk_data associated
 	 * with mmc_card with mmc_set_drvdata, and keeps
@@ -146,6 +148,9 @@ static inline void mmc_blk_clear_packed(struct mmc_queue_req *mqrq)
 	packed->blocks = 0;
 }
 
+static int mmc_rpmb_req_process(struct mmc_blk_data *,
+		struct mmc_ioc_rpmb_req *);
+
 static struct mmc_blk_data *mmc_blk_get(struct gendisk *disk)
 {
 	struct mmc_blk_data *md;
@@ -159,12 +164,6 @@ static struct mmc_blk_data *mmc_blk_get(struct gendisk *disk)
 	mutex_unlock(&open_lock);
 
 	return md;
-}
-
-int mmc_access_rpmb(struct mmc_queue *mq)
-{
-	struct mmc_blk_data *md = mq->data;
-	return md && md->part_type == EXT_CSD_PART_CONFIG_ACC_RPMB;
 }
 
 static inline int mmc_get_devidx(struct gendisk *disk)
@@ -574,12 +573,53 @@ cmd_err:
 	return err;
 }
 
+static int mmc_blk_ioctl_rpmb_req(struct block_device *bdev,
+		struct mmc_ioc_rpmb_req __user *ptr)
+{
+	struct mmc_ioc_rpmb_req req;
+	struct mmc_blk_data *md = NULL;
+	int err = 0;
+
+	/* The caller must have CAP_SYS_RAWIO */
+	if (!capable(CAP_SYS_RAWIO))
+		return -EPERM;
+
+	memset(&req, 0, sizeof(req));
+
+	if (copy_from_user(&req, ptr, sizeof(req)))
+		return -EFAULT;
+
+	md = mmc_blk_get(bdev->bd_disk);
+	if (!md) {
+		pr_err("%s: NO eMMC block data. Try it later\n",
+				__func__);
+		return -ENODEV;
+	}
+	/* handle RPMB request event */
+	err = mmc_rpmb_req_process(md, &req);
+	if (err) {
+		mmc_blk_put(md);
+		return err;
+	}
+	/*
+	 * feedback to user space
+	 */
+	if (copy_to_user(ptr, &req, sizeof(req)))
+		return -EFAULT;
+
+	mmc_blk_put(md);
+	return 0;
+}
+
 static int mmc_blk_ioctl(struct block_device *bdev, fmode_t mode,
 	unsigned int cmd, unsigned long arg)
 {
 	int ret = -EINVAL;
 	if (cmd == MMC_IOC_CMD)
 		ret = mmc_blk_ioctl_cmd(bdev, (struct mmc_ioc_cmd __user *)arg);
+	else if (cmd == MMC_IOC_RPMB_REQ)
+		ret = mmc_blk_ioctl_rpmb_req(bdev,
+				(struct mmc_ioc_rpmb_req __user *)arg);
 	return ret;
 }
 
@@ -896,6 +936,114 @@ static inline void mmc_blk_reset_success(struct mmc_blk_data *md, int type)
 {
 	md->reset_done &= ~type;
 }
+
+static int mmc_rpmb_req_process(struct mmc_blk_data *md,
+		struct mmc_ioc_rpmb_req *req)
+{
+	struct mmc_core_rpmb_req rpmb_req;
+	struct mmc_card *card = NULL;
+	int ret;
+
+	if (!md || !req)
+		return -EINVAL;
+
+	if (!(md->flags & MMC_BLK_CMD23) ||
+			(md->part_type != EXT_CSD_PART_CONFIG_ACC_RPMB))
+		return -EOPNOTSUPP;
+
+	card = md->queue.card;
+	if (!card || !mmc_card_mmc(card) || !card->ext_csd.rpmb_size)
+		return -ENODEV;
+
+	memset(&rpmb_req, 0, sizeof(struct mmc_core_rpmb_req));
+	rpmb_req.req = req;
+	/* check request */
+	ret = mmc_rpmb_pre_frame(&rpmb_req, card);
+	if (ret) {
+		pr_err("%s: prepare frame failed\n", mmc_hostname(card->host));
+		return ret;
+	}
+
+	mmc_claim_host(card->host);
+
+	if (md->flags & MMC_BLK_SUSPENDED) {
+		pr_warn("%s: MMC block device is already suspended\n",
+				mmc_hostname(card->host));
+		ret = -EPERM;
+		goto out;
+	}
+	/*
+	 * before start, let's change to RPMB partition first
+	 */
+	ret = mmc_blk_part_switch(card, md);
+	if (ret) {
+		pr_err("%s: Invalid RPMB partition switch (%d)!\n",
+				mmc_hostname(card->host), ret);
+		/*
+		 * In case partition is not in user data area, make
+		 * a force partition switch.
+		 * we need reset eMMC card at here
+		 */
+		ret = mmc_blk_reset(md, card->host, MMC_BLK_RPMB);
+		if (!ret)
+			mmc_blk_reset_success(md, MMC_BLK_RPMB);
+		else
+			pr_err("%s: eMMC card reset failed (%d)\n",
+					mmc_hostname(card->host), ret);
+		goto out;
+	}
+
+	ret = mmc_rpmb_partition_ops(&rpmb_req, card);
+	if (ret)
+		pr_err("%s: failed (%d) to handle RPMB request type (%d)!\n",
+				mmc_hostname(card->host), ret, req->type);
+out:
+	mmc_release_host(card->host);
+	mmc_rpmb_post_frame(&rpmb_req);
+	return ret;
+}
+
+int mmc_access_rpmb(struct mmc_queue *mq)
+{
+	struct mmc_blk_data *md = mq->data;
+	/*
+	 * If this is a RPMB partition access, return ture
+	 */
+	if (md && md->part_type == EXT_CSD_PART_CONFIG_ACC_RPMB)
+		return true;
+
+	return false;
+}
+EXPORT_SYMBOL_GPL(mmc_access_rpmb);
+
+int mmc_rpmb_req_handle(struct device *emmc, struct mmc_ioc_rpmb_req *req)
+{
+	int ret = 0;
+	struct gendisk *disk    = NULL;
+	struct mmc_blk_data *md = NULL;
+
+	if (!emmc || !req)
+		return -EINVAL;
+
+	disk = dev_to_disk(emmc);
+	if (!disk) {
+		pr_err("%s: NO eMMC disk found. Try it later\n",
+				__func__);
+		return -ENODEV;
+	}
+
+	md = mmc_blk_get(disk);
+	if (!md) {
+		pr_err("%s: NO eMMC block data. Try it later\n",
+				__func__);
+		return -ENODEV;
+	}
+	ret = mmc_rpmb_req_process(md, req);
+	mmc_blk_put(md);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(mmc_rpmb_req_handle);
 
 static int mmc_blk_issue_discard_rq(struct mmc_queue *mq, struct request *req)
 {
@@ -1905,11 +2053,16 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 
 	ret = mmc_blk_part_switch(card, md);
 	if (ret) {
-		if (req) {
-			blk_end_request_all(req, -EIO);
+		pr_err("%s: switch part failed. Try to reset eMMC\n",
+				mmc_hostname(card->host));
+		if (mmc_blk_reset(md, card->host, MMC_BLK_USER)) {
+			if (req)
+				blk_end_request_all(req, -EIO);
+			ret = 0;
+			goto out;
 		}
-		ret = 0;
-		goto out;
+		pr_info("%s: Reset eMMC success\n", mmc_hostname(card->host));
+		mmc_blk_reset_success(md, MMC_BLK_USER);
 	}
 
 	mq->flags &= ~MMC_QUEUE_NEW_REQUEST;
@@ -2372,6 +2525,19 @@ static int mmc_blk_suspend(struct mmc_card *card)
 		mmc_queue_suspend(&md->queue);
 		list_for_each_entry(part_md, &md->part, part) {
 			mmc_queue_suspend(&part_md->queue);
+			if (part_md->part_type ==
+				EXT_CSD_PART_CONFIG_ACC_RPMB) {
+				/*
+				 * RPMB partition is accessed by API directly.
+				 * Driver need to set a flag when suspending
+				 * MMC block device to notify API that the
+				 * accessing of RPMB partition needs to be
+				 * stopped
+				 */
+				mmc_claim_host(card->host);
+				part_md->flags |= MMC_BLK_SUSPENDED;
+				mmc_release_host(card->host);
+			}
 		}
 	}
 	return 0;
@@ -2391,6 +2557,18 @@ static int mmc_blk_resume(struct mmc_card *card)
 		mmc_queue_resume(&md->queue);
 		list_for_each_entry(part_md, &md->part, part) {
 			mmc_queue_resume(&part_md->queue);
+			if (part_md->part_type ==
+					EXT_CSD_PART_CONFIG_ACC_RPMB) {
+				/*
+				 * RPMB partition is accessed by API directly.
+				 * Driver need to clear MMC_BLK_SUSPENDED flag
+				 * to make sure the next RPMB partition access
+				 * request won't be blocked
+				 */
+				mmc_claim_host(card->host);
+				part_md->flags &= ~MMC_BLK_SUSPENDED;
+				mmc_release_host(card->host);
+			}
 		}
 	}
 	return 0;

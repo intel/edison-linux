@@ -84,6 +84,7 @@ struct mmc_ext_csd {
 	unsigned int		hpi_cmd;		/* cmd used as HPI */
 	bool			bkops;		/* background support bit */
 	bool			bkops_en;	/* background enable bit */
+	unsigned int		rpmb_size;		/* Units: half sector */
 	unsigned int            data_sector_size;       /* 512 bytes or 4KB */
 	unsigned int            data_tag_unit_size;     /* DATA TAG UNIT size */
 	unsigned int		boot_ro_lock;		/* ro lock support */
@@ -297,6 +298,8 @@ struct mmc_card {
 	struct dentry		*debugfs_root;
 	struct mmc_part	part[MMC_NUM_PHY_PARTITION]; /* physical partitions */
 	unsigned int    nr_parts;
+
+	unsigned int		rpmb_max_req;
 };
 
 /*
@@ -524,5 +527,8 @@ extern void mmc_unregister_driver(struct mmc_driver *);
 
 extern void mmc_fixup_device(struct mmc_card *card,
 			     const struct mmc_fixup *table);
+
+extern int mmc_rpmb_req_handle(struct device *emmc,
+		struct mmc_ioc_rpmb_req *req);
 
 #endif /* LINUX_MMC_CARD_H */
