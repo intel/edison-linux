@@ -31,17 +31,35 @@
 #include <linux/pm_runtime.h>
 #include <acpi/acpi_bus.h>
 
-#define MAX_CHAN	4 /*max ch across controllers*/
 #include "intel_mid_dma_regs.h"
 
-static struct device *acpi_dma_dev;
+#define HID_MAX_SIZE 8
 
-struct device *intel_mid_get_acpi_dma(void)
+struct list_head dma_dev_list;
+
+LIST_HEAD(dma_dev_list);
+
+struct acpi_dma_dev_list {
+	struct list_head dmadev_list;
+	char dma_hid[HID_MAX_SIZE];
+	struct device *acpi_dma_dev;
+};
+
+struct device *intel_mid_get_acpi_dma(const char *hid)
 {
-	return acpi_dma_dev;
+	struct acpi_dma_dev_list *listnode;
+	if (list_empty(&dma_dev_list))
+		return NULL;
+
+	list_for_each_entry(listnode, &dma_dev_list, dmadev_list) {
+		if (!(strncmp(listnode->dma_hid, hid, HID_MAX_SIZE)))
+			return listnode->acpi_dma_dev;
+	}
+	return NULL;
 }
 EXPORT_SYMBOL_GPL(intel_mid_get_acpi_dma);
 
+#if IS_ENABLED(CONFIG_ACPI)
 static int mid_get_and_map_rsrc(void **dest, struct platform_device *pdev,
 				unsigned int num)
 {
@@ -90,7 +108,6 @@ static int mid_platform_get_resources(struct middma_device *mid_device,
 	return 0;
 }
 
-#if IS_ENABLED(CONFIG_ACPI)
 int dma_acpi_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -168,9 +185,7 @@ int dma_acpi_probe(struct platform_device *pdev)
 
 int dma_acpi_remove(struct platform_device *pdev)
 {
-	pm_runtime_get_noresume(&pdev->dev);
-	pm_runtime_disable(&pdev->dev);
-	acpi_dma_dev = NULL;
+	pm_runtime_forbid(&pdev->dev);
 	middma_shutdown(&pdev->dev);
 	platform_set_drvdata(pdev, NULL);
 	return 0;

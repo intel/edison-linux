@@ -31,6 +31,8 @@
 
 #define INTEL_MID_DMA_DRIVER_VERSION "1.1.0"
 
+#define MID_MAX_CHAN	8 /*max ch across controllers*/
+
 #define	REG_BIT0		0x00000001
 #define	REG_BIT8		0x00000100
 #define INT_MASK_WE		0x8
@@ -342,7 +344,7 @@ struct middma_device {
 	struct pci_pool		*dma_pool;
 	struct dma_device	common;
 	struct tasklet_struct   tasklet;
-	struct intel_mid_dma_chan ch[MAX_CHAN];
+	struct intel_mid_dma_chan ch[MID_MAX_CHAN];
 	unsigned int		pci_id;
 	unsigned int		intr_mask;
 	void __iomem		*mask_reg;
