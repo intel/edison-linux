@@ -1223,11 +1223,6 @@ int wm_hubs_handle_analogue_pdata(struct snd_soc_codec *codec,
 				    WM8993_LINEOUT2_MODE,
 				    WM8993_LINEOUT2_MODE);
 
-	if (!lineout1_diff && !lineout2_diff)
-		snd_soc_update_bits(codec, WM8993_ANTIPOP1,
-				    WM8993_LINEOUT_VMID_BUF_ENA,
-				    WM8993_LINEOUT_VMID_BUF_ENA);
-
 	if (lineout1fb)
 		snd_soc_update_bits(codec, WM8993_ADDITIONAL_CONTROL,
 				    WM8993_LINEOUT1_FB, WM8993_LINEOUT1_FB);
@@ -1252,6 +1247,13 @@ void wm_hubs_vmid_ena(struct snd_soc_codec *codec)
 {
 	struct wm_hubs_data *hubs = snd_soc_codec_get_drvdata(codec);
 	int val = 0;
+
+	if ((hubs->lineout1_se && hubs->lineout2_se) &&
+			(hubs->lineout1n_ena  || hubs->lineout1p_ena ||
+			hubs->lineout2n_ena || hubs->lineout2p_ena))
+		snd_soc_update_bits(codec, WM8993_ANTIPOP1,
+			WM8993_LINEOUT_VMID_BUF_ENA,
+			WM8993_LINEOUT_VMID_BUF_ENA);
 
 	if (hubs->lineout1_se)
 		val |= WM8993_LINEOUT1N_ENA | WM8993_LINEOUT1P_ENA;
@@ -1281,6 +1283,13 @@ void wm_hubs_set_bias_level(struct snd_soc_codec *codec,
 		/* Turn off any unneded single ended outputs */
 		val = 0;
 		mask = 0;
+
+		if ((hubs->lineout1_se && hubs->lineout2_se) &&
+				(hubs->lineout1n_ena  || hubs->lineout1p_ena ||
+				hubs->lineout2n_ena || hubs->lineout2p_ena))
+			snd_soc_update_bits(codec, WM8993_ANTIPOP1,
+				WM8993_LINEOUT_VMID_BUF_ENA,
+				WM8993_LINEOUT_VMID_BUF_ENA);
 
 		if (hubs->lineout1_se)
 			mask |= WM8993_LINEOUT1N_ENA | WM8993_LINEOUT1P_ENA;
