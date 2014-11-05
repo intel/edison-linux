@@ -60,6 +60,7 @@
 #include "device_libs/platform_soc_thermal.h"
 #include "device_libs/platform_msic_adc.h"
 #include "device_libs/platform_bcove_adc.h"
+#include <asm/platform_mrfld_audio.h>
 #include "device_libs/platform_mrfl_thermal.h"
 
 /*
@@ -74,6 +75,8 @@
 #include "device_libs/platform_tc35876x.h"
 #include "device_libs/platform_bq24261.h"
 #include "device_libs/platform_pcal9555a.h"
+
+#include "device_libs/platform_wm8994.h"
 
 /*
  * SPI devices
@@ -147,14 +150,17 @@ struct devs_id __initconst device_ids[] = {
 					&ipc_device_handler},
 	{"bcove_thrm", SFI_DEV_TYPE_IPC, 1, &mrfl_thermal_platform_data,
 					&ipc_device_handler},
-
+	{"wm8994", SFI_DEV_TYPE_I2C, 0, &wm8994_platform_data, NULL},
 	/* IPC devices */
 	{"pmic_charger", SFI_DEV_TYPE_IPC, 1, &no_platform_data, NULL},
 	{"pmic_ccsm", SFI_DEV_TYPE_IPC, 1, &mrfl_pmic_ccsm_platform_data,
 						&ipc_device_handler},
 	{"i2c_pmic_adap", SFI_DEV_TYPE_IPC, 1, &mrfl_pmic_i2c_platform_data,
 						&ipc_device_handler},
+	{"mrfld_wm8958", SFI_DEV_TYPE_IPC, 1, &merfld_wm8958_audio_platform_data,
+						&ipc_device_handler},
 	{"soc_thrm", SFI_DEV_TYPE_IPC, 1, &no_platform_data,
 						&soc_thrm_device_handler},
+	{"wm8958", SFI_DEV_TYPE_I2C, 0, &wm8994_platform_data, NULL},
 	{},
 };
