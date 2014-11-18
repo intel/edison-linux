@@ -1890,7 +1890,7 @@ static int intel_mid_dma_probe(struct pci_dev *pdev,
 		goto err_ioremap;
 
 	pm_runtime_put_noidle(&pdev->dev);
-	pm_runtime_allow(&pdev->dev);
+	pm_runtime_forbid(&pdev->dev);
 	return 0;
 
 err_ioremap:
