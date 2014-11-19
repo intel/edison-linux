@@ -74,15 +74,9 @@ intel_mid_pwm_on_time_divisor(void __iomem *reg, union pwmctrl_reg *pwmctrl,
 	u64 on_time_divisor;
 
 	/* Calculate and set on time divisor */
-	if (duty_cycle == period) {
-		on_time_divisor = 1UL;
-	} else {
-		on_time_divisor = duty_cycle *
-			(u64)(PWM_COMPARE_UNIT_SIZE - 1UL);
-		do_div(on_time_divisor, period);
-		on_time_divisor = PWM_COMPARE_UNIT_SIZE -
-			on_time_divisor - 1UL;
-	}
+	on_time_divisor = duty_cycle * (u64)(PWM_COMPARE_UNIT_SIZE - 1UL);
+	do_div(on_time_divisor, period);
+	on_time_divisor = PWM_COMPARE_UNIT_SIZE - on_time_divisor - 1UL;
 
 	pwmctrl->full = readl(reg);
 	pwmctrl->part.on_time_divisor = on_time_divisor;
