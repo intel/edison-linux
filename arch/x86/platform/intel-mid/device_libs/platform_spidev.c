@@ -33,7 +33,7 @@ static struct intel_mid_ssp_spi_chip chip = {
 
 static void tng_ssp_spi_cs_control(u32 command)
 {
-	gpio_set_value(tng_ssp_spi2_FS_gpio, (command == CS_ASSERT) ? 0 : 1);
+	gpio_set_value(tng_ssp_spi2_FS_gpio, (command != 0) ? 1 : 0);
 }
 
 static void tng_ssp_spi_platform_pinmux(void)

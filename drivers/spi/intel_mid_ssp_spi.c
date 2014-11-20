@@ -728,7 +728,7 @@ static void int_transfer_complete(struct ssp_drv_context *sspc)
 #endif
 
 	if (sspc->cs_control)
-		sspc->cs_control(CS_DEASSERT);
+		sspc->cs_control(!sspc->cs_assert);
 
 	dev_dbg(dev, "End of transfer. SSSR:%08X\n", read_SSSR(reg));
 	msg = sspc->cur_msg;
@@ -1153,7 +1153,7 @@ static int handle_message(struct ssp_drv_context *sspc)
 		}
 
 		if (sspc->cs_control)
-			sspc->cs_control(CS_ASSERT);
+			sspc->cs_control(sspc->cs_assert);
 
 		if (likely(dma_enabled)) {
 			if (unlikely(sspc->quirks & QUIRKS_USE_PM_QOS))
@@ -1168,7 +1168,7 @@ static int handle_message(struct ssp_drv_context *sspc)
 		if (list_is_last(&transfer->transfer_list, &msg->transfers)
 				|| sspc->cs_change) {
 			if (sspc->cs_control)
-				sspc->cs_control(CS_DEASSERT);
+				sspc->cs_control(!sspc->cs_assert);
 		}
 
 	} /* end of list_for_each_entry */
@@ -1259,6 +1259,26 @@ static int setup(struct spi_device *spi)
 	/* chip_info isn't always needed */
 	chip->cr1 = 0;
 	if (chip_info) {
+		/* If user requested CS Active High need to verify that there
+		 * is no transfer pending. If this is the case, kindly fail.  */
+		if ((spi->mode & SPI_CS_HIGH) != sspc->cs_assert) {
+			if (sspc->cur_msg) {
+				dev_err(&spi->dev, "message pending... Failing\n");
+				/* A message is currently in transfer. Do not toggle CS */
+				spin_unlock_irqrestore(&sspc->lock, flags);
+				return -EAGAIN;
+			}
+			if (!chip_info->cs_control) {
+				/* unable to control cs by hand */
+				dev_err(&spi->dev,
+						"This CS does not support SPI_CS_HIGH flag\n");
+				spin_unlock_irqrestore(&sspc->lock, flags);
+				return -EINVAL;
+			}
+			sspc->cs_assert = spi->mode & SPI_CS_HIGH;
+			chip_info->cs_control(!sspc->cs_assert);
+		}
+
 		burst_size = chip_info->burst_size;
 		if (burst_size > IMSS_FIFO_BURST_8)
 			burst_size = DFLT_FIFO_BURST_SIZE;
@@ -1458,7 +1478,7 @@ static int intel_mid_ssp_spi_probe(struct pci_dev *pdev,
 	if (ssp_cfg_is_spi_slave(ssp_cfg))
 		sspc->quirks |= QUIRKS_SPI_SLAVE_CLOCK_MODE;
 
-	master->mode_bits = SPI_CPOL | SPI_CPHA;
+	master->mode_bits = SPI_CS_HIGH | SPI_CPOL | SPI_CPHA;
 	master->bus_num = ssp_cfg_get_spi_bus_nb(ssp_cfg);
 	master->num_chipselect = 4;
 	master->cleanup = cleanup;
