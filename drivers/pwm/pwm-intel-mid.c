@@ -161,6 +161,11 @@ intel_mid_pwm_base_unit(void __iomem *reg, union pwmctrl_reg *pwmctrl,
 			fraction -= numerator;
 		}
 	}
+	/* If both the values are 0, the output will be somehow not correct.
+	 * So if it happens, change the fraction to 1.
+	 */
+	if ((0 == base_unit_fraction) && (0 == base_unit_integer))
+		base_unit_fraction = 1UL;
 
 	pwmctrl->full = readl(reg);
 	pwmctrl->part.base_unit_int = (u32)base_unit_integer;
