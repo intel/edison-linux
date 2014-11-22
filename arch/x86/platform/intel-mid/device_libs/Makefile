@@ -1,4 +1,5 @@
 # IPC Devices
+obj-y += platform_sst_audio.o
 obj-y += platform_mrfl_regulator.o
 obj-y += platform_soc_thermal.o
 obj-$(subst m,y,$(CONFIG_SND_BYT_MACHINE)) += platform_byt_audio.o
@@ -36,6 +37,7 @@ obj-$(subst m,y,$(CONFIG_SENSORS_MPU3050)) += platform_mpu3050.o
 obj-$(subst m,y,$(CONFIG_GPIO_PCA953X)) += platform_tca6416.o
 obj-$(subst m,y,$(CONFIG_BQ24261_CHARGER)) += platform_bq24261.o
 obj-$(subst m,y,$(CONFIG_GPIO_PCA953X)) += platform_pcal9555a.o
+obj-$(subst m,y,$(CONFIG_SND_SOC_WM8994)) += platform_wm8994.o
 # SPI Devices
 obj-$(subst m,y,$(CONFIG_SERIAL_MRST_MAX3110)) += platform_max3111.o
 obj-$(subst m,y,$(CONFIG_SPI_SPIDEV)) += platform_spidev.o
