@@ -906,9 +906,9 @@ static void start_bitbanging(struct ssp_drv_context *sspc)
 
 static unsigned int ssp_get_clk_div(struct ssp_drv_context *sspc, int speed)
 {
-	/* The clock divider shall stay between 3 and 4095 as specified in TRM. */
 	if (sspc->quirks & QUIRKS_PLATFORM_MRFL)
-		return clamp(25000000 / speed - 1, 3, 4095);
+		/* The clock divider shall stay between 0 and 4095. */
+		return clamp(25000000 / speed - 1, 0, 4095);
 	else
 		return clamp(100000000 / speed - 1, 3, 4095);
 }
@@ -951,7 +951,7 @@ static int handle_message(struct ssp_drv_context *sspc)
 	u32 cr0, saved_cr0, cr1, saved_cr1;
 	struct device *dev = &sspc->pdev->dev;
 	struct spi_message *msg = sspc->cur_msg;
-	u32 clk_div, saved_speed_hz;
+	u32 clk_div, saved_speed_hz, speed_hz;
 	u8 dma_enabled;
 	u32 timeout;
 	u8 chip_select;
@@ -1123,9 +1123,11 @@ static int handle_message(struct ssp_drv_context *sspc)
 
 		/* recalculate the frequency for each transfer */
 		if (transfer->speed_hz)
-			clk_div = ssp_get_clk_div(sspc, transfer->speed_hz);
+			speed_hz = transfer->speed_hz;
 		else
-			clk_div = ssp_get_clk_div(sspc, saved_speed_hz);
+			speed_hz = saved_speed_hz;
+
+		clk_div = ssp_get_clk_div(sspc, speed_hz);
 
 		cr0 &= ~SSCR0_SCR;
 		cr0 |= (clk_div & 0xFFF) << 8;
@@ -1136,6 +1138,13 @@ static int handle_message(struct ssp_drv_context *sspc)
 					(sspc->quirks & QUIRKS_BIT_BANGING))) {
 			start_bitbanging(sspc);
 		} else {
+
+			/* if speed is higher than 6.25Mhz, enable clock delay */
+			if (speed_hz > 6250000)
+				write_SSCR2((read_SSCR2(reg) | SSCR2_CLK_DEL_EN), reg);
+			else
+				write_SSCR2((read_SSCR2(reg) & ~SSCR2_CLK_DEL_EN), reg);
+
 			/* (re)start the SSP */
 			if (ssp_timing_wr) {
 				dev_dbg(dev, "original cr0 before reset:%x",

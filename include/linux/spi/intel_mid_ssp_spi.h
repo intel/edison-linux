@@ -109,6 +109,7 @@ DEFINE_SSP_REG(SSITR, 0x0c)
 DEFINE_SSP_REG(SSDR, 0x10)
 DEFINE_SSP_REG(SSTO, 0x28)
 DEFINE_SSP_REG(SSPSP, 0x2c)
+DEFINE_SSP_REG(SSCR2, 0x40)
 DEFINE_SSP_REG(SSFS, 0x44)
 DEFINE_SSP_REG(SFIFOL, 0x68)
 
@@ -207,6 +208,8 @@ DEFINE_SSP_REG(GAFR1_U, 0x44);
 #define SSPSP_ETDS       (1 << 3)    /* End of Transfer data State */
 #define SSPSP_SFRMP      (1 << 2)    /* Serial Frame Polarity */
 #define SSPSP_SCMODE(x)  ((x) << 0)  /* Serial Bit Rate Clock Mode */
+
+#define SSCR2_CLK_DEL_EN (1 << 3)	/* Delay logic for capturing input data */
 
 /*
  * For testing SSCR1 changes that require SSP restart, basically
