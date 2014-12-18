@@ -1786,8 +1786,6 @@ int sst_dsp_init_v2_dpcm(struct snd_soc_platform *platform)
 			ARRAY_SIZE(sst_slot_controls));
 	snd_soc_add_platform_controls(platform, sst_mux_controls,
 			ARRAY_SIZE(sst_mux_controls));
-	snd_soc_add_platform_controls(platform, sst_debug_controls,
-			ARRAY_SIZE(sst_debug_controls));
 
 	/* initialize the names of the probe points */
 	for (i = 0; i < SST_NUM_PROBE_CONNECTION_PTS; i++)
