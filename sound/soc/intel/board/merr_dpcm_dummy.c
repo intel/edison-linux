@@ -29,10 +29,6 @@
 #include <sound/soc.h>
 #include <sound/pcm_params.h>
 
-static bool wm_hardware_avail = true;
-module_param(wm_hardware_avail, bool, S_IRUSR);
-MODULE_PARM_DESC(wm_hardware_avail, "1 in cmdline to use dummy version");
-
 #ifdef CONFIG_PM_SLEEP
 static int snd_merr_dpcm_prepare(struct device *dev)
 {
@@ -196,35 +192,7 @@ static struct platform_driver snd_merr_dpcm_drv = {
 	.remove = snd_merr_dpcm_remove,
 };
 
-static int __init snd_merr_dpcm_dummy_init(void)
-{
-	int err;
-	struct platform_device *device;
-
-	/* Check from cmdline if hardware is plugged to the board */
-	if (wm_hardware_avail) {
-		pr_info("dpcm dummy is not supported according to cmdline");
-		return -EINVAL;
-	}
-
-	err = platform_driver_register(&snd_merr_dpcm_drv);
-	if (err < 0)
-		return err;
-
-	device = platform_device_register_simple("merr_dpcm_dummy",
-			0, NULL, 0);
-	if (IS_ERR(device))
-		return -ENODEV;
-
-	return 0;
-}
-late_initcall(snd_merr_dpcm_dummy_init);
-
-static void __exit snd_merr_dpcm_dummy_exit(void)
-{
-	return platform_driver_unregister(&snd_merr_dpcm_drv);
-}
-module_exit(snd_merr_dpcm_dummy_exit);
+module_platform_driver(snd_merr_dpcm_drv);
 
 MODULE_DESCRIPTION("ASoC Intel(R) Edison dummy MID Machine driver");
 MODULE_AUTHOR("Michael Soares <michaelx.soares@intel.com>");

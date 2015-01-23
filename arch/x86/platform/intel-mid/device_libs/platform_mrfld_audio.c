@@ -12,6 +12,8 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/interrupt.h>
 #include <linux/scatterlist.h>
 #include <linux/init.h>
@@ -22,6 +24,10 @@
 #include <asm/platform_sst_audio.h>
 #include <asm/platform_mrfld_audio.h>
 #include "platform_msic.h"
+
+static char* audio_codec = "dummy";
+module_param(audio_codec, charp, S_IRUSR);
+MODULE_PARM_DESC(audio_codec, "Hardware codec's name in use");
 
 static struct mrfld_audio_platform_data mrfld_audio_pdata;
 
@@ -80,7 +86,7 @@ void *merfld_audio_platform_data(void *info)
 	return NULL;
 }
 
-void *merfld_wm8958_audio_platform_data(void *info)
+void *mrfld_sst_audio_platform_data(void *info)
 {
 	struct platform_device *pdev;
 	int ret;
@@ -91,40 +97,51 @@ void *merfld_wm8958_audio_platform_data(void *info)
 		return NULL;
 	}
 
-	pdev = platform_device_alloc("hdmi-audio", -1);
-	if (!pdev) {
-		pr_err("failed to allocate hdmi-audio platform device\n");
-		return NULL;
-	}
+	if(!audio_codec || !strcmp(audio_codec, "dummy")) {
+		pdev = platform_device_register_simple("merr_dpcm_dummy",
+					0, NULL, 0);
+		if (!pdev) {
+			pr_err("failed to register merr_dpcm_dummy platform device\n");
+			return NULL;
+		}
+	} else if (!strcmp(audio_codec, "wm8958")) {
+		pdev = platform_device_alloc("mrfld_wm8958", -1);
+		if (!pdev) {
+			pr_err("failed to allocate mrfld_wm8958 platform device\n");
+			return NULL;
+		}
 
-	ret = platform_device_add(pdev);
-	if (ret) {
-		pr_err("failed to add hdmi-audio platform device\n");
-		platform_device_put(pdev);
-		return NULL;
-	}
+		ret = platform_device_add(pdev);
+		if (ret) {
+			pr_err("failed to add mrfld_wm8958 platform device\n");
+			platform_device_put(pdev);
+			return NULL;
+		}
+		if (platform_device_add_data(pdev, &mrfld_audio_pdata,
+						 sizeof(mrfld_audio_pdata))) {
+			pr_err("failed to add mrfld_wm8958 platform data\n");
+			platform_device_put(pdev);
+			return NULL;
+		}
 
-	pdev = platform_device_alloc("mrfld_wm8958", -1);
-	if (!pdev) {
-		pr_err("failed to allocate mrfld_wm8958 platform device\n");
-		return NULL;
+		register_rpmsg_service("rpmsg_mrfld_wm8958_audio", RPROC_SCU,
+					RP_MSIC_MRFLD_AUDIO);
 	}
+	/*
+	 * To add a new codec, add a "else if" statement with
+	 * its name and its specific implementation.
+	 */
+	else {
+		pr_info("Codec %s is not implemented."
+				"Dummy codec selected...\n", audio_codec);
 
-	ret = platform_device_add(pdev);
-	if (ret) {
-		pr_err("failed to add mrfld_wm8958 platform device\n");
-		platform_device_put(pdev);
-		return NULL;
+		pdev = platform_device_register_simple("merr_dpcm_dummy",
+							0, NULL, 0);
+		if (!pdev) {
+			pr_err("failed to register merr_dpcm_dummy platform device\n");
+			return NULL;
+		}
 	}
-	if (platform_device_add_data(pdev, &mrfld_audio_pdata,
-				     sizeof(mrfld_audio_pdata))) {
-		pr_err("failed to add mrfld_wm8958 platform data\n");
-		platform_device_put(pdev);
-		return NULL;
-	}
-
-	register_rpmsg_service("rpmsg_mrfld_wm8958_audio", RPROC_SCU,
-				RP_MSIC_MRFLD_AUDIO);
 
 	return NULL;
 }
