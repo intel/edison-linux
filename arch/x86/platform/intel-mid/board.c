@@ -161,6 +161,5 @@ struct devs_id __initconst device_ids[] = {
 						&ipc_device_handler},
 	{"soc_thrm", SFI_DEV_TYPE_IPC, 1, &no_platform_data,
 						&soc_thrm_device_handler},
-	{"mrfld_codec", SFI_DEV_TYPE_I2C, 0, &wm8994_platform_data, NULL},
 	{},
 };
