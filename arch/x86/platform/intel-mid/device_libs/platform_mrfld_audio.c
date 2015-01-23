@@ -24,6 +24,7 @@
 #include <asm/platform_sst_audio.h>
 #include <asm/platform_mrfld_audio.h>
 #include "platform_msic.h"
+#include "platform_wm8994.h"
 
 static char* audio_codec = "dummy";
 module_param(audio_codec, charp, S_IRUSR);
@@ -105,6 +106,9 @@ void *mrfld_sst_audio_platform_data(void *info)
 			return NULL;
 		}
 	} else if (!strcmp(audio_codec, "wm8958")) {
+		/* Register i2c audio codec wm8958 */
+		wm8958_platform_data(NULL);
+
 		pdev = platform_device_alloc("mrfld_wm8958", -1);
 		if (!pdev) {
 			pr_err("failed to allocate mrfld_wm8958 platform device\n");

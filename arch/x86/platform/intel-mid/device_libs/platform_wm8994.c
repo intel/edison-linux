@@ -219,3 +219,25 @@ void __init *wm8994_platform_data(void *info)
 
 	return &wm8994_pdata;
 }
+
+static struct i2c_board_info wm8958_info = {
+	I2C_BOARD_INFO("wm8958", 0x1a),
+};
+
+void __init *wm8958_platform_data(void *info)
+{
+	int irq = 0, bus_num = 1;
+
+	platform_add_devices(wm8958_reg_devices,
+			ARRAY_SIZE(wm8958_reg_devices));
+
+	irq = wm8994_get_irq_data(&wm8994_pdata, &wm8958_info,
+					"audiocodec_int");
+
+	if (irq)
+		wm8958_info.platform_data = &wm8994_pdata;
+
+	i2c_register_board_info(bus_num, &wm8958_info, 1);
+
+	return;
+}
