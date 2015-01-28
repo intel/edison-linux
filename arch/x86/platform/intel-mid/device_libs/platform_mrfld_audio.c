@@ -22,7 +22,7 @@
 #include <asm/intel-mid.h>
 #include <linux/platform_data/intel_mid_remoteproc.h>
 #include <asm/platform_sst_audio.h>
-#include <asm/platform_mrfld_audio.h>
+#include "platform_mrfld_audio.h"
 #include "platform_msic.h"
 #include "platform_wm8994.h"
 
