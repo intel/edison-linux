@@ -32,7 +32,6 @@
 #include <linux/gpio.h>
 #include <asm/intel_scu_pmic.h>
 #include <asm/intel_mid_rpmsg.h>
-#include <asm/platform_mrfld_audio.h>
 #include <asm/intel_sst_mrfld.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>

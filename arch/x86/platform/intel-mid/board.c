@@ -60,7 +60,7 @@
 #include "device_libs/platform_soc_thermal.h"
 #include "device_libs/platform_msic_adc.h"
 #include "device_libs/platform_bcove_adc.h"
-#include <asm/platform_mrfld_audio.h>
+#include "device_libs/platform_mrfld_audio.h"
 #include "device_libs/platform_mrfl_thermal.h"
 
 /*
