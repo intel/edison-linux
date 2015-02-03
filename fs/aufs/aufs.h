@@ -55,5 +55,7 @@
 #include "whout.h"
 #include "wkq.h"
 
+#define f_dentry       f_path.dentry
+
 #endif /* __KERNEL__ */
 #endif /* __AUFS_H__ */
