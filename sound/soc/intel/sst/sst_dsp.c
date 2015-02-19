@@ -50,13 +50,10 @@
 #define MEMCPY_TOIO memcpy32_toio
 #endif
 
-static struct sst_module_info sst_modules_mrfld[] = {
-	{"mp3_dec", SST_CODEC_TYPE_MP3, 0, SST_LIB_NOT_FOUND},
-	{"aac_dec", SST_CODEC_TYPE_AAC, 0, SST_LIB_NOT_FOUND},
-	{"audclass_lib", SST_ALGO_AUDCLASSIFIER, 0, SST_LIB_NOT_FOUND},
-	{"vtsv_lib", SST_ALGO_VTSV, 0, SST_LIB_NOT_FOUND},
-	{"geq_lib", SST_ALGO_GEQ, 0, SST_LIB_NOT_FOUND},
-};
+/**
+ * Add here all the static librairies to be downloaded at bootup
+ */
+static struct sst_module_info sst_modules_mrfld[] = {};
 
 static struct sst_module_info sst_modules_byt[] = {
 	{"mp3_dec", SST_CODEC_TYPE_MP3, 0, SST_LIB_NOT_FOUND},
