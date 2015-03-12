@@ -317,6 +317,9 @@ static void xhci_cleanup_msix(struct xhci_hcd *xhci)
 
 	xhci_free_irq(xhci);
 
+	if (xhci->quirks & XHCI_PLAT)
+		return;
+
 	if (xhci->msix_entries) {
 		pci_disable_msix(pdev);
 		kfree(xhci->msix_entries);
