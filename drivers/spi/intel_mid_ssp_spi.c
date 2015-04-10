@@ -793,38 +793,22 @@ static irqreturn_t ssp_int(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static void poll_writer(struct work_struct *work)
+{
+	struct ssp_drv_context *sspc =
+		container_of(work, struct ssp_drv_context, poll_write);
+
+	while (sspc->tx < sspc->tx_end)
+		sspc->write(sspc);
+
+}
+
 /*
  * Perform a single transfer.
  */
 static void poll_transfer(unsigned long data)
 {
 	struct ssp_drv_context *sspc = (void *)data;
-
-	bool delay = false;
-
-	if ((intel_mid_identify_sim() == INTEL_MID_CPU_SIMULATION_VP) ||
-	     intel_mid_identify_sim() == INTEL_MID_CPU_SIMULATION_HVP) {
-		delay = true;
-	}
-
-	while (sspc->tx < sspc->tx_end) {
-		/* [REVERT ME] Tangier simulator requires a delay */
-		if (delay)
-			udelay(10);
-		if (ssp_timing_wr) {
-			int timeout = 100;
-			/* It is used as debug UART on Tangier. Since
-			   baud rate = 115200, it needs at least 312us
-			   for one word transferring. Becuase of silicon
-			   issue, it MUST check SFIFOL here instead of
-			   TNF. It is the workaround for A0 stepping*/
-			while (--timeout &&
-					((read_SFIFOL(sspc->ioaddr)) & 0xFFFF))
-				udelay(10);
-		}
-		sspc->write(sspc);
-		sspc->read(sspc);
-	}
 
 	while (!sspc->read(sspc))
 		cpu_relax();
@@ -1171,6 +1155,7 @@ static int handle_message(struct ssp_drv_context *sspc)
 			dma_transfer(sspc);
 		} else {
 			/* Do the transfer syncronously */
+			queue_work(sspc->wq_poll_write, &sspc->poll_write);
 			poll_transfer((unsigned long)sspc);
 		}
 
@@ -1570,6 +1555,9 @@ static int intel_mid_ssp_spi_probe(struct pci_dev *pdev,
 	spin_lock_init(&sspc->lock);
 	INIT_WORK(&sspc->pump_messages, pump_messages);
 	sspc->workqueue = create_singlethread_workqueue(dev_name(&pdev->dev));
+
+	INIT_WORK(&sspc->poll_write, poll_writer);
+	sspc->wq_poll_write = create_singlethread_workqueue("spi_poll_wr");
 
 	/* Register with the SPI framework */
 	dev_info(dev, "register with SPI framework (bus spi%d)\n",
