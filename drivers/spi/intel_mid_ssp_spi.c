@@ -169,18 +169,20 @@ static int null_writer(struct ssp_drv_context *sspc)
 	write_SSDR(0, reg);
 	sspc->tx += n_bytes;
 
-	return 1;
+	return n_bytes;
 }
 
 static int null_reader(struct ssp_drv_context *sspc)
 {
 	void *reg = sspc->ioaddr;
 	u8 n_bytes = sspc->n_bytes;
+	size_t pkg_len = sspc->len;
 
 	while ((read_SSSR(reg) & SSSR_RNE)
-		&& (sspc->rx < sspc->rx_end)) {
+		&& (pkg_len > 0)) {
 		read_SSDR(reg);
 		sspc->rx += n_bytes;
+		pkg_len -= n_bytes;
 	}
 
 	return sspc->rx == sspc->rx_end;
@@ -202,10 +204,13 @@ static int u8_writer(struct ssp_drv_context *sspc)
 static int u8_reader(struct ssp_drv_context *sspc)
 {
 	void *reg = sspc->ioaddr;
+	size_t pkg_len = sspc->len;
+
 	while ((read_SSSR(reg) & SSSR_RNE)
-		&& (sspc->rx < sspc->rx_end)) {
+		&& (pkg_len > 0)) {
 		*(u8 *)(sspc->rx) = read_SSDR(reg);
 		++sspc->rx;
+		--pkg_len;
 	}
 
 	return sspc->rx == sspc->rx_end;
@@ -221,15 +226,19 @@ static int u16_writer(struct ssp_drv_context *sspc)
 	write_SSDR(*(u16 *)(sspc->tx), reg);
 	sspc->tx += 2;
 
-	return 1;
+	return 2;
 }
 
 static int u16_reader(struct ssp_drv_context *sspc)
 {
 	void *reg = sspc->ioaddr;
-	while ((read_SSSR(reg) & SSSR_RNE) && (sspc->rx < sspc->rx_end)) {
+	size_t pkg_len = sspc->len;
+
+	while ((read_SSSR(reg) & SSSR_RNE)
+		&& (pkg_len > 0)) {
 		*(u16 *)(sspc->rx) = read_SSDR(reg);
 		sspc->rx += 2;
+		pkg_len -= 2;
 	}
 
 	return sspc->rx == sspc->rx_end;
@@ -245,15 +254,19 @@ static int u32_writer(struct ssp_drv_context *sspc)
 	write_SSDR(*(u32 *)(sspc->tx), reg);
 	sspc->tx += 4;
 
-	return 1;
+	return 4;
 }
 
 static int u32_reader(struct ssp_drv_context *sspc)
 {
 	void *reg = sspc->ioaddr;
-	while ((read_SSSR(reg) & SSSR_RNE) && (sspc->rx < sspc->rx_end)) {
+	size_t pkg_len = sspc->len;
+
+	while ((read_SSSR(reg) & SSSR_RNE)
+		&& (pkg_len > 0)) {
 		*(u32 *)(sspc->rx) = read_SSDR(reg);
 		sspc->rx += 4;
+		pkg_len -= 4;
 	}
 
 	return sspc->rx == sspc->rx_end;
@@ -797,10 +810,14 @@ static void poll_writer(struct work_struct *work)
 {
 	struct ssp_drv_context *sspc =
 		container_of(work, struct ssp_drv_context, poll_write);
+	struct device *dev = &sspc->pdev->dev;
+	size_t pkg_len = sspc->len;
+	int ret;
 
-	while (sspc->tx < sspc->tx_end)
-		sspc->write(sspc);
-
+	while ((pkg_len > 0)) {
+		ret = sspc->write(sspc);
+		pkg_len -= ret;
+	}
 }
 
 /*
