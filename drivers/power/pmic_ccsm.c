@@ -237,6 +237,19 @@ static int adc_temp_conv(int in_val, int *out_val, int conv)
 	return 0;
 }
 
+static int pmic_write_reg(u16 addr, u8 *val)
+{
+	int ret;
+
+	ret = intel_scu_ipc_iowrite8(addr, val);
+	if (ret) {
+		dev_err(chc.dev,
+			"Error in intel_scu_ipc_ioread8 0x%.4x\n", addr);
+		return -EIO;
+	}
+	return 0;
+}
+
 static int pmic_read_reg(u16 addr, u8 *val)
 {
 	int ret;
@@ -414,6 +427,8 @@ static struct pmic_regs_def pmic_regs_bc[] = {
 	PMIC_REG_DEF(THRMZN3H_ADDR_BC),
 	PMIC_REG_DEF(THRMZN4L_ADDR_BC),
 	PMIC_REG_DEF(THRMZN4H_ADDR_BC),
+	PMIC_REG_DEF(VBATRSLTH_ADDR_BC),
+	PMIC_REG_DEF(VBATRSLTL_ADDR_BC),
 };
 
 static struct pmic_regs_def pmic_regs_sc[] = {
@@ -984,6 +999,43 @@ int pmic_get_battery_pack_temp(int *temp)
 	if (chc.invalid_batt)
 		return -ENODEV;
 	return pmic_read_adc_val(GPADC_BATTEMP0, temp, &chc);
+}
+
+int pmic_get_battery_voltage(int *vol)
+{
+	long tmp;
+	int ret;
+	u8 val;
+
+	ret = pmic_write_reg(GPADCREQ_ADDR_BC, GPADCREG_VIBATT_REQ);
+	if (ret != 0) {
+		dev_err(chc.dev,
+			"Error writing GPADCREQ_ADDR_BC-register\n");
+		return -EINVAL;
+	}
+	msleep(200);
+
+	ret = pmic_read_reg(VBATRSLTH_ADDR_BC, &val);
+	if (ret != 0) {
+		dev_err(chc.dev,
+			"Error reading VBATRSLTH_ADDR_BC-register\n");
+		return -EINVAL;
+	}
+	tmp = val * 0x100;
+
+	ret = pmic_read_reg(VBATRSLTL_ADDR_BC, &val);
+	if (ret != 0) {
+		dev_err(chc.dev,
+			"Error reading VBATRSLTL_ADDR_BC-register\n");
+		return -EINVAL;
+	}
+
+	tmp += val;
+	tmp *= GPADC_MAX_VOLTAGE;
+	tmp /= GPADC_MAX_RANGE;
+	*vol = tmp;
+
+	return 0;
 }
 
 static int get_charger_type()
@@ -1561,6 +1613,34 @@ static int pmic_check_initial_events(void)
 	return ret;
 }
 
+static ssize_t
+pmic_show_battery_level(struct device *d, struct device_attribute *attr,
+			char *buf)
+{
+	int ret = 0;
+
+	ret = pmic_get_battery_voltage(&chc.battry_voltage);
+	if (ret != 0) {
+		dev_info(chc.dev, "read error!\n");
+		return -1;
+	}
+
+	return sprintf(buf, "0x%x\n", chc.battry_voltage);
+}
+
+static DEVICE_ATTR(battery_level, S_IWUSR | S_IRUGO, pmic_show_battery_level,
+		   NULL);
+
+static struct attribute *pmic_sysfs_entries[] = {
+	&dev_attr_battery_level.attr,
+	NULL
+};
+
+static struct attribute_group pmic_attribute_group = {
+	.name  = NULL,		/* put in device directory */
+	.attrs = pmic_sysfs_entries,
+};
+
 /**
  * pmic_charger_probe - PMIC charger probe function
  * @pdev: pmic platform device structure
@@ -1728,6 +1808,12 @@ static int pmic_chrgr_probe(struct platform_device *pdev)
 	if (unlikely(retval))
 		goto unmask_irq_failed;
 
+	retval = sysfs_create_group(&pdev->dev.kobj, &pmic_attribute_group);
+	if (retval) {
+		dev_err(&pdev->dev, "failed to create sysfs device attributes\n");
+		goto unmask_irq_failed;
+	}
+
 	chc.health = POWER_SUPPLY_HEALTH_GOOD;
 #ifdef CONFIG_DEBUG_FS
 	pmic_debugfs_init();
@@ -1776,6 +1862,7 @@ static int pmic_chrgr_remove(struct platform_device *pdev)
 		kfree(chc->sfi_bcprof);
 		kfree(chc->actual_bcprof);
 		kfree(chc->runtime_bcprof);
+		sysfs_remove_group(&pdev->dev.kobj, &pmic_attribute_group);
 	}
 
 	return 0;

@@ -69,6 +69,12 @@
 #define THRMZN4H_ADDR_BC		0xD6
 #define THRMZN4L_ADDR_BC		0xD7
 
+#define GPADCREQ_ADDR_BC		0xDC
+#define GPADCREG_VIBATT_REQ		(0x01 << 5)
+
+#define VBATRSLTH_ADDR_BC		0xE9
+#define VBATRSLTL_ADDR_BC		0xEA
+
 #define THRMZN0H_ADDR_SC		0xD7
 #define THRMZN0L_ADDR_SC		0xD8
 #define THRMZN1H_ADDR_SC		0xD9
@@ -288,6 +294,9 @@
 #define PMIC_REG_NAME_LEN		28
 #define PMIC_REG_DEF(x) { .reg_name = #x, .addr = x }
 
+#define GPADC_MAX_VOLTAGE		450
+#define GPADC_MAX_RANGE 		1024
+
 struct interrupt_info {
 	/* Interrupt register mask*/
 	u8 int_reg_mask;
@@ -325,6 +334,7 @@ struct pmic_chrgr_drv_context {
 	void __iomem *pmic_intr_iomap;
 	struct device *dev;
 	int health;
+	int battry_voltage;
 	u8 pmic_id;
 	bool is_internal_usb_phy;
 	enum pmic_charger_cable_type charger_type;
