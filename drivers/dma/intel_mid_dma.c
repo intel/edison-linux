@@ -48,6 +48,12 @@
 #define INTEL_BYT_LPIO2_DMAC_ID		0x0F40
 #define INTEL_BYT_DMAC0_ID		0x0F28
 
+#define PCI_DEVICE_ID_INTEL_GP_DMAC2_MOOR      0x1497
+
+#define MRFL_INSTANCE_SPI3     3
+#define MRFL_INSTANCE_SPI5     5
+#define MRFL_INSTANCE_SPI6     6
+
 #define LNW_PERIPHRAL_MASK_SIZE		0x20
 
 #define INFO(_max_chan, _ch_base, _block_size, _pimr_mask,	\
@@ -1023,29 +1029,68 @@ static struct dma_async_tx_descriptor *intel_mid_dma_prep_memcpy_v2(
 	cfg_lo.cfgx_v2.dst_burst_align = 1;
 	cfg_lo.cfgx_v2.src_burst_align = 1;
 
-	/*calculate CFG_HI*/
-	if (mids->cfg_mode == LNW_DMA_MEM_TO_MEM) {
-		/*SW HS only*/
-		cfg_hi.cfg_hi = 0;
-	} else {
-		cfg_hi.cfg_hi = 0;
+	/* For  mem to mem transfer, it's SW HS only*/
+	cfg_hi.cfg_hi = 0;
+	/*calculate CFG_HI for mem to/from dev scenario */
+	if (mids->cfg_mode != LNW_DMA_MEM_TO_MEM) {
 		if (midc->dma->pimr_mask) {
+			/* device_instace => SSP0 = 0, SSP1 = 1, SSP2 = 2*/
+			if (mids->device_instance > 2) {
+				pr_err("Invalid SSP identifier\n");
+				return NULL;
+			}
+			cfg_hi.cfgx_v2.src_per = 0;
+			cfg_hi.cfgx_v2.dst_per = 0;
+			if (mids->dma_slave.direction == DMA_MEM_TO_DEV)
+				/* SSP DMA in Tx direction */
+				cfg_hi.cfgx_v2.dst_per = (2 * mids->device_instance) + 1;
+			else if (mids->dma_slave.direction == DMA_DEV_TO_MEM)
+				/* SSP DMA in Rx direction */
+				cfg_hi.cfgx_v2.src_per = (2 * mids->device_instance);
+			else
+				return NULL;
+
+		} else if ((midc->dma->pci_id == INTEL_MRFLD_GP_DMAC2_ID) ||
+				(midc->dma->pci_id == PCI_DEVICE_ID_INTEL_GP_DMAC2_MOOR)) {
 			if (mids->dma_slave.direction == DMA_MEM_TO_DEV) {
 				cfg_hi.cfgx_v2.src_per = 0;
-				if (mids->device_instance == 0)
-					cfg_hi.cfgx_v2.dst_per = 1;
-				if (mids->device_instance == 1)
-					cfg_hi.cfgx_v2.dst_per = 3;
-			} else if (mids->dma_slave.direction == DMA_DEV_TO_MEM) {
-				if (mids->device_instance == 0)
-					cfg_hi.cfgx_v2.src_per = 0;
-				if (mids->device_instance == 1)
-					cfg_hi.cfgx_v2.src_per = 2;
+
+				if (mids->device_instance ==
+					MRFL_INSTANCE_SPI3)
+					cfg_hi.cfgx_v2.dst_per = 0xF;
+				else if (mids->device_instance ==
+					MRFL_INSTANCE_SPI5)
+					cfg_hi.cfgx_v2.dst_per = 0xD;
+				else if (mids->device_instance ==
+					MRFL_INSTANCE_SPI6)
+					cfg_hi.cfgx_v2.dst_per = 0xB;
+				else
+					cfg_hi.cfgx_v2.dst_per = midc->ch_id
+						- midc->dma->chan_base;
+			} else if (mids->dma_slave.direction
+				== DMA_DEV_TO_MEM) {
+				if (mids->device_instance ==
+					MRFL_INSTANCE_SPI3)
+					cfg_hi.cfgx_v2.src_per = 0xE;
+				else if (mids->device_instance ==
+					MRFL_INSTANCE_SPI5)
+					cfg_hi.cfgx_v2.src_per = 0xC;
+				else if (mids->device_instance ==
+					MRFL_INSTANCE_SPI6)
+					cfg_hi.cfgx_v2.src_per = 0xA;
+				else
+					cfg_hi.cfgx_v2.src_per = midc->ch_id
+						- midc->dma->chan_base;
+
 				cfg_hi.cfgx_v2.dst_per = 0;
+			} else {
+				cfg_hi.cfgx_v2.dst_per =
+					cfg_hi.cfgx_v2.src_per = 0;
 			}
 		} else {
-			cfg_hi.cfgx_v2.src_per = cfg_hi.cfgx_v2.dst_per =
-					midc->ch_id - midc->dma->chan_base;
+			cfg_hi.cfgx_v2.src_per =
+				cfg_hi.cfgx_v2.dst_per =
+				midc->ch_id - midc->dma->chan_base;
 		}
 	}
 	/*calculate CTL_HI*/
