@@ -1041,16 +1041,7 @@ static int handle_message(struct ssp_drv_context *sspc)
 			sspc->read = u32_reader;
 			sspc->write = u32_writer;
 		}
-		sspc->tx  = (void *)transfer->tx_buf;
-		sspc->rx  = (void *)transfer->rx_buf;
-		sspc->len = transfer->len;
-		sspc->cs_change = transfer->cs_change;
 
-		if (likely(dma_enabled)) {
-			sspc->dma_mapped = map_dma_buffers(sspc);
-			if (unlikely(!sspc->dma_mapped))
-				return 0;
-		}
 		sspc->tx  = (void *)transfer->tx_buf;
 		sspc->rx  = (void *)transfer->rx_buf;
 		sspc->len = transfer->len;
@@ -1061,10 +1052,11 @@ static int handle_message(struct ssp_drv_context *sspc)
 			sspc->dma_mapped = map_dma_buffers(sspc);
 			if (unlikely(!sspc->dma_mapped))
 				return 0;
-		} else {
-			sspc->write = sspc->tx ? sspc->write : null_writer;
-			sspc->read  = sspc->rx ? sspc->read : null_reader;
 		}
+
+		sspc->write = sspc->tx ? sspc->write : null_writer;
+		sspc->read  = sspc->rx ? sspc->read : null_reader;
+
 		sspc->tx_end = sspc->tx + transfer->len;
 		sspc->rx_end = sspc->rx + transfer->len;
 
@@ -1313,10 +1305,11 @@ static int setup(struct spi_device *spi)
 		sspc->rx_fifo_threshold = 4;
 	else
 		sspc->rx_fifo_threshold = 1;
-	/*FIXME:this is workaround.
-	On MRST, in DMA mode, it is very strang that RX fifo can't reach
-	burst size.*/
-	if (sspc->quirks & QUIRKS_PLATFORM_MRFL && chip->dma_enabled)
+	/* FIXME: This is a workaround. */
+	/* When speed is lower than 800KHz, the transfer data will be */
+	/* incorrect on MRFL by DMA method*/
+	if (sspc->quirks & QUIRKS_PLATFORM_MRFL && chip->dma_enabled
+			&& (spi->max_speed_hz < 800000))
 		sspc->rx_fifo_threshold = 1;
 	tx_fifo_threshold = SPI_FIFO_SIZE - sspc->rx_fifo_threshold;
 	chip->cr1 |= (SSCR1_RxTresh(sspc->rx_fifo_threshold) &
@@ -1364,7 +1357,9 @@ static int setup(struct spi_device *spi)
 
 	if (chip->dma_enabled) {
 		sspc->n_bytes = chip->n_bytes;
+		spin_unlock_irqrestore(&sspc->lock, flags);
 		intel_mid_ssp_spi_dma_init(sspc);
+		spin_lock_irqsave(&sspc->lock, flags);
 		sspc->cr1_sig = SSCR1_TSRE | SSCR1_RSRE;
 		sspc->mask_sr = SSSR_ROR | SSSR_TUR;
 		if (sspc->quirks & QUIRKS_DMA_USE_NO_TRAIL)
