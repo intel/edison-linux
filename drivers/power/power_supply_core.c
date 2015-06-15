@@ -629,12 +629,12 @@ void power_supply_unregister(struct power_supply *psy)
 {
 	cancel_work_sync(&psy->changed_work);
 	sysfs_remove_link(&psy->dev->kobj, "powers");
-	power_supply_remove_triggers(psy);
 	if (IS_CHARGER(psy))
 		power_supply_unregister_charger(psy);
 	power_supply_remove_triggers(psy);
 	psy_unregister_cooler(psy);
 	psy_unregister_thermal(psy);
+	device_init_wakeup(psy->dev, false);
 	device_unregister(psy->dev);
 }
 EXPORT_SYMBOL_GPL(power_supply_unregister);

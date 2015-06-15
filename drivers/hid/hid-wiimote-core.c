@@ -62,14 +62,14 @@ static ssize_t wiimote_hid_send(struct hid_device *hdev, __u8 *buffer,
 	__u8 *buf;
 	ssize_t ret;
 
-	if (!hdev->hid_output_raw_report)
+	if (!hdev->ll_driver->output_report)
 		return -ENODEV;
 
 	buf = kmemdup(buffer, count, GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
 
-	ret = hdev->hid_output_raw_report(hdev, buf, count, HID_OUTPUT_REPORT);
+	ret = hid_hw_output_report(hdev, buf, count);
 
 	kfree(buf);
 	return ret;

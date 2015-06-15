@@ -672,38 +672,6 @@ static void hid_led(struct work_struct *work)
 	spin_unlock_irqrestore(&usbhid->lock, flags);
 }
 
-static int usb_hidinput_input_event(struct input_dev *dev, unsigned int type, unsigned int code, int value)
-{
-	struct hid_device *hid = input_get_drvdata(dev);
-	struct usbhid_device *usbhid = hid->driver_data;
-	struct hid_field *field;
-	unsigned long flags;
-	int offset;
-
-	if (type == EV_FF)
-		return input_ff_event(dev, type, code, value);
-
-	if (type != EV_LED)
-		return -1;
-
-	if ((offset = hidinput_find_field(hid, type, code, &field)) == -1) {
-		hid_warn(dev, "event field not found\n");
-		return -1;
-	}
-
-	spin_lock_irqsave(&usbhid->lock, flags);
-	hid_set_field(field, offset, value);
-	spin_unlock_irqrestore(&usbhid->lock, flags);
-
-	/*
-	 * Defer performing requested LED action.
-	 * This is more likely gather all LED changes into a single URB.
-	 */
-	schedule_work(&usbhid->led_work);
-
-	return 0;
-}
-
 static int usbhid_wait_io(struct hid_device *hid)
 {
 	struct usbhid_device *usbhid = hid->driver_data;
@@ -936,52 +904,66 @@ static int usbhid_get_raw_report(struct hid_device *hid,
 	return ret;
 }
 
-static int usbhid_output_raw_report(struct hid_device *hid, __u8 *buf, size_t count,
-		unsigned char report_type)
+static int usbhid_set_raw_report(struct hid_device *hid, unsigned int reportnum,
+				 __u8 *buf, size_t count, unsigned char rtype)
 {
 	struct usbhid_device *usbhid = hid->driver_data;
 	struct usb_device *dev = hid_to_usb_dev(hid);
 	struct usb_interface *intf = usbhid->intf;
 	struct usb_host_interface *interface = intf->cur_altsetting;
-	int ret;
+	int ret, skipped_report_id = 0;
 
-	if (usbhid->urbout && report_type != HID_FEATURE_REPORT) {
-		int actual_length;
-		int skipped_report_id = 0;
+	/* Byte 0 is the report number. Report data starts at byte 1.*/
+	if ((rtype == HID_OUTPUT_REPORT) &&
+	    (hid->quirks & HID_QUIRK_SKIP_OUTPUT_REPORT_ID))
+		buf[0] = 0;
+	else
+		buf[0] = reportnum;
 
-		if (buf[0] == 0x0) {
-			/* Don't send the Report ID */
-			buf++;
-			count--;
-			skipped_report_id = 1;
-		}
-		ret = usb_interrupt_msg(dev, usbhid->urbout->pipe,
-			buf, count, &actual_length,
-			USB_CTRL_SET_TIMEOUT);
-		/* return the number of bytes transferred */
-		if (ret == 0) {
-			ret = actual_length;
-			/* count also the report id */
-			if (skipped_report_id)
-				ret++;
-		}
-	} else {
-		int skipped_report_id = 0;
-		int report_id = buf[0];
-		if (buf[0] == 0x0) {
-			/* Don't send the Report ID */
-			buf++;
-			count--;
-			skipped_report_id = 1;
-		}
-		ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
+	if (buf[0] == 0x0) {
+		/* Don't send the Report ID */
+		buf++;
+		count--;
+		skipped_report_id = 1;
+	}
+
+	ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 			HID_REQ_SET_REPORT,
 			USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-			((report_type + 1) << 8) | report_id,
+			((rtype + 1) << 8) | reportnum,
 			interface->desc.bInterfaceNumber, buf, count,
 			USB_CTRL_SET_TIMEOUT);
-		/* count also the report id, if this was a numbered report. */
-		if (ret > 0 && skipped_report_id)
+	/* count also the report id, if this was a numbered report. */
+	if (ret > 0 && skipped_report_id)
+		ret++;
+
+	return ret;
+}
+
+static int usbhid_output_report(struct hid_device *hid, __u8 *buf, size_t count)
+{
+	struct usbhid_device *usbhid = hid->driver_data;
+	struct usb_device *dev = hid_to_usb_dev(hid);
+	int actual_length, skipped_report_id = 0, ret;
+
+	if (!usbhid->urbout)
+		return -ENOSYS;
+
+	if (buf[0] == 0x0) {
+		/* Don't send the Report ID */
+		buf++;
+		count--;
+		skipped_report_id = 1;
+	}
+
+	ret = usb_interrupt_msg(dev, usbhid->urbout->pipe,
+				buf, count, &actual_length,
+				USB_CTRL_SET_TIMEOUT);
+	/* return the number of bytes transferred */
+	if (ret == 0) {
+		ret = actual_length;
+		/* count also the report id */
+		if (skipped_report_id)
 			ret++;
 	}
 
@@ -1252,6 +1234,20 @@ static void usbhid_request(struct hid_device *hid, struct hid_report *rep, int r
 	}
 }
 
+static int usbhid_raw_request(struct hid_device *hid, unsigned char reportnum,
+			      __u8 *buf, size_t len, unsigned char rtype,
+			      int reqtype)
+{
+	switch (reqtype) {
+	case HID_REQ_GET_REPORT:
+		return usbhid_get_raw_report(hid, reportnum, buf, len, rtype);
+	case HID_REQ_SET_REPORT:
+		return usbhid_set_raw_report(hid, reportnum, buf, len, rtype);
+	default:
+		return -EIO;
+	}
+}
+
 static int usbhid_idle(struct hid_device *hid, int report, int idle,
 		int reqtype)
 {
@@ -1273,8 +1269,9 @@ static struct hid_ll_driver usb_hid_driver = {
 	.open = usbhid_open,
 	.close = usbhid_close,
 	.power = usbhid_power,
-	.hidinput_input_event = usb_hidinput_input_event,
 	.request = usbhid_request,
+	.raw_request = usbhid_raw_request,
+	.output_report = usbhid_output_report,
 	.wait = usbhid_wait_io,
 	.idle = usbhid_idle,
 };
@@ -1306,8 +1303,6 @@ static int usbhid_probe(struct usb_interface *intf, const struct usb_device_id *
 
 	usb_set_intfdata(intf, hid);
 	hid->ll_driver = &usb_hid_driver;
-	hid->hid_get_raw_report = usbhid_get_raw_report;
-	hid->hid_output_raw_report = usbhid_output_raw_report;
 	hid->ff_init = hid_pidff_init;
 #ifdef CONFIG_USB_HIDDEV
 	hid->hiddev_connect = hiddev_connect;

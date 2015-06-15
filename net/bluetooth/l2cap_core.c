@@ -1669,9 +1669,10 @@ static void l2cap_conn_free(struct kref *ref)
 	kfree(conn);
 }
 
-void l2cap_conn_get(struct l2cap_conn *conn)
+struct l2cap_conn *l2cap_conn_get(struct l2cap_conn *conn)
 {
 	kref_get(&conn->ref);
+	return conn;
 }
 EXPORT_SYMBOL(l2cap_conn_get);
 
