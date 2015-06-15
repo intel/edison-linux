@@ -255,15 +255,27 @@ static int i2c_hid_get_report(struct i2c_client *client, u8 reportType,
 	return 0;
 }
 
-static int i2c_hid_set_report(struct i2c_client *client, u8 reportType,
-		u8 reportID, unsigned char *buf, size_t data_len)
+/**
+ * i2c_hid_set_or_send_report: forward an incoming report to the device
+ * @client: the i2c_client of the device
+ * @reportType: 0x03 for HID_FEATURE_REPORT ; 0x02 for HID_OUTPUT_REPORT
+ * @reportID: the report ID
+ * @buf: the actual data to transfer, without the report ID
+ * @len: size of buf
+ * @use_data: true: use SET_REPORT HID command, false: send plain OUTPUT report
+ */
+static int i2c_hid_set_or_send_report(struct i2c_client *client, u8 reportType,
+		u8 reportID, unsigned char *buf, size_t data_len, bool use_data)
 {
 	struct i2c_hid *ihid = i2c_get_clientdata(client);
 	u8 *args = ihid->argsbuf;
+	const struct i2c_hid_cmd *hidcmd;
 	int ret;
 	u16 dataRegister = le16_to_cpu(ihid->hdesc.wDataRegister);
+	u16 outputRegister = le16_to_cpu(ihid->hdesc.wOutputRegister);
+	u16 maxOutputLength = le16_to_cpu(ihid->hdesc.wMaxOutputLength);
 
-	/* hidraw already checked that data_len < HID_MAX_BUFFER_SIZE */
+	/* hid_hw_* already checked that data_len < HID_MAX_BUFFER_SIZE */
 	u16 size =	2			/* size */ +
 			(reportID ? 1 : 0)	/* reportID */ +
 			data_len		/* buf */;
@@ -274,13 +286,27 @@ static int i2c_hid_set_report(struct i2c_client *client, u8 reportType,
 
 	i2c_hid_dbg(ihid, "%s\n", __func__);
 
+	if (!use_data && maxOutputLength == 0)
+		return -ENOSYS;
+
 	if (reportID >= 0x0F) {
 		args[index++] = reportID;
 		reportID = 0x0F;
 	}
 
-	args[index++] = dataRegister & 0xFF;
-	args[index++] = dataRegister >> 8;
+	/*
+	 * use the data register for feature reports or if the device does not
+	 * support the output register
+	 */
+	if (use_data) {
+		args[index++] = dataRegister & 0xFF;
+		args[index++] = dataRegister >> 8;
+		hidcmd = &hid_set_report_cmd;
+	} else {
+		args[index++] = outputRegister & 0xFF;
+		args[index++] = outputRegister >> 8;
+		hidcmd = &hid_no_cmd;
+	}
 
 	args[index++] = size & 0xFF;
 	args[index++] = size >> 8;
@@ -290,7 +316,7 @@ static int i2c_hid_set_report(struct i2c_client *client, u8 reportType,
 
 	memcpy(&args[index], buf, data_len);
 
-	ret = __i2c_hid_command(client, &hid_set_report_cmd, reportID,
+	ret = __i2c_hid_command(client, hidcmd, reportID,
 		reportType, args, args_len, NULL, 0);
 	if (ret) {
 		dev_err(&client->dev, "failed to set a report to device.\n");
@@ -546,7 +572,7 @@ static int i2c_hid_get_raw_report(struct hid_device *hid,
 }
 
 static int i2c_hid_output_raw_report(struct hid_device *hid, __u8 *buf,
-		size_t count, unsigned char report_type)
+		size_t count, unsigned char report_type, bool use_data)
 {
 	struct i2c_client *client = hid->driver_data;
 	int report_id = buf[0];
@@ -560,9 +586,9 @@ static int i2c_hid_output_raw_report(struct hid_device *hid, __u8 *buf,
 		count--;
 	}
 
-	ret = i2c_hid_set_report(client,
+	ret = i2c_hid_set_or_send_report(client,
 				report_type == HID_FEATURE_REPORT ? 0x03 : 0x02,
-				report_id, buf, count);
+				report_id, buf, count, use_data);
 
 	if (report_id && ret >= 0)
 		ret++; /* add report_id to the number of transfered bytes */
@@ -570,34 +596,27 @@ static int i2c_hid_output_raw_report(struct hid_device *hid, __u8 *buf,
 	return ret;
 }
 
-static void i2c_hid_request(struct hid_device *hid, struct hid_report *rep,
-		int reqtype)
+static int i2c_hid_output_report(struct hid_device *hid, __u8 *buf,
+		size_t count)
 {
-	struct i2c_client *client = hid->driver_data;
-	char *buf;
-	int ret;
-	int len = i2c_hid_get_report_length(rep) - 2;
+	return i2c_hid_output_raw_report(hid, buf, count, HID_OUTPUT_REPORT,
+			false);
+}
 
-	buf = kzalloc(len, GFP_KERNEL);
-	if (!buf)
-		return;
-
+static int i2c_hid_raw_request(struct hid_device *hid, unsigned char reportnum,
+			       __u8 *buf, size_t len, unsigned char rtype,
+			       int reqtype)
+{
 	switch (reqtype) {
 	case HID_REQ_GET_REPORT:
-		ret = i2c_hid_get_raw_report(hid, rep->id, buf, len, rep->type);
-		if (ret < 0)
-			dev_err(&client->dev, "%s: unable to get report: %d\n",
-				__func__, ret);
-		else
-			hid_input_report(hid, rep->type, buf, ret, 0);
-		break;
+		return i2c_hid_get_raw_report(hid, reportnum, buf, len, rtype);
 	case HID_REQ_SET_REPORT:
-		hid_output_report(rep, buf);
-		i2c_hid_output_raw_report(hid, buf, len, rep->type);
-		break;
+		if (buf[0] != reportnum)
+			return -EINVAL;
+		return i2c_hid_output_raw_report(hid, buf, len, rtype, true);
+	default:
+		return -EIO;
 	}
-
-	kfree(buf);
 }
 
 static int i2c_hid_parse(struct hid_device *hid)
@@ -749,29 +768,6 @@ static int i2c_hid_power(struct hid_device *hid, int lvl)
 	return ret;
 }
 
-static int i2c_hid_hidinput_input_event(struct input_dev *dev,
-		unsigned int type, unsigned int code, int value)
-{
-	struct hid_device *hid = input_get_drvdata(dev);
-	struct hid_field *field;
-	int offset;
-
-	if (type == EV_FF)
-		return input_ff_event(dev, type, code, value);
-
-	if (type != EV_LED)
-		return -1;
-
-	offset = hidinput_find_field(hid, type, code, &field);
-
-	if (offset == -1) {
-		hid_warn(dev, "event field not found\n");
-		return -1;
-	}
-
-	return hid_set_field(field, offset, value);
-}
-
 static struct hid_ll_driver i2c_hid_ll_driver = {
 	.parse = i2c_hid_parse,
 	.start = i2c_hid_start,
@@ -779,8 +775,8 @@ static struct hid_ll_driver i2c_hid_ll_driver = {
 	.open = i2c_hid_open,
 	.close = i2c_hid_close,
 	.power = i2c_hid_power,
-	.request = i2c_hid_request,
-	.hidinput_input_event = i2c_hid_hidinput_input_event,
+	.output_report = i2c_hid_output_report,
+	.raw_request = i2c_hid_raw_request,
 };
 
 static int i2c_hid_init_irq(struct i2c_client *client)
@@ -992,8 +988,6 @@ static int i2c_hid_probe(struct i2c_client *client,
 
 	hid->driver_data = client;
 	hid->ll_driver = &i2c_hid_ll_driver;
-	hid->hid_get_raw_report = i2c_hid_get_raw_report;
-	hid->hid_output_raw_report = i2c_hid_output_raw_report;
 	hid->dev.parent = &client->dev;
 	ACPI_HANDLE_SET(&hid->dev, ACPI_HANDLE(&client->dev));
 	hid->bus = BUS_I2C;

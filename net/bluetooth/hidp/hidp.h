@@ -24,6 +24,7 @@
 #define __HIDP_H
 
 #include <linux/types.h>
+#include <linux/hid.h>
 #include <linux/kref.h>
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/l2cap.h>
@@ -128,6 +129,7 @@ int hidp_get_conninfo(struct hidp_conninfo *ci);
 
 enum hidp_session_state {
 	HIDP_SESSION_IDLING,
+	HIDP_SESSION_PREPARING,
 	HIDP_SESSION_RUNNING,
 };
 
@@ -156,6 +158,7 @@ struct hidp_session {
 	unsigned long idle_to;
 
 	/* device management */
+	struct work_struct dev_init;
 	struct input_dev *input;
 	struct hid_device *hid;
 	struct timer_list timer;
@@ -177,6 +180,9 @@ struct hidp_session {
 
 	/* Used in hidp_output_raw_report() */
 	int output_report_success; /* boolean */
+
+	/* temporary input buffer */
+	u8 input_buf[HID_MAX_BUFFER_SIZE];
 };
 
 /* HIDP init defines */
