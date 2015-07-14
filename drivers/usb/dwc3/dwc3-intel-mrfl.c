@@ -508,7 +508,7 @@ static int dwc3_intel_set_power(struct usb_phy *_otg,
 int dwc3_intel_enable_vbus(struct dwc_otg2 *otg, int enable)
 {
 	atomic_notifier_call_chain(&otg->usb2_phy.notifier,
-			USB_EVENT_DRIVE_VBUS, &enable);
+			USB_EVENT_VBUS, &enable);
 
 	return 0;
 }
