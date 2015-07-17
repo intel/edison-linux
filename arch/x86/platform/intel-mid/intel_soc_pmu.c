@@ -1330,7 +1330,7 @@ int __ref pmu_pci_set_power_state(struct pci_dev *pdev, pci_power_t state)
 	bool d3_cold = false;
 
 	/* Ignore callback from devices until we have initialized */
-	if (unlikely((!pmu_initialized)))
+	if (unlikely((!pmu_initialized)) || !pdev->driver)
 		return 0;
 
 	might_sleep();
@@ -2036,7 +2036,7 @@ static int mid_suspend_enter(suspend_state_t state)
 	if (pmu_ops->check_nc_sc_status) {
 		if (!(pmu_ops->check_nc_sc_status())) {
 			trace_printk("Device d0ix status check failed! Aborting Standby entry!\n");
-			WARN_ON(1);
+//			WARN_ON(1);
 		}
 	}
 
