@@ -1980,11 +1980,12 @@ int dma_suspend(struct device *dev)
 	int i;
 	struct middma_device *device = dev_get_drvdata(dev);
 	pr_debug("MDMA: dma_suspend called\n");
-
+#if 0
 	for (i = 0; i < device->max_chan; i++) {
 		if (device->ch[i].in_use)
 			return -EAGAIN;
 	}
+#endif
 	dmac1_mask_periphral_intr(device);
 	device->state = SUSPENDED;
 
