@@ -1982,16 +1982,20 @@ static int dwc3_gadget_stop(struct usb_gadget *g,
 
 	spin_lock_irqsave(&dwc->lock, flags);
 
+#if 0
 	dwc3_gadget_disable_irq(dwc);
 	__dwc3_gadget_ep_disable(dwc->eps[0]);
 	__dwc3_gadget_ep_disable(dwc->eps[1]);
+#endif
 
 	dwc->gadget_driver	= NULL;
 
 	spin_unlock_irqrestore(&dwc->lock, flags);
 
+#if 0
 	irq = platform_get_irq(to_platform_device(dwc->dev), 0);
 	free_irq(irq, dwc);
+#endif
 
 	return 0;
 }
