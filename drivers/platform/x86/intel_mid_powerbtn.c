@@ -30,6 +30,7 @@
 #include <asm/intel_mid_powerbtn.h>
 #include <asm/intel_scu_pmic.h>
 #include <asm/intel_mid_rpmsg.h>
+#include <linux/suspend.h>
 
 #define DRIVER_NAME "msic_power_btn"
 
@@ -62,6 +63,7 @@ static irqreturn_t mid_pb_isr(int irq, void *dev_id)
 		pr_info("[%s] power button released\n", priv->input->name);
 	else
 		pr_info("[%s] power button pressed\n", priv->input->name);
+	freeze_wake();
 
 	return IRQ_WAKE_THREAD;
 }
