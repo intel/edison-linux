@@ -1363,13 +1363,43 @@ static struct rpmsg_device_id watchdog_rpmsg_id_table[] = {
 };
 MODULE_DEVICE_TABLE(rpmsg, watchdog_rpmsg_id_table);
 
+static int watchdog_rpmsg_suspend(struct device *dev)
+{
+	int ret;
+
+	pr_debug("%s\n", __func__);
+	ret = watchdog_stop();
+	if (ret)
+		pr_err("cannot stop the watchdog\n");
+	return 0;
+}
+
+static int watchdog_rpmsg_resume(struct device *dev)
+{
+	int ret;
+
+	pr_debug("%s\n", __func__);
+	ret = watchdog_config_and_start(timeout, pre_timeout);
+	if (ret)
+		pr_err("cannot start the watchdog\n");
+	return 0;
+}
+
+static const struct dev_pm_ops wd_pm_ops = {
+	.suspend	= watchdog_rpmsg_suspend,
+	.resume		= watchdog_rpmsg_resume,
+};
+
 static struct rpmsg_driver watchdog_rpmsg = {
-	.drv.name	= KBUILD_MODNAME,
-	.drv.owner	= THIS_MODULE,
 	.id_table	= watchdog_rpmsg_id_table,
 	.probe		= watchdog_rpmsg_probe,
 	.callback	= watchdog_rpmsg_cb,
 	.remove		= watchdog_rpmsg_remove,
+	.drv 		= {
+			.name = KBUILD_MODNAME,
+			.owner = THIS_MODULE,
+			.pm	= &wd_pm_ops,
+		},
 };
 
 static int __init watchdog_rpmsg_init(void)
