@@ -546,8 +546,11 @@ static void dma_transfer(struct ssp_drv_context *sspc)
 		if (sspc->rx_dma &&
 			(sspc->len_dma_rx >
 				sspc->rx_fifo_threshold * sspc->n_bytes))
+		{
 			sspc->len_dma_rx = TRUNCATE(sspc->len_dma_rx,
 				sspc->rx_fifo_threshold * sspc->n_bytes);
+			sspc->len_dma_tx = sspc->len_dma_rx;
+		}
 		else if (!sspc->rx_dma)
 			dev_err(dev, "ERROR : rx_dma is null\r\n");
 	} else {
@@ -689,6 +692,8 @@ void drain_trail(struct ssp_drv_context *sspc)
 			read_SSSR(reg));
 		sspc->rx += sspc->len_dma_rx;
 		sspc->tx += sspc->len_dma_tx;
+		sspc->len = sspc->len - sspc->len_dma_rx;
+		sspc->cur_msg->actual_length = sspc->len_dma_rx;
 
 		while ((sspc->tx != sspc->tx_end) ||
 			(sspc->rx != sspc->rx_end)) {
@@ -734,7 +739,7 @@ static void int_transfer_complete(struct ssp_drv_context *sspc)
 		write_SSTO(0, reg);
 
 	sspc->cur_msg->status = 0;
-	sspc->cur_msg->actual_length = sspc->len;
+	sspc->cur_msg->actual_length += sspc->len;
 
 #ifdef DUMP_RX
 	dump_trailer(dev, sspc->rx, sspc->len, 16);
@@ -959,6 +964,7 @@ static int handle_message(struct ssp_drv_context *sspc)
 	u32 mask = 0;
 	int bits_per_word, saved_bits_per_word;
 	unsigned long flags;
+	u8 normal_enabled = 0;
 
 	chip = spi_get_ctldata(msg->spi);
 
@@ -1047,16 +1053,28 @@ static int handle_message(struct ssp_drv_context *sspc)
 			sspc->n_bytes = 1;
 			sspc->read = u8_reader;
 			sspc->write = u8_writer;
+			/* It maybe has some unclear issue in dma mode, as workaround,
+			use normal mode to transfer when len equal 8 bytes */
+			if (transfer->len == 8)
+				normal_enabled = 1;
 		} else if (bits_per_word <= 16) {
 			sspc->n_bytes = 2;
 			sspc->read = u16_reader;
 			sspc->write = u16_writer;
+			/* It maybe has some unclear issue in dma mode, as workaround,
+			use normal mode to transfer when len equal 16 bytes */
+			if (transfer->len == 16)
+				normal_enabled = 1;
 		} else if (bits_per_word <= 32) {
 			if (!ssp_timing_wr)
 				cr0 |= SSCR0_EDSS;
 			sspc->n_bytes = 4;
 			sspc->read = u32_reader;
 			sspc->write = u32_writer;
+			/* It maybe has some unclear issue in dma mode, as workaround,
+			use normal mode to transfer when len equal 32 bytes */
+			if (transfer->len == 32)
+				normal_enabled = 1;
 		}
 
 		sspc->tx  = (void *)transfer->tx_buf;
@@ -1157,7 +1175,7 @@ static int handle_message(struct ssp_drv_context *sspc)
 		if (sspc->cs_control)
 			sspc->cs_control(sspc->cs_assert);
 
-		if (likely(dma_enabled)) {
+		if (likely(dma_enabled) && (!normal_enabled)) {
 			if (unlikely(sspc->quirks & QUIRKS_USE_PM_QOS))
 				pm_qos_update_request(&sspc->pm_qos_req,
 						MIN_EXIT_LATENCY);
@@ -1177,7 +1195,8 @@ static int handle_message(struct ssp_drv_context *sspc)
 	} /* end of list_for_each_entry */
 
 	/* Now we are done with this entire message */
-	if (!dma_enabled) {
+	if ((!dma_enabled) || (normal_enabled)) {
+		unmap_dma_buffers(sspc);
 		if (likely(msg->complete))
 			msg->complete(msg->context);
 		complete(&sspc->msg_done);
