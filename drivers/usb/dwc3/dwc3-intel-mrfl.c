@@ -21,6 +21,7 @@
 #define VERSION "2.10a"
 
 static int otg_id = -1;
+static int reboot_flag = 1;
 static int enable_usb_phy(struct dwc_otg2 *otg, bool on_off);
 static int dwc3_intel_notify_charger_type(struct dwc_otg2 *otg,
 		enum power_supply_charger_event event);
@@ -507,9 +508,11 @@ static int dwc3_intel_set_power(struct usb_phy *_otg,
 
 int dwc3_intel_enable_vbus(struct dwc_otg2 *otg, int enable)
 {
-	atomic_notifier_call_chain(&otg->usb2_phy.notifier,
-			USB_EVENT_VBUS, &enable);
-
+	if (reboot_flag) {
+		atomic_notifier_call_chain(&otg->usb2_phy.notifier,
+				USB_EVENT_VBUS, &enable);
+		reboot_flag = 0;
+	}
 	return 0;
 }
 
