@@ -598,8 +598,11 @@ static int pci_raw_set_power_state(struct pci_dev *dev, pci_power_t state)
 	if (state == PCI_D3hot || dev->current_state == PCI_D3hot)
 		pci_dev_d3_sleep(dev);
 	else if (state == PCI_D2 || dev->current_state == PCI_D2)
+#ifdef CONFIG_ATOM_SOC_POWER
+		; /* On Intel mid platforms pci delays are handled by SCU */
+#else
 		udelay(PCI_PM_D2_DELAY);
-
+#endif
 	pci_read_config_word(dev, dev->pm_cap + PCI_PM_CTRL, &pmcsr);
 	dev->current_state = (pmcsr & PCI_PM_CTRL_STATE_MASK);
 	if (dev->current_state != state && printk_ratelimit())
@@ -1208,6 +1211,7 @@ static int do_pci_enable_device(struct pci_dev *dev, int bars)
 	err = pcibios_enable_device(dev, bars);
 	if (err < 0)
 		return err;
+
 	pci_fixup_device(pci_fixup_enable, dev);
 
 	if (dev->msi_enabled || dev->msix_enabled)

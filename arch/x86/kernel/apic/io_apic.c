@@ -103,6 +103,7 @@ static struct ioapic {
 	struct irq_domain *irqdomain;
 	struct mp_pin_info *pin_info;
 	struct resource *iomem_res;
+	DECLARE_BITMAP(pin_programmed, MP_MAX_IOAPIC_PIN + 1);
 } ioapics[MAX_IO_APICS];
 
 #define mpc_ioapic_ver(ioapic_idx)	ioapics[ioapic_idx].mp_config.apicver
@@ -288,6 +289,24 @@ void io_apic_eoi(unsigned int apic, unsigned int vector)
 	struct io_apic __iomem *io_apic = io_apic_base(apic);
 	writel(vector, &io_apic->eoi);
 }
+
+/*
+ * This index matches with 1024 - 4 address in SCU RTE table area.
+ * That is not used for anything. Works in CLVP only
+ */
+#define LAST_INDEX_IN_IO_APIC_SPACE 255
+#define KERNEL_TO_SCU_PANIC_REQUEST (0x0515dead)
+void apic_scu_panic_dump(void)
+{
+	unsigned long flags;
+
+	printk(KERN_ERR "Request SCU panic dump");
+	raw_spin_lock_irqsave(&ioapic_lock, flags);
+	io_apic_write(0, LAST_INDEX_IN_IO_APIC_SPACE,
+			  KERNEL_TO_SCU_PANIC_REQUEST);
+	raw_spin_unlock_irqrestore(&ioapic_lock, flags);
+}
+EXPORT_SYMBOL_GPL(apic_scu_panic_dump);
 
 unsigned int native_io_apic_read(unsigned int apic, unsigned int reg)
 {
@@ -2008,6 +2027,11 @@ static void ack_ioapic_level(struct irq_data *data)
 	ioapic_irqd_unmask(data, cfg, masked);
 }
 
+static int ioapic_set_wake(struct irq_data *data, unsigned int on)
+{
+	return 0;
+}
+
 static struct irq_chip ioapic_chip __read_mostly = {
 	.name			= "IO-APIC",
 	.irq_startup		= startup_ioapic_irq,
@@ -2016,6 +2040,7 @@ static struct irq_chip ioapic_chip __read_mostly = {
 	.irq_ack		= apic_ack_edge,
 	.irq_eoi		= ack_ioapic_level,
 	.irq_set_affinity	= native_ioapic_set_affinity,
+	.irq_set_wake	   = ioapic_set_wake,
 	.irq_retrigger		= apic_retrigger_irq,
 	.flags			= IRQCHIP_SKIP_SET_WAKE,
 };
@@ -2462,6 +2487,24 @@ io_apic_setup_irq_pin(unsigned int irq, int node, struct io_apic_irq_attr *attr)
 	return ret;
 }
 
+int io_apic_setup_irq_pin_once(unsigned int irq, int node,
+				   struct io_apic_irq_attr *attr)
+{
+	unsigned int ioapic_idx = attr->ioapic, pin = attr->ioapic_pin;
+	int ret;
+
+	/* Avoid redundant programming */
+	if (test_bit(pin, ioapics[ioapic_idx].pin_programmed)) {
+		pr_debug("Pin %d-%d already programmed\n",
+			 mpc_ioapic_id(ioapic_idx), pin);
+		return 0;
+	}
+	ret = io_apic_setup_irq_pin(irq, node, attr);
+	if (!ret)
+		set_bit(pin, ioapics[ioapic_idx].pin_programmed);
+	return ret;
+}
+
 static int io_apic_get_redir_entries(int ioapic)
 {
 	union IO_APIC_reg_01	reg_01;
@@ -2485,6 +2528,22 @@ unsigned int arch_dynirq_lower_bound(unsigned int from)
 	 * gsi_top if ioapic_dynirq_base hasn't been initialized yet.
 	 */
 	return ioapic_initialized ? ioapic_dynirq_base : gsi_top;
+}
+
+int io_apic_set_pci_routing(struct device *dev, int irq,
+				struct io_apic_irq_attr *irq_attr)
+{
+	int node;
+
+	if (!IO_APIC_IRQ(irq)) {
+		apic_printk(APIC_QUIET,KERN_ERR "IOAPIC[%d]: Invalid reference to IRQ 0\n",
+				irq_attr->ioapic);
+		return -EINVAL;
+	}
+
+	node = dev ? dev_to_node(dev) : cpu_to_node(0);
+
+	return io_apic_setup_irq_pin_once(irq, node, irq_attr);
 }
 
 #ifdef CONFIG_X86_32

@@ -41,6 +41,7 @@ config X86
 	select HAVE_MEMBLOCK_NODE_MAP
 	select ARCH_DISCARD_MEMBLOCK
 	select ARCH_WANT_OPTIONAL_GPIOLIB
+	select ARCH_HAVE_CUSTOM_GPIO_H
 	select ARCH_WANT_FRAME_POINTERS
 	select HAVE_DMA_ATTRS
 	select HAVE_DMA_CONTIGUOUS
@@ -356,8 +357,8 @@ config X86_BIGSMP
 	  This option is needed for the systems that have more than 8 CPUs
 
 config GOLDFISH
-       def_bool y
-       depends on X86_GOLDFISH
+	   def_bool y
+	   depends on X86_GOLDFISH
 
 if X86_32
 config X86_EXTENDED_PLATFORM
@@ -440,9 +441,9 @@ config X86_UV
 # Please maintain the alphabetic order if and when there are additions
 
 config X86_GOLDFISH
-       bool "Goldfish (Virtual Platform)"
-       depends on X86_EXTENDED_PLATFORM
-       ---help---
+	   bool "Goldfish (Virtual Platform)"
+	   depends on X86_EXTENDED_PLATFORM
+	   ---help---
 	 Enable support for the Goldfish virtual platform used primarily
 	 for Android development. Unless you are building for the Android
 	 Goldfish emulator say N here.
@@ -463,6 +464,26 @@ config X86_INTEL_CE
 	  This option compiles in support for the CE4100 SOC for settop
 	  boxes and media devices.
 
+config X86_WANT_INTEL_MID
+    bool "Intel MID platform support"
+    depends on X86_32
+    depends on X86_EXTENDED_PLATFORM
+    ---help---
+      Select to build a kernel capable of supporting Intel MID platform
+      systems which do not have the PCI legacy interfaces (Moorestown,
+      Medfield). If you are building for a PC class system say N here.
+
+if X86_WANT_INTEL_MID
+
+config IIO_BASINCOVE_GPADC
+	bool "BasinCove"
+
+config SST_MRFLD_DPCM
+	bool "Merrifield DPCM"
+
+config TI_ADS7955_ADC
+	bool "TI ADS7955"
+
 config X86_INTEL_MID
 	bool "Intel MID platform support"
 	depends on X86_32
@@ -472,11 +493,16 @@ config X86_INTEL_MID
 	depends on PCI_GOANY
 	depends on X86_IO_APIC
 	select SFI
+	select SPI
 	select I2C
 	select DW_APB_TIMER
 	select APB_TIMER
 	select INTEL_SCU_IPC
 	select MFD_INTEL_MSIC
+	select IIO_BASINCOVE_GPADC
+	select IIO_TRIGGERED_BUFFER
+	select SST_MRFLD_DPCM
+	select TI_ADS7955_ADC
 	---help---
 	  Select to build a kernel capable of supporting Intel MID (Mobile
 	  Internet Device) platform systems which do not have the PCI legacy
@@ -484,6 +510,37 @@ config X86_INTEL_MID
 
 	  Intel MID platforms are based on an Intel processor and chipset which
 	  consume less power than most of the x86 derivatives.
+
+config ATOM_SOC_POWER
+	bool "Select Atom SOC Power"
+
+choice
+	prompt "Select PMU support"
+	depends on ATOM_SOC_POWER
+	default REMOVEME_INTEL_ATOM_MDFLD_POWER
+
+config REMOVEME_INTEL_ATOM_MDFLD_POWER
+	bool "Medfield"
+
+config REMOVEME_INTEL_ATOM_CLV_POWER
+	bool "Clovertrail"
+
+config REMOVEME_INTEL_ATOM_MRFLD_POWER
+	bool "Merrifield"
+
+endchoice
+
+config INTEL_DEBUG_FEATURE
+		bool "Debug feature interface on Intel MID platform"
+		depends on X86_INTEL_MID
+		---help---
+		 Provides an interface to list the debug features
+		 that are enabled on an Intel MID platform. The
+		 enabling of the debug features depends on the mode
+		 the device is in (e.g. manufacturing, production,
+		 end user, etc...).
+
+endif
 
 config X86_INTEL_LPSS
 	bool "Intel Low Power Subsystem Support"
@@ -690,10 +747,10 @@ config MEMTEST
 	---help---
 	  This option adds a kernel parameter 'memtest', which allows memtest
 	  to be set.
-	        memtest=0, mean disabled; -- default
-	        memtest=1, mean do 1 test pattern;
-	        ...
-	        memtest=4, mean do 4 test patterns.
+			memtest=0, mean disabled; -- default
+			memtest=1, mean do 1 test pattern;
+			...
+			memtest=4, mean do 4 test patterns.
 	  If you are unsure how to answer this question, answer N.
 
 source "arch/x86/Kconfig.cpu"
@@ -722,16 +779,26 @@ config HPET_EMULATE_RTC
 	depends on HPET_TIMER && (RTC=y || RTC=m || RTC_DRV_CMOS=m || RTC_DRV_CMOS=y)
 
 config APB_TIMER
-       def_bool y if X86_INTEL_MID
-       prompt "Intel MID APB Timer Support" if X86_INTEL_MID
-       select DW_APB_TIMER
-       depends on X86_INTEL_MID && SFI
-       help
-         APB timer is the replacement for 8254, HPET on X86 MID platforms.
-         The APBT provides a stable time base on SMP
-         systems, unlike the TSC, but it is more expensive to access,
-         as it is off-chip. APB timers are always running regardless of CPU
-         C states, they are used as per CPU clockevent device when possible.
+	   def_bool y if X86_INTEL_MID
+	   prompt "Intel MID APB Timer Support" if X86_INTEL_MID
+	   select DW_APB_TIMER
+	   depends on X86_INTEL_MID && SFI
+	   help
+		 APB timer is the replacement for 8254, HPET on X86 MID platforms.
+		 The APBT provides a stable time base on SMP
+		 systems, unlike the TSC, but it is more expensive to access,
+		 as it is off-chip. APB timers are always running regardless of CPU
+		 C states, they are used as per CPU clockevent device when possible.
+
+config ARCH_NR_GPIO
+	int
+	depends on ARCH_HAVE_CUSTOM_GPIO_H
+	default 512 if X86_INTEL_MID
+	default 0
+	help
+	  Maximum number of GPIOs in the system.
+
+	  If unsure, leave the default value.
 
 # Mark as expert because too many people got it wrong.
 # The code disables itself when not needed.
@@ -994,10 +1061,10 @@ config X86_ESPFIX64
 	depends on X86_16BIT && X86_64
 
 config X86_VSYSCALL_EMULATION
-       bool "Enable vsyscall emulation" if EXPERT
-       default y
-       depends on X86_64
-       ---help---
+	   bool "Enable vsyscall emulation" if EXPERT
+	   default y
+	   depends on X86_64
+	   ---help---
 	 This enables emulation of the legacy vsyscall page.  Disabling
 	 it is roughly equivalent to booting with vsyscall=none, except
 	 that it will also disable the helpful warning if a program
@@ -1389,9 +1456,9 @@ config ARCH_PROC_KCORE_TEXT
 	depends on X86_64 && PROC_KCORE
 
 config ILLEGAL_POINTER_VALUE
-       hex
-       default 0 if X86_32
-       default 0xdead000000000000 if X86_64
+	   hex
+	   default 0 if X86_32
+	   default 0xdead000000000000 if X86_64
 
 source "mm/Kconfig"
 
@@ -1637,14 +1704,13 @@ config EFI
 	  platforms.
 
 config EFI_STUB
-       bool "EFI stub support"
-       depends on EFI && !X86_USE_3DNOW
-       select RELOCATABLE
-       ---help---
-          This kernel feature allows a bzImage to be loaded directly
-	  by EFI firmware without the use of a bootloader.
-
-	  See Documentation/efi-stub.txt for more information.
+	   bool "EFI stub support"
+	   depends on EFI && !X86_USE_3DNOW
+	   select RELOCATABLE
+	   ---help---
+		  This kernel feature allows a bzImage to be loaded directly
+		  by EFI firmware without the use of a bootloader.
+		  See Documentation/efi-stub.txt for more information.
 
 config EFI_MIXED
 	bool "EFI mixed-mode support"

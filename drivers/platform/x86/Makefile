@@ -39,9 +39,9 @@ obj-$(CONFIG_ACPI_TOSHIBA)	+= toshiba_acpi.o
 
 obj-$(CONFIG_TOSHIBA_BT_RFKILL)	+= toshiba_bluetooth.o
 obj-$(CONFIG_TOSHIBA_HAPS)	+= toshiba_haps.o
-obj-$(CONFIG_INTEL_SCU_IPC)	+= intel_scu_ipc.o
+obj-$(CONFIG_INTEL_SCU_IPC)	+= intel_scu_ipc.o intel_scu_pmic.o intel_scu_mip.o intel_scu_fw_update.o
 obj-$(CONFIG_INTEL_SCU_IPC_UTIL) += intel_scu_ipcutil.o
-obj-$(CONFIG_INTEL_MFLD_THERMAL) += intel_mid_thermal.o
+obj-$(CONFIG_INTEL_SCU_FLIS)   += intel_scu_flis.o
 obj-$(CONFIG_INTEL_IPS)		+= intel_ips.o
 obj-$(CONFIG_GPIO_INTEL_PMIC)	+= intel_pmic_gpio.o
 obj-$(CONFIG_XO1_RFKILL)	+= xo1-rfkill.o
@@ -57,4 +57,5 @@ obj-$(CONFIG_INTEL_RST)		+= intel-rst.o
 obj-$(CONFIG_INTEL_SMARTCONNECT)	+= intel-smartconnect.o
 
 obj-$(CONFIG_PVPANIC)           += pvpanic.o
+obj-$(CONFIG_INTEL_PSH_IPC)     += intel_psh_ipc.o
 obj-$(CONFIG_ALIENWARE_WMI)	+= alienware-wmi.o

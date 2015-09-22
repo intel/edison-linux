@@ -693,6 +693,20 @@ config INTEL_SCU_IPC
 	  IPC is used to bridge the communications between kernel and SCU on
 	  some embedded Intel x86 platforms. This is not needed for PC-type
 	  machines.
+choice
+	prompt "IPC access mode"
+	depends on INTEL_SCU_IPC
+	default INTEL_SCU_IPC_INTR_MODE
+	---help---
+	Select the desired access mode for IPC call.
+
+config INTEL_SCU_IPC_INTR_MODE
+	bool "Intel SCU IPC interrupt mode"
+
+config INTEL_SCU_IPC_POLL_MODE
+	bool "Intel SCU IPC polling mode"
+
+endchoice
 
 config INTEL_SCU_IPC_UTIL
 	tristate "Intel SCU IPC utility driver"
@@ -858,5 +872,31 @@ config PVPANIC
 	  This driver provides support for the pvpanic device.  pvpanic is
 	  a paravirtualized device provided by QEMU; it lets a virtual machine
 	  (guest) communicate panic events to the host.
+
+config INTEL_SCU_FLIS
+	bool "scu flis driver config"
+	depends on INTEL_SCU_IPC
+	default y
+	help
+	  This driver builds the SCU Flis Access Sysfs Interfaces.
+	  We could read write the flis address and configure the
+	  pin pull up/down using these interfaces.
+
+config INTEL_PSH_IPC
+	bool "Intel PSH IPC Support"
+	depends on X86_INTEL_MID
+	---help---
+	  PSH(Platform Services Hub) is a low frequence IA core on Tangier Platform,
+	  whose power consumption is quite low. PSH runs RTOS software inside itself,
+	  which independently controls and collects sensor data, pre-processes the data,
+	  and communicates with Atom. Thus ATOM side could be put into low power mode
+	  with more time, while all the sensor data are collected without any lost.
+
+	  PSH IPC is used as a  bridge for OS sensor service to control and access PSH
+	  sensors communications between kernel and PSH. This is not needed for PC-type
+	  machines.
+
+	  Say Y here to get Intel PSH IPC support.
+
 
 endif # X86_PLATFORM_DEVICES

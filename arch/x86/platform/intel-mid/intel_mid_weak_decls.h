@@ -10,6 +10,9 @@
  */
 
 
+/* __attribute__((weak)) makes these declarations overridable */
+extern struct devs_id __initconst device_ids[] __attribute__((weak));
+
 /* For every CPU addition a new get_<cpuname>_ops interface needs
  * to be added.
  */

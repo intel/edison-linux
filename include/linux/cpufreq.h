@@ -261,6 +261,8 @@ struct cpufreq_driver {
 	unsigned int	(*get)(unsigned int cpu);
 
 	/* optional */
+	unsigned int (*getavg)  (struct cpufreq_policy *policy,
+					unsigned int cpu);
 	int		(*bios_limit)(int cpu, unsigned int *limit);
 
 	int		(*exit)(struct cpufreq_policy *policy);
@@ -315,6 +317,9 @@ struct cpufreq_driver {
 
 int cpufreq_register_driver(struct cpufreq_driver *driver_data);
 int cpufreq_unregister_driver(struct cpufreq_driver *driver_data);
+
+void cpufreq_notify_transition(struct cpufreq_policy *policy,
+		struct cpufreq_freqs *freqs, unsigned int state);
 
 const char *cpufreq_get_current_driver(void);
 void *cpufreq_get_driver_data(void);
@@ -498,6 +503,7 @@ extern struct cpufreq_governor cpufreq_gov_conservative;
 #define CPUFREQ_BOOST_FREQ	(1 << 0)
 
 struct cpufreq_frequency_table {
+	unsigned int	index;
 	unsigned int	flags;
 	unsigned int	driver_data; /* driver specific data, not used by core */
 	unsigned int	frequency; /* kHz - doesn't need to be in ascending

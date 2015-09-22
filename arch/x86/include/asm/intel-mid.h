@@ -11,16 +11,73 @@
 #ifndef _ASM_X86_INTEL_MID_H
 #define _ASM_X86_INTEL_MID_H
 
+#include <linux/types.h>
+#include <linux/init.h>
 #include <linux/sfi.h>
+#include <linux/pci.h>
 #include <linux/platform_device.h>
+#include <asm/intel_mid_pcihelpers.h>
+
+#ifdef CONFIG_SFI
+extern int get_gpio_by_name(const char *name);
+extern void install_irq_resource(struct platform_device *pdev, int irq);
+#else
+static inline int get_gpio_by_name(const char *name) { return -ENODEV; }
+/* Dummy function to prevent compilation error in byt */
+static inline void install_irq_resource(struct platform_device *pdev, int irq)
+{};
+#endif
 
 extern int intel_mid_pci_init(void);
-extern int get_gpio_by_name(const char *name);
+extern void *get_oem0_table(void);
+extern void intel_delayed_device_register(void *dev,
+			void (*delayed_callback)(void *dev_desc));
 extern void intel_scu_device_register(struct platform_device *pdev);
+extern struct devs_id *get_device_id(u8 type, char *name);
 extern int __init sfi_parse_mrtc(struct sfi_table_header *table);
 extern int __init sfi_parse_mtmr(struct sfi_table_header *table);
 extern int sfi_mrtc_num;
 extern struct sfi_rtc_table_entry sfi_mrtc_array[];
+extern void *get_oem0_table(void);
+extern void register_rpmsg_service(char *name, int id, u32 addr);
+extern int sdhci_pci_request_regulators(void);
+
+/* Define soft platform ID to comply with the OEMB table format. But SPID is not supported */
+#define INTEL_PLATFORM_SSN_SIZE 32
+struct soft_platform_id {
+        u16 customer_id; /*Defines the final customer for the product */
+        u16 vendor_id; /* Defines who owns the final product delivery */
+        u16 manufacturer_id; /* Defines who build the hardware. This can be
+                              * different for the same product */
+        u16 platform_family_id; /* Defined by vendor and defines the family of
+                                 * the product with the same root components */
+        u16 product_line_id; /* Defined by vendor and defines the name of the
+                              * product. This can be used to differentiate the
+                              * feature set for the same product family (low
+                              * cost vs full feature). */
+        u16 hardware_id; /* Defined by vendor and defines the physical hardware
+                          * component set present on the PCB/FAB */
+        u8  fru[SPID_FRU_SIZE]; /* Field Replaceabl Unit */
+} __packed;
+
+/* OEMB table */
+struct sfi_table_oemb {
+	struct sfi_table_header header;
+	u32 board_id;
+	u32 board_fab;
+	u8 iafw_major_version;
+	u8 iafw_main_version;
+	u8 val_hooks_major_version;
+	u8 val_hooks_minor_version;
+	u8 ia_suppfw_major_version;
+	u8 ia_suppfw_minor_version;
+	u8 scu_runtime_major_version;
+	u8 scu_runtime_minor_version;
+	u8 ifwi_major_version;
+	u8 ifwi_minor_version;
+	struct soft_platform_id spid;
+	u8 ssn[INTEL_PLATFORM_SSN_SIZE];
+} __packed;
 
 /*
  * Here defines the array of devices platform data that IAFW would export
@@ -32,14 +89,34 @@ struct devs_id {
 	u8 type;
 	u8 delay;
 	void *(*get_platform_data)(void *info);
-	/* Custom handler for devices */
 	void (*device_handler)(struct sfi_device_table_entry *pentry,
 				struct devs_id *dev);
+	/* Custom handler for devices */
+	u8 trash_itp;/* true if this driver uses pin muxed with XDB connector */
 };
 
 #define sfi_device(i)   \
-	static const struct devs_id *const __intel_mid_sfi_##i##_dev __used \
-	__attribute__((__section__(".x86_intel_mid_dev.init"))) = &i
+    static const struct devs_id *const __intel_mid_sfi_##i##_dev __used \
+    __attribute__((__section__(".x86_intel_mid_dev.init"))) = &i
+
+#define SD_NAME_SIZE 16
+/**
+ * struct sd_board_info - template for device creation
+ * @name: Initializes sdio_device.name; identifies the driver.
+ * @bus_num: board-specific identifier for a given SDIO controller.
+ * @board_ref_clock: Initializes sd_device.board_ref_clock;
+ * @platform_data: Initializes sd_device.platform_data; the particular
+ *      data stored there is driver-specific.
+ *
+ */
+struct sd_board_info {
+	char            name[SD_NAME_SIZE];
+	int             bus_num;
+	unsigned short  addr;
+	u32             board_ref_clock;
+	void            *platform_data;
+};
+
 
 /*
  * Medfield is the follow-up of Moorestown, it combines two chip solution into
@@ -49,10 +126,14 @@ struct devs_id {
  * identified via MSRs.
  */
 enum intel_mid_cpu_type {
+	INTEL_CPU_CHIP_NOTMID = 0,
 	/* 1 was Moorestown */
 	INTEL_MID_CPU_CHIP_PENWELL = 2,
 	INTEL_MID_CPU_CHIP_CLOVERVIEW,
 	INTEL_MID_CPU_CHIP_TANGIER,
+	INTEL_MID_CPU_CHIP_VALLEYVIEW2,
+	INTEL_MID_CPU_CHIP_ANNIEDALE,
+	INTEL_MID_CPU_CHIP_CARBONCANYON,
 };
 
 extern enum intel_mid_cpu_type __intel_mid_cpu_chip;
@@ -70,8 +151,8 @@ struct intel_mid_ops {
 };
 
 /* Helper API's for INTEL_MID_OPS_INIT */
-#define DECLARE_INTEL_MID_OPS_INIT(cpuname, cpuid)	\
-				[cpuid] = get_##cpuname##_ops
+#define DECLARE_INTEL_MID_OPS_INIT(cpuname, cpuid)[cpuid] = \
+		get_##cpuname##_ops,
 
 /* Maximum number of CPU ops */
 #define MAX_CPU_OPS(a) (sizeof(a)/sizeof(void *))
@@ -81,29 +162,28 @@ struct intel_mid_ops {
  * declared in arch/x86/platform/intel_mid/intel_mid_weak_decls.h.
  */
 #define INTEL_MID_OPS_INIT {\
-	DECLARE_INTEL_MID_OPS_INIT(penwell, INTEL_MID_CPU_CHIP_PENWELL), \
-	DECLARE_INTEL_MID_OPS_INIT(cloverview, INTEL_MID_CPU_CHIP_CLOVERVIEW), \
+	DECLARE_INTEL_MID_OPS_INIT(penwell, INTEL_MID_CPU_CHIP_PENWELL) \
+	DECLARE_INTEL_MID_OPS_INIT(cloverview, INTEL_MID_CPU_CHIP_CLOVERVIEW) \
 	DECLARE_INTEL_MID_OPS_INIT(tangier, INTEL_MID_CPU_CHIP_TANGIER) \
 };
 
-#ifdef CONFIG_X86_INTEL_MID
-
 static inline enum intel_mid_cpu_type intel_mid_identify_cpu(void)
 {
+#ifdef CONFIG_X86_INTEL_MID
 	return __intel_mid_cpu_chip;
+#else
+	return INTEL_CPU_CHIP_NOTMID;
+#endif
 }
 
+#ifdef CONFIG_X86_INTEL_MID
 static inline bool intel_mid_has_msic(void)
 {
 	return (intel_mid_identify_cpu() == INTEL_MID_CPU_CHIP_PENWELL);
 }
-
-#else /* !CONFIG_X86_INTEL_MID */
-
-#define intel_mid_identify_cpu()    (0)
+#else
 #define intel_mid_has_msic()    (0)
-
-#endif /* !CONFIG_X86_INTEL_MID */
+#endif
 
 enum intel_mid_timer_options {
 	INTEL_MID_TIMER_DEFAULT,
@@ -139,11 +219,18 @@ extern enum intel_mid_timer_options intel_mid_timer_options;
 extern struct console early_mrst_console;
 extern void mrst_early_console_init(void);
 
+extern struct console early_mrfld_console;
+extern void mrfld_early_console_init(void);
+
 extern struct console early_hsu_console;
 extern void hsu_early_console_init(const char *);
 
+extern struct console early_pti_console;
+
 extern void intel_scu_devices_create(void);
 extern void intel_scu_devices_destroy(void);
+extern void intel_psh_devices_create(void);
+extern void intel_psh_devices_destroy(void);
 
 /* VRTC timer */
 #define MRST_VRTC_MAP_SZ	(1024)
@@ -151,7 +238,24 @@ extern void intel_scu_devices_destroy(void);
 
 extern void intel_mid_rtc_init(void);
 
-/* the offset for the mapping of global gpio pin to irq */
+enum intel_mid_sim_type {
+	INTEL_MID_CPU_SIMULATION_NONE = 0,
+	INTEL_MID_CPU_SIMULATION_VP,
+	INTEL_MID_CPU_SIMULATION_SLE,
+	INTEL_MID_CPU_SIMULATION_HVP,
+};
+extern enum intel_mid_sim_type __intel_mid_sim_platform;
+static inline enum intel_mid_sim_type intel_mid_identify_sim(void)
+{
+#ifdef CONFIG_X86_INTEL_MID
+	return __intel_mid_sim_platform;
+#else
+	return INTEL_MID_CPU_SIMULATION_NONE;
+#endif
+}
+
 #define INTEL_MID_IRQ_OFFSET 0x100
+
+extern void pstore_ram_reserve_memory(void);
 
 #endif /* _ASM_X86_INTEL_MID_H */

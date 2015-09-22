@@ -85,6 +85,17 @@ config GPIO_SYSFS
 	  Kernel drivers may also request that a particular GPIO be
 	  exported to userspace; this can be useful when debugging.
 
+config GPIODEBUG
+	tristate "GPIO Setting DEBUG"
+	depends on DEBUG_FS
+	help
+	  Say yes here to support GPIO/FLIS Setting Debug.
+
+	  This is mostly useful to dump and set gpio/flis conguration.
+
+	  Kernel drivers may also request that a particular GPIO be
+	  exported to userspace; this can be useful when debugging.
+
 config GPIO_GENERIC
 	tristate
 
@@ -760,6 +771,13 @@ config GPIO_AMD8111
 	  of this driver!
 
 	  If unsure, say N
+
+config GPIO_LANGWELL
+    bool "Intel Langwell/Penwell GPIO support"
+    depends on PCI && X86
+    select IRQ_DOMAIN
+    help
+      Say Y here to support Intel Langwell/Penwell GPIO.
 
 config GPIO_INTEL_MID
 	bool "Intel Mid GPIO support"

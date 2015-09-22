@@ -5,25 +5,6 @@
  * PCI device IDs
  */
 
-#define PCI_DEVICE_ID_INTEL_PCH_SDIO0	0x8809
-#define PCI_DEVICE_ID_INTEL_PCH_SDIO1	0x880a
-#define PCI_DEVICE_ID_INTEL_BYT_EMMC	0x0f14
-#define PCI_DEVICE_ID_INTEL_BYT_SDIO	0x0f15
-#define PCI_DEVICE_ID_INTEL_BYT_SD	0x0f16
-#define PCI_DEVICE_ID_INTEL_BYT_EMMC2	0x0f50
-#define PCI_DEVICE_ID_INTEL_BSW_EMMC	0x2294
-#define PCI_DEVICE_ID_INTEL_BSW_SDIO	0x2295
-#define PCI_DEVICE_ID_INTEL_BSW_SD	0x2296
-#define PCI_DEVICE_ID_INTEL_MRFL_MMC	0x1190
-#define PCI_DEVICE_ID_INTEL_CLV_SDIO0	0x08f9
-#define PCI_DEVICE_ID_INTEL_CLV_SDIO1	0x08fa
-#define PCI_DEVICE_ID_INTEL_CLV_SDIO2	0x08fb
-#define PCI_DEVICE_ID_INTEL_CLV_EMMC0	0x08e5
-#define PCI_DEVICE_ID_INTEL_CLV_EMMC1	0x08e6
-#define PCI_DEVICE_ID_INTEL_QRK_SD	0x08A7
-#define PCI_DEVICE_ID_INTEL_SPT_EMMC	0x9d2b
-#define PCI_DEVICE_ID_INTEL_SPT_SDIO	0x9d2c
-#define PCI_DEVICE_ID_INTEL_SPT_SD	0x9d2d
 
 /*
  * PCI registers
@@ -38,6 +19,19 @@
 #define  PCI_SLOT_INFO_FIRST_BAR_MASK	0x07
 
 #define MAX_SLOTS			8
+
+#define IPC_EMMC_MUTEX_CMD             0xEE
+
+/* CLV SD card power resource */
+
+#define VCCSDIO_ADDR       0xd5
+#define VCCSDIO_OFF        0x4
+#define VCCSDIO_NORMAL     0x7
+#define ENCTRL0_ISOLATE        0x55555557
+#define ENCTRL1_ISOLATE        0x5555
+#define STORAGESTIO_FLISNUM    0x8
+#define ENCTRL0_OFF        0x10
+#define ENCTRL1_OFF        0x11
 
 struct sdhci_pci_chip;
 struct sdhci_pci_slot;
@@ -72,6 +66,9 @@ struct sdhci_pci_slot {
 	bool			cd_override_level;
 
 	void (*hw_reset)(struct sdhci_host *host);
+	bool            dev_power;
+	struct mutex        power_lock;
+	bool            dma_enabled;
 };
 
 struct sdhci_pci_chip {
@@ -80,10 +77,13 @@ struct sdhci_pci_chip {
 	unsigned int		quirks;
 	unsigned int		quirks2;
 	bool			allow_runtime_pm;
+	unsigned int        autosuspend_delay;
 	const struct sdhci_pci_fixes *fixes;
 
 	int			num_slots;	/* Slots on controller */
 	struct sdhci_pci_slot	*slots[MAX_SLOTS]; /* Pointers to host slots */
+	unsigned int        enctrl0_orig;
+	unsigned int        enctrl1_orig;
 };
 
 #endif /* __SDHCI_PCI_H */

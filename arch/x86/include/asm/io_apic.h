@@ -243,6 +243,8 @@ extern void disable_IO_APIC(void);
 extern void setup_ioapic_dest(void);
 extern int IO_APIC_get_PCI_irq_vector(int bus, int devfn, int pin);
 extern void print_IO_APICs(void);
+extern int io_apic_set_pci_routing(struct device *dev, int irq,
+		struct io_apic_irq_attr *irq_attr);
 #else  /* !CONFIG_X86_IO_APIC */
 
 #define IO_APIC_IRQ(x)		0
@@ -256,6 +258,9 @@ static inline int mp_find_ioapic(u32 gsi) { return 0; }
 static inline u32 mp_pin_to_gsi(int ioapic, int pin) { return UINT_MAX; }
 static inline int mp_map_gsi_to_irq(u32 gsi, unsigned int flags) { return gsi; }
 static inline void mp_unmap_irq(int irq) { }
+
+static inline int io_apic_set_pci_routing(struct device *dev, int irq,
+		struct io_apic_irq_attr *irq_attr) { return 0; }
 
 static inline int save_ioapic_entries(void)
 {

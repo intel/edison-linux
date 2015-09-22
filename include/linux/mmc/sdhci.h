@@ -107,10 +107,61 @@ struct sdhci_host {
 /* Capability register bit-63 indicates HS400 support */
 #define SDHCI_QUIRK2_CAPS_BIT63_FOR_HS400		(1<<11)
 
+/* Intel private quirk2 starts on 15 */
+
+/* V2.0 host controller support DDR50 */
+#define SDHCI_QUIRK2_V2_0_SUPPORT_DDR50            (1<<15)
+/* Controller has bug when enabling Auto CMD23 */
+#define SDHCI_QUIRK2_BROKEN_AUTO_CMD23         (1<<16)
+/* HC Reg High Speed must be set later than HC2 Reg 1.8v Signaling Enable */
+#define SDHCI_QUIRK2_HIGH_SPEED_SET_LATE       (1<<17)
+/* BRCM voltage support: advertise 2.0v support and force using 1.8v instead */
+#define SDHCI_QUIRK2_ADVERTISE_2V0_FORCE_1V8       (1<<18)
+/* to allow mmc_detect to detach the bus */
+#define SDHCI_QUIRK2_DISABLE_MMC_CAP_NONREMOVABLE  (1<<19)
+/* avoid detect/rescan/poweoff operations on suspend/resume. */
+#define SDHCI_QUIRK2_ENABLE_MMC_PM_IGNORE_PM_NOTIFY    (1<<20)
+/* Disable eMMC/SD card High speed feature. */
+#define SDHCI_QUIRK2_DISABLE_HIGH_SPEED            (1<<21)
+#define SDHCI_QUIRK2_CAN_VDD_300           (1<<22)
+#define SDHCI_QUIRK2_CAN_VDD_330           (1<<23)
+#define SDHCI_QUIRK2_2MS_DELAY             (1<<24)
+#define SDHCI_QUIRK2_WAIT_FOR_IDLE         (1<<25)
+/* BAD sd cd in HOST IC. This will cause system hang when removing SD */
+#define SDHCI_QUIRK2_BAD_SD_CD             (1<<26)
+#define SDHCI_QUIRK2_POWER_PIN_GPIO_MODE       (1<<27)
+#define SDHCI_QUIRK2_ADVERTISE_3V0_FORCE_1V8   (1<<28)
+#define SDHCI_QUIRK2_NON_STD_CIS   (1<<29)
+#define SDHCI_QUIRK2_TUNING_POLL           (1<<30)
+
 	int irq;		/* Device IRQ */
 	void __iomem *ioaddr;	/* Mapped address */
 
+	/*
+	 * XXX: SCU/X86 mutex variables base address in shared SRAM
+	 * NOTE: Max size of this struct is 16 bytes
+	 * without shared SRAM re-organization.
+	 */
+	void __iomem *sram_addr;        /* Shared SRAM address */
+
+	void __iomem *rte_addr; /* IOAPIC RTE register address */
+
+#define DEKKER_EMMC_OWNER_OFFSET        0
+#define DEKKER_IA_REQ_OFFSET            0x04
+#define DEKKER_SCU_REQ_OFFSET           0x08
+/* 0xc offset: state of the emmc chip to SCU. */
+#define DEKKER_EMMC_STATE               0x0c
+#define DEKKER_OWNER_IA                 0
+#define DEKKER_OWNER_SCU                1
+#define DEKKER_EMMC_CHIP_ACTIVE         0
+#define DEKKER_EMMC_CHIP_SUSPENDED      1
+
+	unsigned int    usage_cnt;  /* eMMC mutex usage count */
+
 	const struct sdhci_ops *ops;	/* Low level hw interface */
+
+struct regulator *vmmc;         /* Power regulator (vmmc) */
+struct regulator *vqmmc;        /* Signaling regulator (vccq) */
 
 	/* Internal data */
 	struct mmc_host *mmc;	/* MMC structure */
@@ -122,6 +173,7 @@ struct sdhci_host {
 #endif
 
 	spinlock_t lock;	/* Mutex */
+	spinlock_t dekker_lock; /* eMMC Dekker Mutex lock */
 
 	int flags;		/* Host attributes */
 #define SDHCI_USE_SDMA		(1<<0)	/* Host is SDMA capable */
@@ -138,6 +190,7 @@ struct sdhci_host {
 #define SDHCI_USING_RETUNING_TIMER (1<<11)	/* Host is using a retuning timer for the card */
 #define SDHCI_USE_64_BIT_DMA	(1<<12)	/* Use 64-bit DMA */
 #define SDHCI_HS400_TUNING	(1<<13)	/* Tuning for HS400 */
+#define SDHCI_POWER_CTRL_DEV   (1<<14) /* ctrl dev power */
 
 	unsigned int version;	/* SDHCI spec. version */
 
@@ -149,6 +202,7 @@ struct sdhci_host {
 	u8 pwr;			/* Current voltage */
 
 	bool runtime_suspended;	/* Host is runtime suspended */
+	bool suspended;     /* Host is suspended */
 	bool bus_on;		/* Bus power prevents runtime suspend */
 	bool preset_enabled;	/* Preset is enabled */
 
@@ -204,5 +258,6 @@ struct sdhci_host {
 	struct timer_list	tuning_timer;	/* Timer for tuning */
 
 	unsigned long private[0] ____cacheline_aligned;
+	unsigned int r1b_busy_end:1;    /* R1B busy end */
 };
 #endif /* LINUX_MMC_SDHCI_H */

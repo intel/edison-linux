@@ -21,6 +21,8 @@
  * compact JTAG, standard.
  */
 
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
@@ -35,6 +37,12 @@
 #include <linux/pti.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
+
+#include <asm/intel_scu_ipc.h>
+
+#ifdef CONFIG_INTEL_PTI_STM
+#include "stm.h"
+#endif
 
 #define DRIVERNAME		"pti"
 #define PCINAME			"pciPTI"
@@ -55,6 +63,56 @@
 #define APERTURE_14		0x3800000 /* offset to first OS write addr */
 #define APERTURE_LEN		0x400000  /* address length */
 
+#define SMIP_PTI_OFFSET	0x30C  /* offset to PTI config in MIP header */
+#define SMIP_PTI_EN	(1<<7) /* PTI enable bit in PTI configuration */
+
+#define PTI_PNW_PCI_ID		 0x082B
+#define PTI_CLV_PCI_ID		 0x0900
+#define PTI_TNG_PCI_ID		 0x119F
+
+#define INTEL_PTI_PCI_DEVICE(dev, info) {  \
+	.vendor = PCI_VENDOR_ID_INTEL,	  \
+	.device = dev,			  \
+	.subvendor = PCI_ANY_ID,		\
+	.subdevice = PCI_ANY_ID,		\
+	.driver_data = (unsigned long) info }
+ 
+struct pti_device_info {
+	u8 pci_bar;
+	u8 scu_secure_mode:1;
+	u8 has_d8_d16_support:1;
+};
+
+static const struct pti_device_info intel_pti_pnw_info = {
+	.pci_bar = 1,
+	.scu_secure_mode = 0,
+	.has_d8_d16_support = 0,
+};
+
+static const struct pti_device_info intel_pti_clv_info = {
+	.pci_bar = 1,
+	.scu_secure_mode = 1,
+	.has_d8_d16_support = 0,
+};
+
+static const struct pti_device_info intel_pti_tng_info = {
+	.pci_bar = 2,
+	.scu_secure_mode = 0,
+	.has_d8_d16_support = 1,
+};
+
+static DEFINE_PCI_DEVICE_TABLE(pci_ids) = {
+	INTEL_PTI_PCI_DEVICE(PTI_PNW_PCI_ID, &intel_pti_pnw_info),
+	INTEL_PTI_PCI_DEVICE(PTI_CLV_PCI_ID, &intel_pti_clv_info),
+	INTEL_PTI_PCI_DEVICE(PTI_TNG_PCI_ID, &intel_pti_tng_info),
+	{0}
+};
+
+#define GET_PCI_BAR(pti_dev) (pti_dev->pti_dev_info->pci_bar)
+#define HAS_SCU_SECURE_MODE(pti_dev) (pti_dev->pti_dev_info->scu_secure_mode)
+#define HAS_D8_D16_SUPPORT(pti_dev) (pti_dev->pti_dev_info->has_d8_d16_support)
+
+
 struct pti_tty {
 	struct pti_masterchannel *mc;
 };
@@ -67,7 +125,15 @@ struct pti_dev {
 	u8 ia_app[MAX_APP_IDS];
 	u8 ia_os[MAX_OS_IDS];
 	u8 ia_modem[MAX_MODEM_IDS];
+	struct pti_device_info *pti_dev_info;
+#ifdef CONFIG_INTEL_PTI_STM
+	struct stm_dev stm;
+#endif
 };
+
+static unsigned int stm_enabled;
+module_param(stm_enabled, uint, 0600);
+MODULE_PARM_DESC(stm_enabled, "set to 1 to enable stm");
 
 /*
  * This protects access to ia_app, ia_os, and ia_modem,
@@ -75,11 +141,6 @@ struct pti_dev {
  * an aperture write id.
  */
 static DEFINE_MUTEX(alloclock);
-
-static const struct pci_device_id pci_ids[] = {
-		{PCI_DEVICE(PCI_VENDOR_ID_INTEL, 0x82B)},
-		{0}
-};
 
 static struct tty_driver *pti_tty_driver;
 static struct pti_dev *drv_data;
@@ -831,9 +892,14 @@ static int pti_pci_probe(struct pci_dev *pdev,
 			__func__, __LINE__);
 		goto err_disable_pci;
 	}
-	drv_data->pti_addr = pci_resource_start(pdev, pci_bar);
 
-	retval = pci_request_region(pdev, pci_bar, dev_name(&pdev->dev));
+	drv_data->pti_dev_info = (struct pti_device_info *)ent->driver_data;
+ 
+	drv_data->pti_addr = pci_resource_start(pdev, GET_PCI_BAR(drv_data));
+ 
+	retval = pci_request_region(pdev, GET_PCI_BAR(drv_data),
+					dev_name(&pdev->dev));
+
 	if (retval != 0) {
 		dev_err(&pdev->dev,
 			"%s(%d): pci_request_region() returned error %d\n",
@@ -849,6 +915,14 @@ static int pti_pci_probe(struct pci_dev *pdev,
 		goto err_rel_reg;
 	}
 
+#ifdef CONFIG_INTEL_PTI_STM
+	/* Initialize STM resources */
+	if ((stm_enabled) && (stm_dev_init(pdev, &drv_data->stm) != 0)) {
+		retval = -ENOMEM;
+		goto err_rel_reg;
+	}
+#endif
+
 	pci_set_drvdata(pdev, drv_data);
 
 	for (a = 0; a < PTITTY_MINOR_NUM; a++) {
@@ -863,7 +937,7 @@ static int pti_pci_probe(struct pci_dev *pdev,
 
 	return 0;
 err_rel_reg:
-	pci_release_region(pdev, pci_bar);
+	pci_release_region(pdev, GET_PCI_BAR(drv_data));
 err_free_dd:
 	kfree(drv_data);
 err_disable_pci:
@@ -891,9 +965,14 @@ static void pti_pci_remove(struct pci_dev *pdev)
 		tty_port_destroy(&drv_data->port[a]);
 	}
 
+#ifdef CONFIG_INTEL_PTI_STM
+	if (stm_enabled)
+		stm_dev_clean(pdev, &drv_data->stm);
+#endif
+
 	iounmap(drv_data->pti_ioaddr);
+	pci_release_region(pdev, GET_PCI_BAR(drv_data));
 	kfree(drv_data);
-	pci_release_region(pdev, 1);
 	pci_disable_device(pdev);
 
 	misc_deregister(&pti_char_driver);

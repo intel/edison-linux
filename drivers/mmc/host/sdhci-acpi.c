@@ -249,6 +249,8 @@ static const struct sdhci_acpi_uid_slot sdhci_acpi_uids[] = {
 	{ "INT3436"  , NULL, &sdhci_acpi_slot_int_sdio },
 	{ "INT344D"  , NULL, &sdhci_acpi_slot_int_sdio },
 	{ "PNP0D40"  },
+	{ "BCM43241" },
+	{ "BCM2E1A" },
 	{ },
 };
 
@@ -260,6 +262,8 @@ static const struct acpi_device_id sdhci_acpi_ids[] = {
 	{ "INT3436"  },
 	{ "INT344D"  },
 	{ "PNP0D40"  },
+	{ "BCM43241" },
+	{ "BCM2E1A" },
 	{ },
 };
 MODULE_DEVICE_TABLE(acpi, sdhci_acpi_ids);

@@ -47,11 +47,64 @@
  */
 DEFINE_SPINLOCK(gpio_lock);
 
+static struct gpio_desc gpio_desc[ARCH_NR_GPIOS];
+
 #define GPIO_OFFSET_VALID(chip, offset) (offset >= 0 && offset < chip->ngpio)
 
 static DEFINE_MUTEX(gpio_lookup_lock);
 static LIST_HEAD(gpio_lookup_list);
 LIST_HEAD(gpio_chips);
+
+static DEFINE_MUTEX(sysfs_lock);
+
+static ssize_t gpio_pinmux_show(struct device *dev,
+        struct device_attribute *attr, char *buf)
+{
+    const struct gpio_desc  *desc = dev_get_drvdata(dev);
+    unsigned        gpio = desc - gpio_desc;
+    struct gpio_chip    *chip;
+    ssize_t      status = -EINVAL;
+
+    mutex_lock(&sysfs_lock);
+
+    chip = desc->chip;
+
+    if (!test_bit(FLAG_EXPORT, &desc->flags))
+        status = -EIO;
+    else if (chip->get_pinmux != NULL)
+        status = sprintf(buf, "%d\n", chip->get_pinmux(gpio));
+
+    mutex_unlock(&sysfs_lock);
+    return status;
+}
+
+static ssize_t gpio_pinmux_store(struct device *dev,
+        struct device_attribute *attr, const char *buf, size_t size)
+{
+    const struct gpio_desc  *desc = dev_get_drvdata(dev);
+    unsigned        gpio = desc - gpio_desc;
+    ssize_t      status = -EINVAL;
+    struct gpio_chip    *chip;
+    long    mux;
+
+    mutex_lock(&sysfs_lock);
+
+    chip = desc->chip;
+
+    if (!test_bit(FLAG_EXPORT, &desc->flags))
+        status = -EIO;
+    else if (chip->set_pinmux != NULL) {
+        status = kstrtol(buf, 0, &mux);
+        if (status == 0)
+            chip->set_pinmux(gpio, mux);
+    }
+
+    mutex_unlock(&sysfs_lock);
+    return status ? : size;
+}
+
+static DEVICE_ATTR(pinmux, 0644,
+        gpio_pinmux_show, gpio_pinmux_store);
 
 static inline void desc_set_label(struct gpio_desc *d, const char *label)
 {

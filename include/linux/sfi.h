@@ -75,6 +75,7 @@
 #define SFI_SIG_WAKE		"WAKE"
 #define SFI_SIG_DEVS		"DEVS"
 #define SFI_SIG_GPIO		"GPIO"
+#define SFI_SIG_OEMB        "OEMB"
 
 #define SFI_SIGNATURE_SIZE	4
 #define SFI_OEM_ID_SIZE		6
@@ -88,6 +89,9 @@
 #define SFI_GET_NUM_ENTRIES(ptable, entry_type) \
 	((ptable->header.len - sizeof(struct sfi_table_header)) / \
 	(sizeof(entry_type)))
+
+#define SPID_FRU_SIZE   10
+
 /*
  * Table structures must be byte-packed to match the SFI specification,
  * as they are provided by the BIOS.
@@ -156,6 +160,7 @@ struct sfi_device_table_entry {
 #define SFI_DEV_TYPE_UART	2
 #define SFI_DEV_TYPE_HSI	3
 #define SFI_DEV_TYPE_IPC	4
+#define SFI_DEV_TYPE_SD     5
 
 	u8	host_num;	/* attached to host 0, 1...*/
 	u16	addr;

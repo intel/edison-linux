@@ -36,6 +36,7 @@
 #include <asm/reboot.h>
 
 #include "intel_mid_weak_decls.h"
+#include "intel_soc_mrfld.h"
 
 /*
  * the clockevent devices on Moorestown/Medfield can be APBT or LAPIC clock,
