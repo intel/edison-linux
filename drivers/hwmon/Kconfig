@@ -526,6 +526,16 @@ config SENSORS_HIH6130
 	  This driver can also be built as a module.  If so, the module
 	  will be called hih6130.
 
+config SENSORS_CORETEMP_INTERRUPT
+	tristate "Intel Core/Core2/Atom temperature sensor Interrupts"
+	depends on SENSORS_CORETEMP
+	help
+	  If you say yes here you get support for interrupts when the
+	  CPU temperature crosses the programmed threshold.
+
+	  This is tested only for specific platforms(e.g Atom). If you
+	  are not sure, say N here.
+
 config SENSORS_IBMAEM
 	tristate "IBM Active Energy Manager temperature/power sensors and control"
 	select IPMI_SI
@@ -731,6 +741,21 @@ config SENSORS_LTC4261
 
 	  This driver can also be built as a module. If so, the module will
 	  be called ltc4261.
+
+config MSIC_GPADC
+	tristate "MSIC GPADC driver for Intel Medfield platform"
+	depends on INTEL_SCU_IPC
+	help
+	  Say Y here to enable MSIC GPADC driver on Intel Medfield Platform
+
+config INTEL_MCU
+	tristate "Intel generic MCU control interface"
+	help
+	  Say Y here to enable control interface for intel mcu
+
+	  This driver provide userspace tty interface for the control and
+	  message output.
+	  You could use normal read/write to complete those operation.
 
 config SENSORS_MAX1111
 	tristate "Maxim MAX1111 Serial 8-bit ADC chip and compatibles"
