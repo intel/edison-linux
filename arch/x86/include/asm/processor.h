@@ -960,6 +960,35 @@ extern void start_thread(struct pt_regs *regs, unsigned long new_ip,
 extern int get_tsc_mode(unsigned long adr);
 extern int set_tsc_mode(unsigned int val);
 
+struct aperfmperf {
+    u64 aperf, mperf;
+};
+
+static inline void get_aperfmperf(struct aperfmperf *am)
+{
+    WARN_ON_ONCE(!boot_cpu_has(X86_FEATURE_APERFMPERF));
+
+    rdmsrl(MSR_IA32_APERF, am->aperf);
+    rdmsrl(MSR_IA32_MPERF, am->mperf);
+}
+
+#define APERFMPERF_SHIFT 10
+
+static inline
+unsigned long calc_aperfmperf_ratio(struct aperfmperf *old,
+                    struct aperfmperf *new)
+{
+    u64 aperf = new->aperf - old->aperf;
+    u64 mperf = new->mperf - old->mperf;
+    unsigned long ratio = aperf;
+
+    mperf >>= APERFMPERF_SHIFT;
+    if (mperf)
+        ratio = div64_u64(aperf, mperf);
+
+    return ratio;
+}
+
 /* Register/unregister a process' MPX related resource */
 #define MPX_ENABLE_MANAGEMENT(tsk)	mpx_enable_management((tsk))
 #define MPX_DISABLE_MANAGEMENT(tsk)	mpx_disable_management((tsk))
