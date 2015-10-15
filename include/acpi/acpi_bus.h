@@ -29,6 +29,9 @@
 #include <linux/device.h>
 #include <linux/property.h>
 
+#include <linux/acpi.h>
+#include <acpi/actypes.h>
+
 /* TBD: Make dynamic */
 #define ACPI_MAX_HANDLES	10
 struct acpi_handle_list {

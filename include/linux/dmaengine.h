@@ -186,6 +186,7 @@ enum dma_ctrl_flags {
 	DMA_PREP_PQ_DISABLE_Q = (1 << 3),
 	DMA_PREP_CONTINUE = (1 << 4),
 	DMA_PREP_FENCE = (1 << 5),
+	DMA_COMPL_SKIP_DEST_UNMAP = (1 << 6),
 };
 
 /**
