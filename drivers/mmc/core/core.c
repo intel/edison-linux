@@ -1355,11 +1355,8 @@ int mmc_regulator_get_supply(struct mmc_host *mmc)
 			dev_warn(dev, "Failed getting OCR mask: %d\n", ret);
 	}
 
-	if (IS_ERR(mmc->supply.vqmmc)) {
-		if (PTR_ERR(mmc->supply.vqmmc) == -EPROBE_DEFER)
-			return -EPROBE_DEFER;
-		dev_info(dev, "No vqmmc regulator found\n");
-	}
+	if (IS_ERR(mmc->supply.vqmmc))
+		dev_warn(dev, "No vqmmc regulator found\n");
 
 	return 0;
 }
@@ -1493,7 +1490,11 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage, u32 ocr)
 	mmc_set_ios(host);
 
 	/* Wait for at least 1 ms according to spec */
-	mmc_delay(1);
+	if (host->ops->busy_wait)
+		host->ops->busy_wait(host, 1000);
+	else
+		mmc_delay(1);
+
 
 	/*
 	 * Failure to switch is indicated by the card holding
@@ -1555,6 +1556,9 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
 
 	mmc_host_clk_hold(host);
 
+	if (host->ops->set_dev_power)
+		host->ops->set_dev_power(host, true);
+
 	host->ios.vdd = fls(ocr) - 1;
 	host->ios.power_mode = MMC_POWER_UP;
 	/* Set initial state and call mmc_set_ios */
@@ -1572,7 +1576,7 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
 	 * This delay should be sufficient to allow the power supply
 	 * to reach the minimum voltage.
 	 */
-	mmc_delay(10);
+	usleep_range(10000, 11000);
 
 	host->ios.clock = host->f_init;
 
@@ -1583,7 +1587,7 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
 	 * This delay must be at least 74 clock sizes, or 1 ms, or the
 	 * time required to reach a stable voltage.
 	 */
-	mmc_delay(10);
+	usleep_range(10000, 11000);
 
 	mmc_host_clk_release(host);
 }
@@ -1601,6 +1605,9 @@ void mmc_power_off(struct mmc_host *host)
 	host->ios.power_mode = MMC_POWER_OFF;
 	/* Set initial state and call mmc_set_ios */
 	mmc_set_initial_state(host);
+
+	if (host->ops->set_dev_power)
+		host->ops->set_dev_power(host, false);
 
 	/*
 	 * Some configurations, such as the 802.11 SDIO card in the OLPC
@@ -2479,6 +2486,7 @@ void mmc_rescan(struct work_struct *work)
 	mmc_release_host(host);
 
  out:
+	mmc_emergency_setup(host);
 	if (host->caps & MMC_CAP_NEEDS_POLL)
 		mmc_schedule_delayed_work(&host->detect, HZ);
 }
@@ -2494,6 +2502,8 @@ void mmc_start_host(struct mmc_host *host)
 		mmc_power_up(host, host->ocr_avail);
 	mmc_gpiod_request_cd_irq(host);
 	_mmc_detect_change(host, 0, false);
+	if (host->caps2 & MMC_CAP2_INIT_CARD_SYNC)
+		flush_work(&host->detect.work);
 }
 
 void mmc_stop_host(struct mmc_host *host)

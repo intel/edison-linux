@@ -23,6 +23,8 @@
 /*
  * Vendors and devices.  Sort key: vendor first, device next.
  */
+#define IWL_SDIO_DEVICE_ID_WKP1    0x3160
+#define IWL_SDIO_DEVICE_ID_WKP2    0x7260
 #define SDIO_VENDOR_ID_BROADCOM			0x02d0
 #define SDIO_DEVICE_ID_BROADCOM_43143		43143
 #define SDIO_DEVICE_ID_BROADCOM_43241		0x4324

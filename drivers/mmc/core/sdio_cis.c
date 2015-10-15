@@ -225,11 +225,78 @@ static const struct cis_tpl cis_tpl_list[] = {
 	{	0x22,	0,	cistpl_funce		},
 };
 
+/***************************** WP B0 WA *******************************/
+
+unsigned char wp_tpl_codes[] = {
+	0x21, 0x22, 0x20, 0x21, 0x22, 0x91, 0x15,
+};
+
+unsigned char wp_tpl_links[] = {
+	0x2, 0x4, 0x4, 0x2, 0x2a, 0x2, 0x19,
+};
+
+unsigned char wp_tuple_data[7][42] = {
+	{
+	  12, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	  0, 0
+	},
+	{
+	  0, 0, 2, 11, 0, 0, 0, 0, 0, 0,
+	  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	  0, 0
+	},
+	{
+	  137, 0, 96, 114, 0, 0, 0, 0, 0, 0,
+	  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	  0, 0
+	},
+	{
+	  12, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	  0, 0
+	},
+	{
+	  1, 1, 48, 0, 0, 3, 0, 2, 0, 128,
+	  255, 0, 7, 0, 0, 7, 7, 255, 0, 16,
+	  0, 200, 100, 0, 0, 0, 0, 0, 16, 1,
+	  33, 2, 0, 0, 0, 0, 32, 4, 137, 0,
+	  96, 114
+	},
+	{
+	  7, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	  0, 0
+	},
+	{
+	  8, 0, 73, 110, 116, 101, 108, 40, 82, 41,
+	  32, 87, 105, 114, 101, 108, 101, 115, 115, 32,
+	  67, 111, 114, 101, 0, 0, 0, 0, 0, 0,
+	  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	  0, 0
+	},
+};
+
+/**********************************************************************/
+
 static int sdio_read_cis(struct mmc_card *card, struct sdio_func *func)
 {
 	int ret;
 	struct sdio_func_tuple *this, **prev;
 	unsigned i, ptr = 0;
+
+	int count = 0;
+	bool replace = false;
 
 	/*
 	 * Note that this works for the common CIS (function number 0) as
@@ -246,6 +313,7 @@ static int sdio_read_cis(struct mmc_card *card, struct sdio_func *func)
 
 		ret = mmc_io_rw_direct(card, 0, 0,
 			SDIO_FBR_BASE(fn) + SDIO_FBR_CIS + i, 0, &x);
+
 		if (ret)
 			return ret;
 		ptr |= x << (i * 8);
@@ -258,20 +326,49 @@ static int sdio_read_cis(struct mmc_card *card, struct sdio_func *func)
 
 	BUG_ON(*prev);
 
+	if (card->quirks & MMC_QUIRK_NON_STD_CIS)
+		count = (func) ? 2 : -1;
+
 	do {
 		unsigned char tpl_code, tpl_link;
+
+		if (card->quirks & MMC_QUIRK_NON_STD_CIS) {
+			count++;
+			if ((func && (count > 6)) || (!func && (count > 2))) {
+				pr_debug("%s: break: count %d\n",
+					 __func__, count);
+				break;
+			}
+		}
 
 		ret = mmc_io_rw_direct(card, 0, 0, ptr++, 0, &tpl_code);
 		if (ret)
 			break;
+
+		if (card->quirks & MMC_QUIRK_NON_STD_CIS) {
+			/* if the first tuple is 0 - then it's b0, so replace */
+			if ((count < 4) && (tpl_code == 0)) {
+				pr_info("%s card with non std CIS",
+					mmc_hostname(card->host));
+				/* disable UHS on buggy cards */
+				card->sw_caps.sd3_bus_mode = 0;
+				replace = true;
+			}
+		}
 
 		/* 0xff means we're done */
 		if (tpl_code == 0xff)
 			break;
 
 		/* null entries have no link field or data */
-		if (tpl_code == 0x00)
-			continue;
+		if (card->quirks & MMC_QUIRK_NON_STD_CIS) {
+			if ((tpl_code == 0x00) && (!replace))
+				continue;
+		} else {
+			if (tpl_code == 0x00)
+				continue;
+		}
+
 
 		ret = mmc_io_rw_direct(card, 0, 0, ptr++, 0, &tpl_link);
 		if (ret)
@@ -290,6 +387,7 @@ static int sdio_read_cis(struct mmc_card *card, struct sdio_func *func)
 					       ptr + i, 0, &this->data[i]);
 			if (ret)
 				break;
+			pr_debug("%d, ", this->data[i]);
 		}
 		if (ret) {
 			kfree(this);
@@ -297,9 +395,28 @@ static int sdio_read_cis(struct mmc_card *card, struct sdio_func *func)
 		}
 
 		/* Try to parse the CIS tuple */
-		ret = cis_tpl_parse(card, func, "CIS",
-				    cis_tpl_list, ARRAY_SIZE(cis_tpl_list),
-				    tpl_code, this->data, tpl_link);
+		if (card->quirks & MMC_QUIRK_NON_STD_CIS) {
+			if (!replace)
+				ret = cis_tpl_parse(card, func, "CIS",
+							cis_tpl_list,
+							ARRAY_SIZE(cis_tpl_list),
+							tpl_code, this->data,
+							tpl_link);
+			else
+				ret = cis_tpl_parse(card, func, "CIS",
+							cis_tpl_list,
+							ARRAY_SIZE(cis_tpl_list),
+							wp_tpl_codes[count],
+							wp_tuple_data[count],
+							wp_tpl_links[count]);
+		} else {
+			ret = cis_tpl_parse(card, func, "CIS",
+						cis_tpl_list,
+						ARRAY_SIZE(cis_tpl_list),
+						tpl_code, this->data,
+						tpl_link);
+		}
+
 		if (ret == -EILSEQ || ret == -ENOENT) {
 			/*
 			 * The tuple is unknown or known but not parsed.
