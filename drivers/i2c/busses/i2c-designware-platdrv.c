@@ -143,8 +143,10 @@ static int dw_i2c_probe(struct platform_device *pdev)
 	u32 clk_freq, ht = 0;
 
 	irq = platform_get_irq(pdev, 0);
-	if (irq < 0)
-		return irq;
+ 	if (irq < 0) {
+ 		dev_err(&pdev->dev, "no irq resource?\n");
+ 		return irq; /* -ENXIO */
+ 	}
 
 	dev = devm_kzalloc(&pdev->dev, sizeof(struct dw_i2c_dev), GFP_KERNEL);
 	if (!dev)
@@ -192,10 +194,6 @@ static int dw_i2c_probe(struct platform_device *pdev)
 		if (pdata)
 			clk_freq = pdata->i2c_scl_freq;
 	}
-
-	r = i2c_dw_eval_lock_support(dev);
-	if (r)
-		return r;
 
 	dev->functionality =
 		I2C_FUNC_I2C |
@@ -259,14 +257,10 @@ static int dw_i2c_probe(struct platform_device *pdev)
 		return r;
 	}
 
-	if (dev->pm_runtime_disabled) {
-		pm_runtime_forbid(&pdev->dev);
-	} else {
-		pm_runtime_set_autosuspend_delay(&pdev->dev, 1000);
-		pm_runtime_use_autosuspend(&pdev->dev);
-		pm_runtime_set_active(&pdev->dev);
-		pm_runtime_enable(&pdev->dev);
-	}
+	pm_runtime_set_autosuspend_delay(&pdev->dev, 1000);
+	pm_runtime_use_autosuspend(&pdev->dev);
+	pm_runtime_set_active(&pdev->dev);
+	pm_runtime_enable(&pdev->dev);
 
 	return 0;
 }
@@ -317,8 +311,7 @@ static int dw_i2c_resume(struct device *dev)
 
 	clk_prepare_enable(i_dev->clk);
 
-	if (!i_dev->pm_runtime_disabled)
-		i2c_dw_init(i_dev);
+	i2c_dw_init(i_dev);
 
 	return 0;
 }
