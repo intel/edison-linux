@@ -19,6 +19,9 @@ static DEFINE_MUTEX(sysfs_lock);
 
 /*
  * /sys/class/gpio/gpioN... only for GPIOs that are exported
+ *   /pinmux
+ *      * configures GPIO or alternate function
+ *      * r/w as zero (normal GPIO) or alternate function number
  *   /direction
  *      * MAY BE OMITTED if kernel won't allow direction changes
  *      * is read/write as "in" or "out"
