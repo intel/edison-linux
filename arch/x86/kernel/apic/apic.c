@@ -55,6 +55,7 @@
 #include <asm/mce.h>
 #include <asm/tsc.h>
 #include <asm/hypervisor.h>
+#include <asm/intel-mid.h>
 
 unsigned int num_processors;
 
@@ -716,7 +717,7 @@ static int __init calibrate_APIC_clock(void)
 		lapic_clockevent.mult = div_sc(lapic_timer_frequency/APIC_DIVISOR,
 					TICK_NSEC, lapic_clockevent.shift);
 		lapic_clockevent.max_delta_ns =
-			clockevent_delta2ns(0x7FFFFF, &lapic_clockevent);
+			clockevent_delta2ns(0x7FFFFFFF, &lapic_clockevent);
 		lapic_clockevent.min_delta_ns =
 			clockevent_delta2ns(0xF, &lapic_clockevent);
 		lapic_clockevent.features &= ~CLOCK_EVT_FEAT_DUMMY;
@@ -2307,6 +2308,19 @@ static int lapic_suspend(void)
 	unsigned long flags;
 	int maxlvt;
 
+	/*
+	 * On intel_mid, the suspend flow is a bit different, and the lapic
+	 * hw implementation, and integration is not supporting standard
+	 * suspension.
+	 * This implementation is only putting high value to the timer, so that
+	 * AONT global timer will be updated with this big value at s0i3 entry,
+	 * and wont produce timer based wake up event.
+	 */
+	if (intel_mid_identify_cpu() != 0) {
+		apic_write(APIC_TMICT, ~0);
+		return 0;
+	}
+
 	if (!apic_pm_state.active)
 		return 0;
 
@@ -2344,6 +2358,15 @@ static void lapic_resume(void)
 	unsigned int l, h;
 	unsigned long flags;
 	int maxlvt;
+
+	/*
+	 * On intel_mid, the resume flow is a bit different.
+	 * Refer explanation on lapic_suspend.
+	 */
+	if (intel_mid_identify_cpu() != 0) {
+		apic_write(APIC_TMICT, 10);
+		return;
+	}
 
 	if (!apic_pm_state.active)
 		return;

@@ -1410,8 +1410,15 @@ static inline void mwait_play_dead(void)
 				highest_subcstate = edx & MWAIT_SUBSTATE_MASK;
 			}
 		}
-		eax = (highest_cstate << MWAIT_SUBSTATE_SIZE) |
-			(highest_subcstate - 1);
+
+		if (highest_cstate < 6) {
+			eax = (highest_cstate << MWAIT_SUBSTATE_SIZE) |
+				(highest_subcstate - 1);
+		} else {
+			/* For s0i3 substate code is 4 */
+			eax = (highest_cstate << MWAIT_SUBSTATE_SIZE) |
+				((highest_subcstate - 1) * 2);
+		}
 	}
 
 	/*
@@ -1422,6 +1429,13 @@ static inline void mwait_play_dead(void)
 	mwait_ptr = &current_thread_info()->flags;
 
 	wbinvd();
+
+	/*
+	 * FIXME: SCU will abort S3 entry with ACK C6 timeout
+	 * if the lapic timer value programmed is low.
+	 * Hence program a high value before offlineing the CPU
+	 */
+	apic_write(APIC_TMICT, ~0);
 
 	while (1) {
 		/*
