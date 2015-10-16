@@ -602,7 +602,7 @@ trip_point_temp_store(struct device *dev, struct device_attribute *attr,
 {
 	struct thermal_zone_device *tz = to_thermal_zone(dev);
 	int trip, ret;
-	unsigned long temperature;
+	long temperature;
 
 	if (!tz->ops->set_trip_temp)
 		return -EPERM;
@@ -746,6 +746,82 @@ passive_show(struct device *dev, struct device_attribute *attr,
 }
 
 static ssize_t
+slope_store(struct device *dev, struct device_attribute *attr,
+			const char *buf, size_t count)
+{
+	int ret;
+	long slope;
+	struct thermal_zone_device *tz = to_thermal_zone(dev);
+ 
+	if (!tz->ops->set_slope)
+		return -EPERM;
+ 
+	if (kstrtol(buf, 10, &slope))
+		return -EINVAL;
+ 
+	ret = tz->ops->set_slope(tz, slope);
+	if (ret)
+		return ret;
+ 
+	return count;
+}
+
+static ssize_t
+slope_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	int ret;
+	long slope;
+	struct thermal_zone_device *tz = to_thermal_zone(dev);
+ 
+	if (!tz->ops->get_slope)
+		return -EINVAL;
+ 
+	ret = tz->ops->get_slope(tz, &slope);
+	if (ret)
+		return ret;
+ 
+	return sprintf(buf, "%ld\n", slope);
+}
+
+static ssize_t
+intercept_store(struct device *dev, struct device_attribute *attr,
+			const char *buf, size_t count)
+{
+	int ret;
+	long intercept;
+	struct thermal_zone_device *tz = to_thermal_zone(dev);
+ 
+	if (!tz->ops->set_intercept)
+		return -EPERM;
+ 
+	if (kstrtol(buf, 10, &intercept))
+		return -EINVAL;
+ 
+	ret = tz->ops->set_intercept(tz, intercept);
+	if (ret)
+		return ret;
+ 
+	return count;
+}
+
+static ssize_t
+intercept_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	int ret;
+	long intercept;
+	struct thermal_zone_device *tz = to_thermal_zone(dev);
+ 
+	if (!tz->ops->get_intercept)
+		return -EINVAL;
+ 
+	ret = tz->ops->get_intercept(tz, &intercept);
+	if (ret)
+		return ret;
+ 
+	return sprintf(buf, "%ld\n", intercept);
+}
+
+static ssize_t
 policy_store(struct device *dev, struct device_attribute *attr,
 		    const char *buf, size_t count)
 {
@@ -812,6 +888,9 @@ static DEVICE_ATTR(type, 0444, type_show, NULL);
 static DEVICE_ATTR(temp, 0444, temp_show, NULL);
 static DEVICE_ATTR(mode, 0644, mode_show, mode_store);
 static DEVICE_ATTR(passive, S_IRUGO | S_IWUSR, passive_show, passive_store);
+static DEVICE_ATTR(slope, S_IRUGO | S_IWUSR, slope_show, slope_store);
+static DEVICE_ATTR(intercept,
+		S_IRUGO | S_IWUSR, intercept_show, intercept_store);
 static DEVICE_ATTR(policy, S_IRUGO | S_IWUSR, policy_show, policy_store);
 
 /* sys I/F for cooling device */
@@ -839,6 +918,43 @@ thermal_cooling_device_max_state_show(struct device *dev,
 	if (ret)
 		return ret;
 	return sprintf(buf, "%ld\n", state);
+}
+
+/*
+ * Sysfs to read the mapped values and to override
+ * the default values mapped to each state during runtime.
+ */
+static ssize_t
+thermal_cooling_device_force_state_override_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	struct thermal_cooling_device *cdev = to_cooling_device(dev);
+ 
+	return cdev->ops->get_force_state_override(cdev, buf);
+}
+
+static ssize_t
+thermal_cooling_device_force_state_override_store(struct device *dev,
+					struct device_attribute *attr,
+					const char *buf, size_t count)
+{
+	int ret;
+	struct thermal_cooling_device *cdev = to_cooling_device(dev);
+ 
+	ret = cdev->ops->set_force_state_override(cdev, (char *) buf);
+	if (ret)
+		return ret;
+ 
+	return count;
+}
+
+static ssize_t
+thermal_cooling_device_available_states_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct thermal_cooling_device *cdev = to_cooling_device(dev);
+ 
+	return cdev->ops->get_available_states(cdev, buf);
 }
 
 static ssize_t
@@ -883,6 +999,12 @@ static DEVICE_ATTR(max_state, 0444,
 static DEVICE_ATTR(cur_state, 0644,
 		   thermal_cooling_device_cur_state_show,
 		   thermal_cooling_device_cur_state_store);
+static DEVICE_ATTR(force_state_override, 0644,
+		thermal_cooling_device_force_state_override_show,
+		thermal_cooling_device_force_state_override_store);
+static DEVICE_ATTR(available_states, 0444,
+		thermal_cooling_device_available_states_show, NULL);
+
 
 static ssize_t
 thermal_cooling_device_trip_point_show(struct device *dev,
@@ -1148,13 +1270,26 @@ __thermal_cooling_device_register(struct device_node *np,
 
 	result = device_create_file(&cdev->device, &dev_attr_max_state);
 	if (result)
-		goto unregister;
+		goto remove_type;
 
 	result = device_create_file(&cdev->device, &dev_attr_cur_state);
 	if (result)
-		goto unregister;
+		goto remove_max_state;
+
+	if (ops->get_force_state_override) {
+		result = device_create_file(&cdev->device,
+					&dev_attr_force_state_override);
+		if (result)
+			goto remove_cur_state;
+	}
 
 	/* Add 'this' new cdev to the global cdev list */
+	if (ops->get_available_states) {
+		result = device_create_file(&cdev->device,
+						&dev_attr_available_states);
+		if (result)
+			goto remove_force_override;
+	}
 	mutex_lock(&thermal_list_lock);
 	list_add(&cdev->node, &thermal_cdev_list);
 	mutex_unlock(&thermal_list_lock);
@@ -1164,6 +1299,16 @@ __thermal_cooling_device_register(struct device_node *np,
 
 	return cdev;
 
+remove_force_override:
+	if (cdev->ops->get_force_state_override)
+		device_remove_file(&cdev->device,
+				&dev_attr_force_state_override);
+remove_cur_state:
+	device_remove_file(&cdev->device, &dev_attr_cur_state);
+remove_max_state:
+	device_remove_file(&cdev->device, &dev_attr_max_state);
+remove_type:
+	device_remove_file(&cdev->device, &dev_attr_cdev_type);
 unregister:
 	release_idr(&thermal_cdev_idr, &thermal_idr_lock, cdev->id);
 	device_unregister(&cdev->device);
@@ -1268,7 +1413,12 @@ void thermal_cooling_device_unregister(struct thermal_cooling_device *cdev)
 		device_remove_file(&cdev->device, &dev_attr_cdev_type);
 	device_remove_file(&cdev->device, &dev_attr_max_state);
 	device_remove_file(&cdev->device, &dev_attr_cur_state);
-
+	if (cdev->ops->get_force_state_override)
+		device_remove_file(&cdev->device,
+					&dev_attr_force_state_override);
+	if (cdev->ops->get_available_states)
+		device_remove_file(&cdev->device,
+					&dev_attr_available_states);
 	release_idr(&thermal_cdev_idr, &thermal_idr_lock, cdev->id);
 	device_unregister(&cdev->device);
 	return;
@@ -1539,6 +1689,19 @@ struct thermal_zone_device *thermal_zone_device_register(const char *type,
 			goto unregister;
 	}
 
+	/* Create Sysfs for slope/intercept values */
+	if (tz->ops->get_slope) {
+		result = device_create_file(&tz->device, &dev_attr_slope);
+		if (result)
+			goto unregister;
+	}
+ 
+	if (tz->ops->get_intercept) {
+		result = device_create_file(&tz->device, &dev_attr_intercept);
+		if (result)
+			goto unregister;
+	}
+
 #ifdef CONFIG_THERMAL_EMULATION
 	result = device_create_file(&tz->device, &dev_attr_emul_temp);
 	if (result)
@@ -1642,6 +1805,10 @@ void thermal_zone_device_unregister(struct thermal_zone_device *tz)
 	device_remove_file(&tz->device, &dev_attr_temp);
 	if (tz->ops->get_mode)
 		device_remove_file(&tz->device, &dev_attr_mode);
+	if (tz->ops->get_slope)
+		device_remove_file(&tz->device, &dev_attr_slope);
+	if (tz->ops->get_intercept)
+		device_remove_file(&tz->device, &dev_attr_intercept);
 	device_remove_file(&tz->device, &dev_attr_policy);
 	remove_trip_attrs(tz);
 	tz->governor = NULL;
