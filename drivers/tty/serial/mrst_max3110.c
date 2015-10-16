@@ -42,6 +42,7 @@
 #include <linux/tty_flip.h>
 #include <linux/serial_core.h>
 #include <linux/serial_reg.h>
+#include <linux/serial_max3110.h>
 
 #include <linux/kthread.h>
 #include <linux/spi/spi.h>
@@ -69,6 +70,7 @@ struct uart_max3110 {
 	u8 clock;
 	u8 parity, word_7bits;
 	u16 irq;
+	u16 irq_edge_triggered;
 
 	unsigned long uart_flags;
 
@@ -270,7 +272,7 @@ static void send_circ_buf(struct uart_max3110 *max,
 	int i, len, blen, dma_size, left, ret = 0;
 
 
-	dma_size = WORDS_PER_XFER * sizeof(u16) * 2;
+	dma_size = M3110_RX_FIFO_DEPTH * sizeof(u16) * 2;
 	buf = kzalloc(dma_size, GFP_KERNEL | GFP_DMA);
 	if (!buf)
 		return;
@@ -280,7 +282,7 @@ static void send_circ_buf(struct uart_max3110 *max,
 	while (!uart_circ_empty(xmit)) {
 		left = uart_circ_chars_pending(xmit);
 		while (left) {
-			len = min(left, WORDS_PER_XFER);
+			len = min(left, M3110_RX_FIFO_DEPTH);
 			blen = len * sizeof(u16);
 			memset(ibuf, 0, blen);
 
@@ -416,8 +418,8 @@ static int max3110_main_thread(void *_max)
 
 		mutex_lock(&max->thread_mutex);
 
-		if (test_and_clear_bit(BIT_IRQ_PENDING, &max->uart_flags))
-			max3110_con_receive(max);
+		if (max->irq_edge_triggered &&
+			test_and_clear_bit(BIT_IRQ_PENDING, &max->uart_flags))
 
 		/* first handle console output */
 		if (test_and_clear_bit(CON_TX_NEEDED, &max->uart_flags))
@@ -438,11 +440,14 @@ static irqreturn_t serial_m3110_irq(int irq, void *dev_id)
 {
 	struct uart_max3110 *max = dev_id;
 
-	/* max3110's irq is a falling edge, not level triggered,
-	 * so no need to disable the irq */
+	if (max->irq_edge_triggered) {
+		/* max3110's irq is a falling edge, not level triggered,
+		 * so no need to disable the irq */
 
-	if (!test_and_set_bit(BIT_IRQ_PENDING, &max->uart_flags))
-		wake_up(&max->wq);
+		if (!test_and_set_bit(BIT_IRQ_PENDING, &max->uart_flags))
+			wake_up(&max->wq);
+	} else
+		max3110_con_receive(max);
 
 	return IRQ_HANDLED;
 }
@@ -763,6 +768,10 @@ static int serial_m3110_probe(struct spi_device *spi)
 	void *buffer;
 	u16 res;
 	int ret = 0;
+	struct plat_max3110 *pdata = spi->dev.platform_data;
+
+	if (!pdata)
+		return -EINVAL;
 
 	max = kzalloc(sizeof(*max), GFP_KERNEL);
 	if (!max)
