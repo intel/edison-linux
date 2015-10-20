@@ -1244,7 +1244,7 @@ static void bq24261_wdt_reset_worker(struct work_struct *work)
 	ret = bq24261_reset_timer(chip);
 
 	if (ret)
-		dev_err(&chip->client->dev, "Error (%d) in WDT reset\n");
+		dev_err(&chip->client->dev, "Error (%d) in WDT reset\n",ret);
 	else
 		dev_info(&chip->client->dev, "WDT reset\n");
 
@@ -1526,7 +1526,7 @@ static irqreturn_t bq24261_thread_handler(int id, void *data)
 {
 	struct bq24261_charger *chip = (struct bq24261_charger *)data;
 
-	queue_work(system_nrt_wq, &chip->irq_work);
+	queue_work(system_wq, &chip->irq_work);
 	return IRQ_HANDLED;
 }
 
@@ -1601,7 +1601,7 @@ static int otg_handle_notification(struct notifier_block *nb,
 	list_add_tail(&evt->node, &chip->otg_queue);
 	spin_unlock(&chip->otg_queue_lock);
 
-	queue_work(system_nrt_wq, &chip->otg_work);
+	queue_work(system_wq, &chip->otg_work);
 	return NOTIFY_OK;
 }
 
