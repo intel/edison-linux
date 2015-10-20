@@ -986,7 +986,7 @@ int pmic_get_battery_pack_temp(int *temp)
 	return pmic_read_adc_val(GPADC_BATTEMP0, temp, &chc);
 }
 
-static int get_charger_type()
+static int get_charger_type(void)
 {
 	int ret, i = 0;
 	u8 val;
@@ -1054,7 +1054,7 @@ static void handle_internal_usbphy_notifications(int mask)
 	if (cap.chrg_type == POWER_SUPPLY_CHARGER_TYPE_USB_SDP)
 		cap.ma = 0;
 	else if ((cap.chrg_type == POWER_SUPPLY_CHARGER_TYPE_USB_DCP)
-			|| (cap.chrg_type == POWER_SUPPLY_TYPE_USB_CDP)
+			|| (cap.chrg_type == POWER_SUPPLY_CHARGER_TYPE_USB_CDP)
 			|| (cap.chrg_type == POWER_SUPPLY_CHARGER_TYPE_SE1))
 		cap.ma = 1500;
 
@@ -1309,7 +1309,7 @@ static irqreturn_t pmic_thread_handler(int id, void *data)
 	list_add_tail(&evt->node, &chc.evt_queue);
 	mutex_unlock(&chc.evt_queue_lock);
 
-	queue_work(system_nrt_wq, &chc.evt_work);
+	queue_work(system_wq, &chc.evt_work);
 
 end:
 	/*clear first level IRQ */
@@ -1534,7 +1534,6 @@ static int pmic_check_initial_events(void)
 {
 	struct pmic_event *evt;
 	int ret;
-	u8 mask = (CHRGRIRQ1_SVBUSDET_MASK);
 
 	evt = kzalloc(sizeof(struct pmic_event), GFP_KERNEL);
 	if (evt == NULL) {
@@ -1793,9 +1792,7 @@ static int pmic_chrgr_resume(struct device *dev)
 	dev_dbg(dev, "%s called\n", __func__);
 	return 0;
 }
-#endif
 
-#ifdef CONFIG_PM_RUNTIME
 static int pmic_chrgr_runtime_suspend(struct device *dev)
 {
 	dev_dbg(dev, "%s called\n", __func__);
