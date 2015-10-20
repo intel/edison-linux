@@ -463,6 +463,13 @@ static int log_store(int facility, int level,
 	return msg->text_len;
 }
 
+/* Clears the ring-buffer */
+void log_buf_clear(void)
+{
+	clear_seq = log_next_seq;
+	clear_idx = log_next_idx;
+}
+
 int dmesg_restrict = IS_ENABLED(CONFIG_SECURITY_DMESG_RESTRICT);
 
 static int syslog_action_restricted(int type)
@@ -1477,7 +1484,7 @@ static int console_trylock_for_printk(void)
 {
 	unsigned int cpu = smp_processor_id();
 
-	if (!console_trylock())
+	if (!console_trylock() || in_nmi())
 		return 0;
 	/*
 	 * If we can't use the console, we need to release the console
@@ -1658,7 +1665,13 @@ asmlinkage int vprintk_emit(int facility, int level,
 	}
 
 	lockdep_off();
-	raw_spin_lock(&logbuf_lock);
+	if (unlikely(in_nmi())) {
+		if (!raw_spin_trylock(&logbuf_lock))
+			goto out_restore_lockdep_irqs;
+	} else {
+		raw_spin_lock(&logbuf_lock);
+	}
+
 	logbuf_cpu = this_cpu;
 
 	if (unlikely(recursion_bug)) {
@@ -1756,6 +1769,7 @@ asmlinkage int vprintk_emit(int facility, int level,
 
 	logbuf_cpu = UINT_MAX;
 	raw_spin_unlock(&logbuf_lock);
+out_restore_lockdep_irqs:
 	lockdep_on();
 	local_irq_restore(flags);
 

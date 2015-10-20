@@ -56,4 +56,10 @@ static inline void mwait_idle_with_hints(unsigned long eax, unsigned long ecx)
 	current_clr_polling();
 }
 
+#ifdef CONFIG_ATOM_SOC_POWER
+#define MWAIT_MAX_NUM_CSTATES		10
+#else
+#define MWAIT_MAX_NUM_CSTATES		8
+#endif
+
 #endif /* _ASM_X86_MWAIT_H */
