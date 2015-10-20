@@ -59,6 +59,11 @@
 		.ch_base = (_ch_base),				\
 		.block_size = (_block_size),			\
 		.pimr_mask = (_pimr_mask),			\
+		.pimr_base = (_pimr_base),          \
+		.dword_trf = (_dword_trf),          \
+		.pimr_offset = (_pimr_offset),          \
+		.pci_id = (_pci_id),                \
+		.pdma_ops = (_pdma_ops)             \
 	})
 
 /*****************************************************************************
