@@ -351,6 +351,9 @@ struct iio_info {
 			int *val_len,
 			long mask);
 
+	int (*read_all_raw)(struct iio_channel *chan,
+			int *val);
+
 	int (*write_raw)(struct iio_dev *indio_dev,
 			 struct iio_chan_spec const *chan,
 			 int val,
