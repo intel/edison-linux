@@ -26,7 +26,7 @@ static struct intel_mid_ssp_spi_chip chip = {
 	.burst_size = DFLT_FIFO_BURST_SIZE,
 	.timeout = DFLT_TIMEOUT_VAL,
 	/* SPI DMA is currently usable on Tangier */
-	.dma_enabled = true,
+	.dma_enabled = false,
 	.cs_control = tng_ssp_spi_cs_control,
 	.platform_pinmux = tng_ssp_spi_platform_pinmux,
 };
