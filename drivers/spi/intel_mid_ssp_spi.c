@@ -695,8 +695,8 @@ void drain_trail(struct ssp_drv_context *sspc)
 		sspc->len = sspc->len - sspc->len_dma_rx;
 		sspc->cur_msg->actual_length = sspc->len_dma_rx;
 
-		while ((sspc->tx != sspc->tx_end) ||
-			(sspc->rx != sspc->rx_end)) {
+		while ((sspc->tx < sspc->tx_end) ||
+			(sspc->rx < sspc->rx_end)) {
 			sspc->read(sspc);
 			sspc->write(sspc);
 		}
@@ -749,9 +749,6 @@ static void int_transfer_complete(struct ssp_drv_context *sspc)
 		sspc->cs_control(!sspc->cs_assert);
 
 	dev_dbg(dev, "End of transfer. SSSR:%08X\n", read_SSSR(reg));
-	msg = sspc->cur_msg;
-	if (likely(msg->complete))
-		msg->complete(msg->context);
 	complete(&sspc->msg_done);
 }
 
@@ -980,7 +977,11 @@ static int handle_message(struct ssp_drv_context *sspc)
 	dma_enabled = chip->dma_enabled;
 	spin_unlock_irqrestore(&sspc->lock, flags);
 
+	complete(&sspc->msg_done);
+
 	list_for_each_entry(transfer, &msg->transfers, transfer_list) {
+		wait_for_completion(&sspc->msg_done);
+		INIT_COMPLETION(sspc->msg_done);
 
 		/* Check transfer length */
 		if (unlikely((transfer->len > MAX_SPI_TRANSFER_SIZE) ||
@@ -1184,6 +1185,8 @@ static int handle_message(struct ssp_drv_context *sspc)
 			/* Do the transfer syncronously */
 			queue_work(sspc->wq_poll_write, &sspc->poll_write);
 			poll_transfer((unsigned long)sspc);
+			unmap_dma_buffers(sspc);
+			complete(&sspc->msg_done);
 		}
 
 		if (list_is_last(&transfer->transfer_list, &msg->transfers)
@@ -1194,13 +1197,11 @@ static int handle_message(struct ssp_drv_context *sspc)
 
 	} /* end of list_for_each_entry */
 
+	wait_for_completion(&sspc->msg_done);
+
 	/* Now we are done with this entire message */
-	if ((!dma_enabled) || (normal_enabled)) {
-		unmap_dma_buffers(sspc);
-		if (likely(msg->complete))
-			msg->complete(msg->context);
-		complete(&sspc->msg_done);
-	}
+	if (likely(msg->complete))
+		msg->complete(msg->context);
 
 	return 0;
 }
@@ -1222,9 +1223,7 @@ static void pump_messages(struct work_struct *work)
 		list_del_init(&msg->queue);
 		sspc->cur_msg = msg;
 		spin_unlock_irqrestore(&sspc->lock, flags);
-		INIT_COMPLETION(sspc->msg_done);
 		handle_message(sspc);
-		wait_for_completion(&sspc->msg_done);
 		spin_lock_irqsave(&sspc->lock, flags);
 		sspc->cur_msg = NULL;
 	}
