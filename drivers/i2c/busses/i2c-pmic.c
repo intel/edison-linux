@@ -339,7 +339,7 @@ static int pmic_i2c_resume(struct device *dev)
 }
 #endif
 
-#ifdef CONFIG_PM_RUNTIME
+#ifdef CONFIG_PM
 static int pmic_i2c_runtime_suspend(struct device *dev)
 {
 	dev_info(dev, "%s\n", __func__);

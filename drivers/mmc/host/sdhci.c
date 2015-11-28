@@ -3718,7 +3718,7 @@ static void sdhci_mfld_panic_prepare(struct mmc_panic_host *panic_host)
 	 */
 	host->runtime_suspended = true;
 
-#ifdef CONFIG_PM_RUNTIME
+#ifdef CONFIG_PM
 	/*
 	 * disable runtime pm directly
 	 */

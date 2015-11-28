@@ -486,7 +486,7 @@ static int psh_ipc_resume_noirq(struct device *dev)
 
 #endif
 
-#ifdef CONFIG_PM_RUNTIME
+#ifdef CONFIG_PM
 static int psh_ipc_runtime_suspend(struct device *dev)
 {
 	dev_dbg(dev, "runtime suspend called\n");
