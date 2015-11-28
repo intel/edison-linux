@@ -16,6 +16,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/netdevice.h>
+#include <linux/moduleparam.h>
 
 #include "u_serial.h"
 #if defined USB_ETH_RNDIS
@@ -45,6 +46,10 @@ MODULE_LICENSE("GPL");
 USB_GADGET_COMPOSITE_OPTIONS();
 
 USB_ETHERNET_MODULE_PARAMETERS();
+
+static char ethernet_config[6];
+module_param_string(ethernet_config, ethernet_config, sizeof(ethernet_config), 0444);
+MODULE_PARM_DESC(ethernet_config, "ethernet configuration : should be cdc or rndis");
 
 /***************************** Device Descriptor ****************************/
 
@@ -430,13 +435,30 @@ static int __ref multi_bind(struct usb_composite_dev *cdev)
 	device_desc.iProduct = strings_dev[USB_GADGET_PRODUCT_IDX].id;
 
 	/* register configurations */
-	status = rndis_config_register(cdev);
-	if (unlikely(status < 0))
-		goto fail_string_ids;
+	/* RNDIS configuration */
+	if (strncmp(ethernet_config, "rndis", 5) == 0) {
+		status = rndis_config_register(cdev);
+ 
+		if (unlikely(status < 0))
+			goto fail2;
+	} else if (strncmp(ethernet_config, "cdc", 3) == 0) {
+		/* CDC ECM configuration  */
+		status = cdc_config_register(cdev);
+ 
+		if (unlikely(status < 0))
+			goto fail2;
+	} else {
+		status = rndis_config_register(cdev);
+ 
+		if (unlikely(status < 0))
+			goto fail2;
+ 
+		status = cdc_config_register(cdev);
+ 
+		if (unlikely(status < 0))
+			goto fail2;
+	}
 
-	status = cdc_config_register(cdev);
-	if (unlikely(status < 0))
-		goto fail_string_ids;
 	usb_composite_overwrite_options(cdev, &coverwrite);
 
 	/* we're done */

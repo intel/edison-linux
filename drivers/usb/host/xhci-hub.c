@@ -1169,6 +1169,20 @@ int xhci_bus_suspend(struct usb_hcd *hcd)
 		t1 = xhci_port_state_to_neutral(t1);
 		if (t1 != t2)
 			writel(t2, port_array[port_index]);
+       if (hcd->speed != HCD_USB3) {
+            /* enable remote wake up for USB 2.0 */
+            __le32 __iomem *addr;
+            u32 tmp;
+
+            /* Add one to the port status register address to get
+             * the port power control register address.
+             */
+            addr = port_array[port_index] + 1;
+            tmp = readl(addr);
+            tmp |= PORT_RWE;
+            writel(tmp, addr);
+        }
+
 	}
 	hcd->state = HC_STATE_SUSPENDED;
 	bus_state->next_statechange = jiffies + msecs_to_jiffies(10);
