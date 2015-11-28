@@ -41,7 +41,6 @@ config X86
 	select HAVE_MEMBLOCK_NODE_MAP
 	select ARCH_DISCARD_MEMBLOCK
 	select ARCH_WANT_OPTIONAL_GPIOLIB
-	select ARCH_HAVE_CUSTOM_GPIO_H
 	select ARCH_WANT_FRAME_POINTERS
 	select HAVE_DMA_ATTRS
 	select HAVE_DMA_CONTIGUOUS
@@ -503,6 +502,7 @@ config X86_INTEL_MID
 	select IIO_TRIGGERED_BUFFER
 	select SST_MRFLD_DPCM
 	select TI_ADS7955_ADC
+	select ARCH_HAVE_CUSTOM_GPIO_H
 	---help---
 	  Select to build a kernel capable of supporting Intel MID (Mobile
 	  Internet Device) platform systems which do not have the PCI legacy
@@ -531,14 +531,14 @@ config REMOVEME_INTEL_ATOM_MRFLD_POWER
 endchoice
 
 config INTEL_DEBUG_FEATURE
-		bool "Debug feature interface on Intel MID platform"
-		depends on X86_INTEL_MID
-		---help---
-		 Provides an interface to list the debug features
-		 that are enabled on an Intel MID platform. The
-		 enabling of the debug features depends on the mode
-		 the device is in (e.g. manufacturing, production,
-		 end user, etc...).
+       bool "Debug feature interface on Intel MID platform"
+       depends on X86_INTEL_MID
+       ---help---
+         Provides an interface to list the debug features
+	 that are enabled on an Intel MID platform. The
+	 enabling of the debug features depends on the mode
+	 the device is in (e.g. manufacturing, production,
+	 end user, etc...).
 
 endif
 

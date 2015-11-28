@@ -258,6 +258,18 @@ config TI_ADC128S052
 	  This driver can also be built as a module. If so, the module will be
 	  called ti-adc128s052.
 
+config TI_ADS7955_ADC
+	tristate "Texas Instruments ADS7955 ADC driver"
+	depends on SPI
+	select IIO_BUFFER
+	select IIO_TRIGGERED_BUFFER
+	help
+	  Say yes here to build support for Texas Instruments ADS7955
+	  8 Channel ADC.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ti-ads7955.
+
 config TI_AM335X_ADC
 	tristate "TI's AM335X ADC driver"
 	depends on MFD_TI_AM335X_TSCADC
@@ -320,5 +332,11 @@ config XILINX_XADC
 
 	  The driver can also be build as a module. If so, the module will be called
 	  xilinx-xadc.
+
+config IIO_BASINCOVE_GPADC
+	tristate "IIO Basincove GPADC driver"
+	depends on IIO
+	help
+	  Say yes here to build support for the IIO basincove GPADC driver.
 
 endmenu

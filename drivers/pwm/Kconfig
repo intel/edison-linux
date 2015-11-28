@@ -349,4 +349,13 @@ config PWM_VT8500
 	  To compile this driver as a module, choose M here: the module
 	  will be called pwm-vt8500.
 
+config PWM_INTEL_MID
+	tristate "Support for Intel MID PWM"
+	help
+	  This option enables support for Intel Mid PWM Driver. Say Y
+	  here if you want to enable the PWM functionality.
+
+	  To compile this driver as a module, choose M here. The module will
+	  be called pwm-intel-mid.
+
 endif

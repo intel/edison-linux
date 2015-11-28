@@ -139,16 +139,16 @@ config INTEL_MID_PTI
 	  P1149.7 standard implementation.
 
 config INTEL_PTI_STM
-    tristate "MIPI Sytem Trace Macro (STM) for Intel"
-    default n
-    depends on INTEL_MID_PTI
-    help
-      The STM (Sytem Trace Monitor) driver control trace data
-      route through an Intel Tangier PTI port or through USB xDCI
-      interface with Debug-Class DvC.Trace support.
- 
-      It provide the ability to PTI driver to setup the output and
-      to user to change the output with sysfs and exported header.
+	tristate "MIPI Sytem Trace Macro (STM) for Intel"
+	default n
+	depends on INTEL_MID_PTI
+	help
+	   The STM (Sytem Trace Monitor) driver control trace data
+	   route through an Intel Tangier PTI port or through USB xDCI
+	   interface with Debug-Class DvC.Trace support.
+
+	   It provide the ability to PTI driver to setup the output and
+	   to user to change the output with sysfs and exported header.
 
 config SGI_IOC4
 	tristate "SGI IOC4 Base IO support"
@@ -519,18 +519,18 @@ config SRAM
 	  areas found on many SoCs.
 
 config EMMC_IPANIC
-    bool "Intel kernel panic diagnostics driver FOR EMMC"
-    default n
-    ---help---
-      Driver which handles kernel panics and attempts to write
-      critical debugging data to EMMC.
+	bool "Intel kernel panic diagnostics driver FOR EMMC"
+	default n
+	---help---
+	  Driver which handles kernel panics and attempts to write
+	  critical debugging data to EMMC.
 
 config EMMC_IPANIC_PLABEL
-    string "Intel kernel panic driver (EMMC_IPANIC) partition label"
-    depends on EMMC_IPANIC
-    default "panic"
-    ---help---
-      Set the default mmc partition label for EMMC_IPANIC driver.
+	string "Intel kernel panic driver (EMMC_IPANIC) partition label"
+	depends on EMMC_IPANIC
+	default "panic"
+	---help---
+	  Set the default mmc partition label for EMMC_IPANIC driver.
 
 config VEXPRESS_SYSCFG
 	bool "Versatile Express System Configuration driver"
