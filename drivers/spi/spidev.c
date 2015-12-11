@@ -438,7 +438,8 @@ spidev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		break;
 
 	default:
-		/* segmented and/or full-duplex I/O request */
+		/* segmented and/or full-duplex I/O request.
+		   Note: Maximum support 511 n_ioc at a time */
 		if (_IOC_NR(cmd) != _IOC_NR(SPI_IOC_MESSAGE(0))
 				|| _IOC_DIR(cmd) != _IOC_WRITE) {
 			retval = -ENOTTY;
@@ -452,7 +453,10 @@ spidev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		}
 		n_ioc = tmp / sizeof(struct spi_ioc_transfer);
 		if (n_ioc == 0)
+		{
+			dev_err(&spi->dev, "Value of n_ioc is out of range( 1 ~ 511 ).\n");
 			break;
+		}
 
 		/* copy into scratch area */
 		ioc = kmalloc(tmp, GFP_KERNEL);
