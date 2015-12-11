@@ -544,7 +544,7 @@ static void dma_transfer(struct ssp_drv_context *sspc)
 
 		/* In Rx direction, TRAIL Bytes are handled by memcpy */
 		if (sspc->rx_dma &&
-			(sspc->len_dma_rx >
+			(sspc->len_dma_rx >=
 				sspc->rx_fifo_threshold * sspc->n_bytes))
 		{
 			sspc->len_dma_rx = TRUNCATE(sspc->len_dma_rx,
@@ -961,7 +961,6 @@ static int handle_message(struct ssp_drv_context *sspc)
 	u32 mask = 0;
 	int bits_per_word, saved_bits_per_word;
 	unsigned long flags;
-	u8 normal_enabled = 0;
 
 	chip = spi_get_ctldata(msg->spi);
 
@@ -1054,28 +1053,16 @@ static int handle_message(struct ssp_drv_context *sspc)
 			sspc->n_bytes = 1;
 			sspc->read = u8_reader;
 			sspc->write = u8_writer;
-			/* It maybe has some unclear issue in dma mode, as workaround,
-			use normal mode to transfer when len equal 8 bytes */
-			if (transfer->len == 8)
-				normal_enabled = 1;
 		} else if (bits_per_word <= 16) {
 			sspc->n_bytes = 2;
 			sspc->read = u16_reader;
 			sspc->write = u16_writer;
-			/* It maybe has some unclear issue in dma mode, as workaround,
-			use normal mode to transfer when len equal 16 bytes */
-			if (transfer->len == 16)
-				normal_enabled = 1;
 		} else if (bits_per_word <= 32) {
 			if (!ssp_timing_wr)
 				cr0 |= SSCR0_EDSS;
 			sspc->n_bytes = 4;
 			sspc->read = u32_reader;
 			sspc->write = u32_writer;
-			/* It maybe has some unclear issue in dma mode, as workaround,
-			use normal mode to transfer when len equal 32 bytes */
-			if (transfer->len == 32)
-				normal_enabled = 1;
 		}
 
 		sspc->tx  = (void *)transfer->tx_buf;
@@ -1114,7 +1101,7 @@ static int handle_message(struct ssp_drv_context *sspc)
 			/* value. The RX fifo threshold must be aligned with the DMA */
 			/* RX transfer size, which may be limited to a multiple of 4 */
 			/* bytes due to 32bits DDR access.                           */
-			if  (sspc->len / sspc->n_bytes <= sspc->rx_fifo_threshold) {
+			if  (sspc->len / sspc->n_bytes < sspc->rx_fifo_threshold) {
 				u32 rx_fifo_threshold;
 
 				rx_fifo_threshold = (sspc->len & ~(4 - 1)) /
@@ -1176,7 +1163,7 @@ static int handle_message(struct ssp_drv_context *sspc)
 		if (sspc->cs_control)
 			sspc->cs_control(sspc->cs_assert);
 
-		if (likely(dma_enabled) && (!normal_enabled)) {
+		if (likely(dma_enabled)) {
 			if (unlikely(sspc->quirks & QUIRKS_USE_PM_QOS))
 				pm_qos_update_request(&sspc->pm_qos_req,
 						MIN_EXIT_LATENCY);
@@ -1252,9 +1239,10 @@ static int setup(struct spi_device *spi)
 	if (!spi->bits_per_word)
 		spi->bits_per_word = DFLT_BITS_PER_WORD;
 
-	if ((spi->bits_per_word < MIN_BITS_PER_WORD
-		|| spi->bits_per_word > MAX_BITS_PER_WORD)) {
+	if ((spi->bits_per_word != 8) && (spi->bits_per_word != 16)
+		&& (spi->bits_per_word != 32)) {
 		spin_unlock_irqrestore(&sspc->lock, flags);
+		dev_warn(&spi->dev, "invalid wordsize, system only support 8,16,32 bits per word.\n");
 		return -EINVAL;
 	}
 
