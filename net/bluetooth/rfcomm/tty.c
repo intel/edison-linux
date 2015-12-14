@@ -105,15 +105,28 @@ static void rfcomm_dev_destruct(struct tty_port *port)
 
 	tty_unregister_device(rfcomm_tty_driver, dev->id);
 
-	kfree(dev);
+	if (!port->ops || !port->ops->destroy) {
+		kfree(dev);
 
 	/* It's safe to call module_put() here because socket still
 	   holds reference to this module. */
+		module_put(THIS_MODULE);
+	}
+}
+
+static void rfcomm_dev_destroy(struct tty_port *port)
+{
+	struct rfcomm_dev *dev = container_of(port, struct rfcomm_dev, port);
+
+	if (dev)
+		kfree(dev);
+
 	module_put(THIS_MODULE);
 }
 
 static const struct tty_port_operations rfcomm_port_ops = {
 	.destruct = rfcomm_dev_destruct,
+	.destroy = rfcomm_dev_destroy,
 };
 
 static struct rfcomm_dev *__rfcomm_dev_get(int id)
@@ -745,13 +758,11 @@ static void rfcomm_tty_close(struct tty_struct *tty, struct file *filp)
 		dev->port.tty = NULL;
 		rfcomm_dlc_unlock(dev->dlc);
 
-		if (test_bit(RFCOMM_TTY_RELEASED, &dev->flags)) {
-			spin_lock(&rfcomm_dev_lock);
-			list_del_init(&dev->list);
-			spin_unlock(&rfcomm_dev_lock);
+		spin_lock(&rfcomm_dev_lock);
+		list_del_init(&dev->list);
+		spin_unlock(&rfcomm_dev_lock);
 
-			tty_port_put(&dev->port);
-		}
+		tty_port_put(&dev->port);
 	} else
 		spin_unlock_irqrestore(&dev->port.lock, flags);
 

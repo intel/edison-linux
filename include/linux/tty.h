@@ -185,6 +185,7 @@ struct tty_port_operations {
 	int (*activate)(struct tty_port *port, struct tty_struct *tty);
 	/* Called on the final put of a port */
 	void (*destruct)(struct tty_port *port);
+	void (*destroy)(struct tty_port *port);
 };
 	
 struct tty_port {
