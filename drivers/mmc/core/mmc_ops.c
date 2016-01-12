@@ -758,7 +758,7 @@ static int mmc_rpmb_send_command(struct mmc_card *card, u8 *buf, __u16 blks,
 	struct mmc_data data = {0};
 	struct scatterlist sg;
 	u8 *transfer_buf = NULL;
- 
+
 	mrq.sbc = &sbc;
 	mrq.cmd = &cmd;
 	mrq.data = &data;
@@ -766,7 +766,7 @@ static int mmc_rpmb_send_command(struct mmc_card *card, u8 *buf, __u16 blks,
 	transfer_buf = kzalloc(512 * blks, GFP_KERNEL);
 	if (!transfer_buf)
 		return -ENOMEM;
- 
+
 	/*
 	 * set CMD23
 	 */
@@ -776,7 +776,7 @@ static int mmc_rpmb_send_command(struct mmc_card *card, u8 *buf, __u16 blks,
 				type == RPMB_PROGRAM_KEY))
 		sbc.arg |= 1 << 31;
 	sbc.flags = MMC_RSP_R1 | MMC_CMD_AC;
- 
+
 	/*
 	 * set CMD25/18
 	 */
@@ -795,16 +795,16 @@ static int mmc_rpmb_send_command(struct mmc_card *card, u8 *buf, __u16 blks,
 	data.blocks = blks;
 	data.sg = &sg;
 	data.sg_len = 1;
- 
+
 	mmc_set_data_timeout(&data, card);
- 
+
 	mmc_wait_for_req(card->host, &mrq);
- 
+
 	if (req_type != RPMB_REQ)
 		sg_copy_to_buffer(&sg, 1, buf, 512 * blks);
- 
+
 	kfree(transfer_buf);
- 
+
 	if (cmd.error)
 		return cmd.error;
 	if (data.error)
@@ -817,13 +817,13 @@ void mmc_rpmb_post_frame(struct mmc_core_rpmb_req *rpmb_req)
 	int i;
 	struct mmc_ioc_rpmb_req *p_req;
 	__u8 *buf_frame;
- 
+
 	if (!rpmb_req || !rpmb_req->ready)
 		return;
- 
+
 	p_req = rpmb_req->req;
 	buf_frame = rpmb_req->frame;
- 
+
 	if (!p_req || !buf_frame)
 		return;
 	/*
@@ -844,19 +844,19 @@ void mmc_rpmb_post_frame(struct mmc_core_rpmb_req *rpmb_req)
 	 * Except READ_DATA, all of these operations only need to parse
 	 * one frame. READ_DATA needs blks frames to get DATA
 	 */
- 
+
 	memcpy(p_req->result, buf_frame + RPMB_RES_BEG, 2);
 	*p_req->result = be16_to_cpup(p_req->result);
- 
+
 	if (p_req->type == RPMB_PROGRAM_KEY)
 		goto out;
- 
+
 	if (p_req->type == RPMB_GET_WRITE_COUNTER ||
 			p_req->type == RPMB_WRITE_DATA) {
 		memcpy(p_req->wc, buf_frame + RPMB_WCOUNTER_BEG, 4);
 		*p_req->wc = be32_to_cpup(p_req->wc);
 	}
- 
+
 	if (p_req->type == RPMB_GET_WRITE_COUNTER ||
 			p_req->type == RPMB_READ_DATA) {
 		/* nonce copy */
@@ -913,7 +913,7 @@ static int mmc_rpmb_request_check(struct mmc_card *card,
 				mmc_hostname(card->host), p_req->type);
 		return -EINVAL;
 	}
- 
+
 	if (p_req->type == RPMB_GET_WRITE_COUNTER) {
 		if (!p_req->nonce || !p_req->wc) {
 			pr_err("%s: Type %d has NULL pointer for nonce/wc\n",
@@ -980,7 +980,7 @@ static int mmc_rpmb_request_check(struct mmc_card *card,
 		p_req->blk_cnt = 1;
 	} else
 		return -EOPNOTSUPP;
- 
+
 	return 0;
 }
 
@@ -998,34 +998,34 @@ int mmc_rpmb_pre_frame(struct mmc_core_rpmb_req *rpmb_req,
 	__u8 *buf_frame;
 	__u16 blk_cnt, addr, type;
 	__u32 w_counter;
- 
+
 	if (!rpmb_req || !card)
 		return -EINVAL;
- 
+
 	p_req = rpmb_req->req;
 	if (!p_req) {
 		pr_err("%s: mmc_ioc_rpmb_req is NULL. Wrong parameter\n",
 				mmc_hostname(card->host));
 		return -EINVAL;
 	}
- 
+
 	/*
 	 * make sure these two items are clear
 	 */
 	rpmb_req->ready = 0;
 	rpmb_req->frame = NULL;
- 
+
 	ret = mmc_rpmb_request_check(card, p_req);
 	if (ret)
 		return ret;
- 
+
 	buf_frame = kzalloc(512 * p_req->blk_cnt, GFP_KERNEL);
 	if (!buf_frame) {
 		pr_err("%s: cannot allocate frame for type %d\n",
 				mmc_hostname(card->host), p_req->type);
 		return -ENOMEM;
 	}
- 
+
 	type = cpu_to_be16p(&p_req->type);
 	if (p_req->type == RPMB_GET_WRITE_COUNTER ||
 			p_req->type == RPMB_READ_DATA) {
@@ -1094,22 +1094,22 @@ int mmc_rpmb_partition_ops(struct mmc_core_rpmb_req *rpmb_req,
 	struct mmc_ioc_rpmb_req *p_req;
 	__u16 type, blks;
 	__u8 *buf_frame;
- 
+
 	if (!rpmb_req || !card)
 		return -EINVAL;
- 
+
 	p_req = rpmb_req->req;
 	buf_frame = rpmb_req->frame;
- 
+
 	if (!p_req || !rpmb_req->ready || !buf_frame) {
 		pr_err("%s: mmc_ioc_rpmb_req is not prepared\n",
 				mmc_hostname(card->host));
 		return -EINVAL;
 	}
- 
+
 	type = p_req->type;
 	blks = p_req->blk_cnt;
- 
+
 	/*
 	 * STEP 1: send request to RPMB partition
 	 */
@@ -1118,13 +1118,13 @@ int mmc_rpmb_partition_ops(struct mmc_core_rpmb_req *rpmb_req,
 				type, RPMB_REQ);
 	else
 		err = mmc_rpmb_send_command(card, buf_frame, 1, type, RPMB_REQ);
- 
+
 	if (err) {
 		pr_err("%s: request write counter failed (%d)\n",
 				mmc_hostname(card->host), err);
 		goto out;
 	}
- 
+
 	memset(buf_frame, 0, 512 * blks);
 	/*
 	 * STEP 2: check write result
@@ -1141,11 +1141,11 @@ int mmc_rpmb_partition_ops(struct mmc_core_rpmb_req *rpmb_req,
 			goto out;
 		}
 	}
- 
+
 	/*
 	 * STEP 3: get response from RPMB partition
 	 */
- 
+
 	if (type == RPMB_READ_DATA)
 		err = mmc_rpmb_send_command(card, buf_frame,
 				blks, type, RPMB_RESP);

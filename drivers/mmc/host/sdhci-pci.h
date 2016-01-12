@@ -66,9 +66,9 @@ struct sdhci_pci_slot {
 	bool			cd_override_level;
 
 	void (*hw_reset)(struct sdhci_host *host);
-	bool            dev_power;
-	struct mutex        power_lock;
-	bool            dma_enabled;
+	bool		dev_power;
+	struct mutex	power_lock;
+	bool		dma_enabled;
 };
 
 struct sdhci_pci_chip {
@@ -77,13 +77,13 @@ struct sdhci_pci_chip {
 	unsigned int		quirks;
 	unsigned int		quirks2;
 	bool			allow_runtime_pm;
-	unsigned int        autosuspend_delay;
+	unsigned int		autosuspend_delay;
 	const struct sdhci_pci_fixes *fixes;
 
 	int			num_slots;	/* Slots on controller */
 	struct sdhci_pci_slot	*slots[MAX_SLOTS]; /* Pointers to host slots */
-	unsigned int        enctrl0_orig;
-	unsigned int        enctrl1_orig;
+	unsigned int		enctrl0_orig;
+	unsigned int		enctrl1_orig;
 };
 
 #endif /* __SDHCI_PCI_H */

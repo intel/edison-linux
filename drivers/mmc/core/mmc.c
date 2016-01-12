@@ -180,7 +180,8 @@ static int mmc_decode_csd(struct mmc_card *card)
 static void mmc_select_card_type(struct mmc_card *card)
 {
 	struct mmc_host *host = card->host;
-	u8 card_type = card->ext_csd.raw_card_type;
+	u8 card_type = card->ext_csd.raw_card_type &
+					EXT_CSD_CARD_TYPE_MASK_FULL;
 	u32 caps = host->caps, caps2 = host->caps2;
 	unsigned int hs_max_dtr = 0, hs200_max_dtr = 0;
 	unsigned int avail_type = 0;
@@ -471,8 +472,8 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
 			ext_csd[EXT_CSD_PWR_CL_DDR_52_195];
 		card->ext_csd.raw_pwr_cl_ddr_52_360 =
 			ext_csd[EXT_CSD_PWR_CL_DDR_52_360];
-		card->ext_csd.raw_pwr_cl_200_ddr_195 =
-			ext_csd[EXT_CSD_PWR_CL_200_DDR_195];
+		card->ext_csd.raw_pwr_cl_ddr_200_195 =
+			ext_csd[EXT_CSD_PWR_CL_DDR_200_195];
 		card->ext_csd.raw_pwr_cl_ddr_200_360 =
 			ext_csd[EXT_CSD_PWR_CL_DDR_200_360];
 	}
@@ -693,8 +694,8 @@ static int mmc_compare_ext_csds(struct mmc_card *card, unsigned bus_width)
 			bw_ext_csd[EXT_CSD_PWR_CL_DDR_52_195]) &&
 		(card->ext_csd.raw_pwr_cl_ddr_52_360 ==
 			bw_ext_csd[EXT_CSD_PWR_CL_DDR_52_360]) &&
-		(card->ext_csd.raw_pwr_cl_ddr_52_195 ==
-			bw_ext_csd[EXT_CSD_PWR_CL_DDR_52_195]) &&
+		(card->ext_csd.raw_pwr_cl_ddr_200_195 ==
+			bw_ext_csd[EXT_CSD_PWR_CL_DDR_200_195]) &&
 		(card->ext_csd.raw_pwr_cl_ddr_200_360 ==
 			bw_ext_csd[EXT_CSD_PWR_CL_DDR_200_360]));
 
@@ -793,7 +794,7 @@ static int __mmc_select_powerclass(struct mmc_card *card,
 				ext_csd->raw_pwr_cl_ddr_52_195;
 		else if (host->ios.clock <= MMC_HS200_MAX_DTR) {
 			if (mmc_card_hs400(card))
-				pwrclass_val = ext_csd->raw_pwr_cl_200_ddr_195;
+				pwrclass_val = ext_csd->raw_pwr_cl_ddr_200_195;
 			else
 				pwrclass_val = ext_csd->raw_pwr_cl_200_195;
 		}
@@ -870,81 +871,6 @@ static int mmc_select_powerclass(struct mmc_card *card)
 		pr_warn("%s: power class selection to bus width %d ddr %d failed\n",
 			mmc_hostname(host), 1 << bus_width, ddr);
 
-	return err;
-}
-
-/*
- * Support HS400:
- * This function should be called after HS200 tuning.
- */
-static int mmc_select_hs400_start(struct mmc_card *card)
-{
-	int err = -EINVAL;
-	struct mmc_host *host;
-	static unsigned ext_csd_bit = EXT_CSD_DDR_BUS_WIDTH_8;
-	static unsigned bus_width = MMC_BUS_WIDTH_8;
- 
-	BUG_ON(!card);
- 
-	host = card->host;
-	/* HS400 mode only supports 8bit bus.*/
-	if (!(host->caps & MMC_CAP_8_BIT_DATA)) {
-		pr_err("HS400: MMC host does not support 8bit bus, error!\n");
-		goto err;
-	}
- 
-	/* Must set HS_TIMING to 1 after tuning completion. */
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-			EXT_CSD_HS_TIMING, 1, 0);
-	if (!err) {
-		/* Set timing to DDR50 first */
-		mmc_set_timing(card->host, MMC_TIMING_UHS_DDR50);
-		/* Then, set clock to 50MHz */
-		mmc_set_clock(host, MMC_HIGH_DDR_MAX_DTR);
-	} else {
-		goto err;
-	}
- 
-	/*
-	 * Host is capable of 8bit transfer, switch
-	 * the device to work in 8bit transfer mode.
-	 * On success set 8bit bus width on the host.
-	 */
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-			EXT_CSD_BUS_WIDTH,
-			ext_csd_bit,
-			card->ext_csd.generic_cmd6_time);
-	if (err)
-		goto err;
- 
-	/* Bus test */
-	mmc_set_bus_width(card->host, bus_width);
-	if (!(host->caps & MMC_CAP_BUS_WIDTH_TEST))
-		err = mmc_compare_ext_csds(card, bus_width);
-	else
-		err = mmc_bus_test(card, bus_width);
-	if (err)
-		goto err;
- 
-err:
-	return err;
-}
-
-static int mmc_select_hs400_end(struct mmc_card *card, unsigned int max_dtr)
-{
-	int err = -EINVAL;
- 
-	/* Switch timing to HS400 now. */
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-			EXT_CSD_HS_TIMING, 3, 0);
-	if (!err) {
-		mmc_set_timing(card->host, MMC_TIMING_MMC_HS400);
-		/*
-		 * After enablig HS400 mode, we should restore
-		 * frequency to 200MHz.
-		 */
-		mmc_set_clock(card->host, max_dtr);
-	}
 	return err;
 }
 
@@ -1192,7 +1118,7 @@ static int mmc_select_hs200(struct mmc_card *card)
 	struct mmc_host *host = card->host;
 	int err = -EINVAL;
 
-	if ((card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS200_1_2V) || 
+	if ((card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS200_1_2V) ||
 		(card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS400_1_2V) )
 		err = __mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_120);
 
@@ -1231,7 +1157,8 @@ static int mmc_select_timing(struct mmc_card *card)
 	if (!mmc_can_ext_csd(card))
 		goto bus_speed;
 
-	if (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS200)
+	if ((card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS200) ||
+			(card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS400))
 		err = mmc_select_hs200(card);
 	else if (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS)
 		err = mmc_select_hs(card);

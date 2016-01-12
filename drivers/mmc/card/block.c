@@ -626,16 +626,16 @@ static int mmc_blk_ioctl_rpmb_req(struct block_device *bdev,
 	struct mmc_ioc_rpmb_req req;
 	struct mmc_blk_data *md = NULL;
 	int err = 0;
- 
+
 	/* The caller must have CAP_SYS_RAWIO */
 	if (!capable(CAP_SYS_RAWIO))
 		return -EPERM;
- 
+
 	memset(&req, 0, sizeof(req));
- 
+
 	if (copy_from_user(&req, ptr, sizeof(req)))
 		return -EFAULT;
- 
+
 	md = mmc_blk_get(bdev->bd_disk);
 	if (!md) {
 		pr_err("%s: NO eMMC block data. Try it later\n",
@@ -653,7 +653,7 @@ static int mmc_blk_ioctl_rpmb_req(struct block_device *bdev,
 	 */
 	if (copy_to_user(ptr, &req, sizeof(req)))
 		return -EFAULT;
- 
+
 	mmc_blk_put(md);
 	return 0;
 }
@@ -1083,18 +1083,18 @@ static int mmc_rpmb_req_process(struct mmc_blk_data *md,
 	struct mmc_core_rpmb_req rpmb_req;
 	struct mmc_card *card = NULL;
 	int ret;
- 
+
 	if (!md || !req)
 		return -EINVAL;
- 
+
 	if (!(md->flags & MMC_BLK_CMD23) ||
 			(md->part_type != EXT_CSD_PART_CONFIG_ACC_RPMB))
 		return -EOPNOTSUPP;
- 
+
 	card = md->queue.card;
 	if (!card || !mmc_card_mmc(card) || !card->ext_csd.rpmb_size)
 		return -ENODEV;
- 
+
 	memset(&rpmb_req, 0, sizeof(struct mmc_core_rpmb_req));
 	rpmb_req.req = req;
 	/* check request */
@@ -1103,9 +1103,9 @@ static int mmc_rpmb_req_process(struct mmc_blk_data *md,
 		pr_err("%s: prepare frame failed\n", mmc_hostname(card->host));
 		return ret;
 	}
- 
+
 	mmc_claim_host(card->host);
- 
+
 	if (md->flags & MMC_BLK_SUSPENDED) {
 		pr_warn("%s: MMC block device is already suspended\n",
 				mmc_hostname(card->host));
@@ -1132,7 +1132,7 @@ static int mmc_rpmb_req_process(struct mmc_blk_data *md,
 					mmc_hostname(card->host), ret);
 		goto out;
 	}
- 
+
 	ret = mmc_rpmb_partition_ops(&rpmb_req, card);
 	if (ret)
 		pr_err("%s: failed (%d) to handle RPMB request type (%d)!\n",
@@ -1151,7 +1151,7 @@ int mmc_access_rpmb(struct mmc_queue *mq)
 	 */
 	if (md && md->part_type == EXT_CSD_PART_CONFIG_ACC_RPMB)
 		return true;
- 
+
 	return false;
 }
 EXPORT_SYMBOL_GPL(mmc_access_rpmb);
@@ -1161,17 +1161,17 @@ int mmc_rpmb_req_handle(struct device *emmc, struct mmc_ioc_rpmb_req *req)
 	int ret = 0;
 	struct gendisk *disk	= NULL;
 	struct mmc_blk_data *md = NULL;
- 
+
 	if (!emmc || !req)
 		return -EINVAL;
- 
+
 	disk = dev_to_disk(emmc);
 	if (!disk) {
 		pr_err("%s: NO eMMC disk found. Try it later\n",
 				__func__);
 		return -ENODEV;
 	}
- 
+
 	md = mmc_blk_get(disk);
 	if (!md) {
 		pr_err("%s: NO eMMC block data. Try it later\n",
@@ -1180,7 +1180,7 @@ int mmc_rpmb_req_handle(struct device *emmc, struct mmc_ioc_rpmb_req *req)
 	}
 	ret = mmc_rpmb_req_process(md, req);
 	mmc_blk_put(md);
- 
+
 	return ret;
 }
 EXPORT_SYMBOL_GPL(mmc_rpmb_req_handle);

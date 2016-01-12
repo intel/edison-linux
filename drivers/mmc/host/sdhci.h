@@ -90,7 +90,7 @@
 #define  SDHCI_POWER_180	0x0A
 #define  SDHCI_POWER_300	0x0C
 #define  SDHCI_POWER_330	0x0E
-#define     SDHCI_HW_RESET     0x10
+#define  SDHCI_HW_RESET	0x10
 
 #define SDHCI_BLOCK_GAP_CONTROL	0x2A
 
@@ -164,8 +164,8 @@
 #define   SDHCI_CTRL_UHS_SDR104		0x0003
 #define   SDHCI_CTRL_UHS_DDR50		0x0004
 #define   SDHCI_CTRL_HS400		0x0005 /* Non-standard */
-#define   SDHCI_CTRL_HS_SDR200     SDHCI_CTRL_UHS_SDR104
-#define   SDHCI_CTRL_HS_DDR200     0x0005
+#define   SDHCI_CTRL_HS_SDR200		SDHCI_CTRL_UHS_SDR104
+#define   SDHCI_CTRL_HS_DDR200		0x0005
 #define  SDHCI_CTRL_VDD_180		0x0008
 #define  SDHCI_CTRL_DRV_TYPE_MASK	0x0030
 #define   SDHCI_CTRL_DRV_TYPE_B		0x0000
@@ -343,11 +343,11 @@ struct sdhci_ops {
 	void    (*adma_workaround)(struct sdhci_host *host, u32 intmask);
 	void	(*platform_init)(struct sdhci_host *host);
 	void    (*card_event)(struct sdhci_host *host);
-	int (*power_up_host)(struct sdhci_host *host);
-	void    (*set_dev_power)(struct sdhci_host *, bool);
-	int (*get_cd)(struct sdhci_host *host);
-	int (*get_tuning_count)(struct sdhci_host *host);
-	int (*gpio_buf_check)(struct sdhci_host *host, unsigned int clk);
+	int	(*power_up_host)(struct sdhci_host *host);
+	void	(*set_dev_power)(struct sdhci_host *, bool);
+	int	(*get_cd)(struct sdhci_host *host);
+	int	(*get_tuning_count)(struct sdhci_host *host);
+	int	(*gpio_buf_check)(struct sdhci_host *host, unsigned int clk);
 };
 
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS

@@ -258,6 +258,5 @@ struct regulator *vqmmc;        /* Signaling regulator (vccq) */
 	struct timer_list	tuning_timer;	/* Timer for tuning */
 
 	unsigned long private[0] ____cacheline_aligned;
-	unsigned int r1b_busy_end:1;    /* R1B busy end */
 };
 #endif /* LINUX_MMC_SDHCI_H */

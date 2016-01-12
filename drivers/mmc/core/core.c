@@ -1355,8 +1355,15 @@ int mmc_regulator_get_supply(struct mmc_host *mmc)
 			dev_warn(dev, "Failed getting OCR mask: %d\n", ret);
 	}
 
+//FIXME - this errors out and probe fails
+//   if (IS_ERR(mmc->supply.vqmmc)) {
+//       if (PTR_ERR(mmc->supply.vqmmc) == -EPROBE_DEFER)
+//           return -EPROBE_DEFER;
+//       dev_info(dev, "No vqmmc regulator found\n");
+//   }
 	if (IS_ERR(mmc->supply.vqmmc))
 		dev_warn(dev, "No vqmmc regulator found\n");
+
 
 	return 0;
 }
@@ -1494,7 +1501,6 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage, u32 ocr)
 		host->ops->busy_wait(host, 1000);
 	else
 		mmc_delay(1);
-
 
 	/*
 	 * Failure to switch is indicated by the card holding

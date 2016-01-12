@@ -97,8 +97,6 @@ static const unsigned char speed_val[16] =
 	{ 0, 10, 12, 13, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80 };
 static const unsigned int speed_unit[8] =
 	{ 10000, 100000, 1000000, 10000000, 0, 0, 0, 0 };
-
-
 typedef int (tpl_parse_t)(struct mmc_card *, struct sdio_func *,
 			   const unsigned char *, unsigned);
 
@@ -294,7 +292,6 @@ static int sdio_read_cis(struct mmc_card *card, struct sdio_func *func)
 	int ret;
 	struct sdio_func_tuple *this, **prev;
 	unsigned i, ptr = 0;
-
 	int count = 0;
 	bool replace = false;
 

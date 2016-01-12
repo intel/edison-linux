@@ -332,7 +332,7 @@ struct _mmc_csd {
 #define EXT_CSD_POWER_OFF_LONG_TIME	247	/* RO */
 #define EXT_CSD_GENERIC_CMD6_TIME	248	/* RO */
 #define EXT_CSD_CACHE_SIZE		249	/* RO, 4 bytes */
-#define EXT_CSD_PWR_CL_200_DDR_195 252 /* RO, support HS400 */
+#define EXT_CSD_PWR_CL_DDR_200_195	252 /* RO, support HS400 */
 #define EXT_CSD_PWR_CL_DDR_200_360	253	/* RO */
 #define EXT_CSD_FIRMWARE_VERSION	254	/* RO, 8 bytes */
 #define EXT_CSD_SUPPORTED_MODE		493	/* RO */
