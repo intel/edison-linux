@@ -406,7 +406,7 @@ static int bcove_gpadc_probe(struct platform_device *pdev)
 	info->gpadc_regs = pdata->gpadc_regs;
 
 	err = request_threaded_irq(info->irq, gpadc_isr, gpadc_threaded_isr,
-			IRQF_ONESHOT, "adc", indio_dev);
+			IRQF_ONESHOT|IRQF_SHARED, "adc", indio_dev);
 	if (err) {
 		gpadc_dump(info);
 		dev_err(&pdev->dev, "unable to register irq %d\n", info->irq);
