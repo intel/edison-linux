@@ -3,6 +3,9 @@ CFLAGS_trace.o				:= -I$(src)
 
 ccflags-$(CONFIG_USB_DWC3_DEBUG)	:= -DDEBUG
 ccflags-$(CONFIG_USB_DWC3_VERBOSE)	+= -DVERBOSE_DEBUG
+
+# Fix missing trace.h issue
+CFLAGS_dwc3-device-intel.o := -I$(src)
 obj-$(CONFIG_USB_DWC3_DEVICE_INTEL)        += dwc3-device-intel.o
 obj-$(CONFIG_USB_DWC3_INTEL_MRFL)      += dwc3-intel-mrfl.o
 ifneq ($(CONFIG_DEBUG_FS),)
