@@ -1111,6 +1111,11 @@ static int handle_message(struct ssp_drv_context *sspc)
 			} else
 				write_SSTO(timeout, reg);
 		}
+		else
+		{
+			write_SSTO(timeout, reg);
+		}
+
 		dev_dbg(dev, "transfer len:%d  n_bytes:%d  cr0:%x  cr1:%x",
 				sspc->len, sspc->n_bytes, cr0, cr1);
 
@@ -1385,7 +1390,7 @@ static int setup(struct spi_device *spi)
 		spin_lock_irqsave(&sspc->lock, flags);
 		sspc->cr1_sig = SSCR1_TSRE | SSCR1_RSRE;
 		sspc->mask_sr = SSSR_ROR | SSSR_TUR;
-		if (sspc->quirks & QUIRKS_DMA_USE_NO_TRAIL)
+/*		if (sspc->quirks & QUIRKS_DMA_USE_NO_TRAIL)	*/
 			sspc->cr1_sig |= SSCR1_TRAIL;
 	} else {
 		sspc->cr1_sig = SSCR1_TINTE;
@@ -1486,7 +1491,8 @@ static int intel_mid_ssp_spi_probe(struct pci_dev *pdev,
 			sspc->quirks |= QUIRKS_USE_PM_QOS |
 					QUIRKS_SRAM_ADDITIONAL_CPY;
 	}
-	sspc->quirks |= QUIRKS_DMA_USE_NO_TRAIL;
+	if (!(sspc->quirks & QUIRKS_PLATFORM_MRFL))
+		sspc->quirks |= QUIRKS_DMA_USE_NO_TRAIL;
 	if (ssp_cfg_is_spi_slave(ssp_cfg))
 		sspc->quirks |= QUIRKS_SPI_SLAVE_CLOCK_MODE;
 
