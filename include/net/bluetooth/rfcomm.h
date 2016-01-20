@@ -237,10 +237,12 @@ void rfcomm_dlc_free(struct rfcomm_dlc *d);
 int  rfcomm_dlc_open(struct rfcomm_dlc *d, bdaddr_t *src, bdaddr_t *dst,
 								u8 channel);
 int  rfcomm_dlc_close(struct rfcomm_dlc *d, int reason);
+void rfcomm_dlc_send_noerror(struct rfcomm_dlc *d, struct sk_buff *skb);
 int  rfcomm_dlc_send(struct rfcomm_dlc *d, struct sk_buff *skb);
 int  rfcomm_dlc_set_modem_status(struct rfcomm_dlc *d, u8 v24_sig);
 int  rfcomm_dlc_get_modem_status(struct rfcomm_dlc *d, u8 *v24_sig);
 void rfcomm_dlc_accept(struct rfcomm_dlc *d);
+struct rfcomm_dlc *rfcomm_dlc_exists(bdaddr_t *src, bdaddr_t *dst, u8 channel);
 
 #define rfcomm_dlc_lock(d)     spin_lock(&d->lock)
 #define rfcomm_dlc_unlock(d)   spin_unlock(&d->lock)
@@ -325,7 +327,10 @@ int  rfcomm_connect_ind(struct rfcomm_session *s, u8 channel,
 #define RFCOMM_RELEASE_ONHUP  1
 #define RFCOMM_HANGUP_NOW     2
 #define RFCOMM_TTY_ATTACHED   3
-#define RFCOMM_TTY_RELEASED   4
+#define RFCOMM_DEFUNCT_BIT4   4          /* don't reuse this bit - userspace visible */
+
+#define RFCOMM_DEV_RELEASED   0
+#define RFCOMM_TTY_OWNED      1
 
 struct rfcomm_dev_req {
 	s16      dev_id;
