@@ -4406,7 +4406,6 @@ int sdhci_add_host(struct sdhci_host *host)
 	spin_lock_init(&host->lock);
 
 #ifdef CONFIG_REGULATOR
-	sdhci_try_get_regulator(host);
 	/*
 	 * Voltage range check makes sense only if regulator reports
 	 * any voltage value.
