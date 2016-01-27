@@ -4479,9 +4479,12 @@ int sdhci_add_host(struct sdhci_host *host)
 		ocr_avail |= MMC_VDD_32_33;
 
 	/* If OCR set by external regulators, use it instead */
+#if 0
+//MARKW the OCR derived from mmc_regulator_get_ocrmask does not match any available voltages, causing failure in mmc_select_voltage
 	if (mmc->ocr_avail)
 		ocr_avail = mmc->ocr_avail;
 
+#endif
 	if (host->ocr_mask)
 		ocr_avail &= host->ocr_mask;
 
