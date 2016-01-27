@@ -696,7 +696,7 @@ struct dw_i2c_dev *i2c_dw_setup(struct device *pdev, int bus_idx,
 	snprintf(adap->name, sizeof(adap->name), "i2c-designware-%d",
 		adap->nr);
  
-	r = request_irq(irq, i2c_dw_isr, IRQF_SHARED, adap->name, dev);
+	r = request_irq(irq, i2c_dw_isr, IRQF_SHARED|IRQF_NO_SUSPEND, adap->name, dev);
 	if (r) {
 		dev_err(pdev, "failure requesting irq %i\n", irq);
 		goto err_kfree;
