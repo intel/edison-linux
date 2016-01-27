@@ -337,7 +337,6 @@
 
 /* These apply for core versions 1.94a and later */
 #define DWC3_DGCMD_SET_SCRATCH_ADDR_LO	0x04
-#define DWC3_DGCMD_SET_SCRATCH_ADDR_HI	0x05
 #define DWC3_DGCMD_SET_SCRATCHPAD_ADDR_LO	0x04
 #define DWC3_DGCMD_SET_SCRATCHPAD_ADDR_HI	0x05
 
@@ -671,7 +670,6 @@ struct dwc3_hwregs {
 };
 
 /**
-
  * struct dwc3 - representation of our controller
  * @ctrl_req: usb control request which is used for ep0
  * @ep0_trb: trb which is used for the ctrl_req
@@ -801,6 +799,7 @@ struct dwc3 {
 	u32			u1u2;
 	u32			maximum_speed;
 	u32			revision;
+	u32			mode;
 
 #define DWC3_REVISION_173A	0x5533173a
 #define DWC3_REVISION_175A	0x5533175a
@@ -821,8 +820,6 @@ struct dwc3 {
 #define DWC3_REVISION_260A	0x5533260a
 #define DWC3_REVISION_270A	0x5533270a
 #define DWC3_REVISION_280A	0x5533280a
-
-	u32			mode;
 
 	enum dwc3_ep0_next	ep0_next_event;
 	enum dwc3_ep0_state	ep0state;
@@ -860,7 +857,7 @@ struct dwc3 {
 	unsigned		is_fpga:1;
 	unsigned		needs_fifo_resize:1;
 	unsigned		pullups_connected:1;
-	unsigned        quirks_disable_irqthread:1;
+	unsigned		quirks_disable_irqthread:1;
 	unsigned		resize_fifos:1;
 	unsigned		setup_packet_pending:1;
 	unsigned		start_config_issued:1;
@@ -880,19 +877,19 @@ struct dwc3 {
 	unsigned		tx_de_emphasis_quirk:1;
 	unsigned		tx_de_emphasis:2;
 
-	enum dwc3_pm_state  pm_state;
-	u8          is_otg;
-	u8		  soft_connected;
+	enum dwc3_pm_state	pm_state;
+	u8			is_otg;
+	u8			soft_connected;
 
 	/* delayed work for handling Link State Change */
-	struct delayed_work link_work;
- 
-	u8		  is_ebc;
- 
+	struct delayed_work	link_work;
+
+	u8			is_ebc;
+
 	struct dwc3_scratchpad_array	*scratch_array;
-	dma_addr_t	  scratch_array_dma;
+	dma_addr_t		scratch_array_dma;
 	void			*scratch_buffer[DWC3_MAX_HIBER_SCRATCHBUFS];
-	struct dwc3_hwregs  hwregs;
+	struct dwc3_hwregs	hwregs;
 	bool			hiber_enabled;
 };
 
@@ -1021,17 +1018,17 @@ union dwc3_event {
 };
 
 struct ebc_io {
-	const char  *name;
-	const char  *epname;
-	u8      epnum;
-	u8      is_ondemand;
-	u8      static_trb_pool_size;
-	struct list_head    list;
-	int     (*init) (void);
-	void        *(*alloc_static_trb_pool) (dma_addr_t *dma_addr);
-	void        (*free_static_trb_pool) (void);
-	int     (*xfer_start) (void);
-	int     (*xfer_stop) (void);
+	const char	*name;
+	const char	*epname;
+	u8		epnum;
+	u8		is_ondemand;
+	u8		static_trb_pool_size;
+	struct list_head	list;
+	int		(*init) (void);
+	void		*(*alloc_static_trb_pool) (dma_addr_t *dma_addr);
+	void		(*free_static_trb_pool) (void);
+	int		(*xfer_start) (void);
+	int		(*xfer_stop) (void);
 };
 
 void dwc3_register_io_ebc(struct ebc_io *ebc);

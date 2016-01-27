@@ -42,6 +42,25 @@ endchoice
 
 comment "Platform Glue Driver Support"
 
+config USB_DWC3_OMAP
+	tristate "Texas Instruments OMAP5 and similar Platforms"
+	depends on EXTCON && (ARCH_OMAP2PLUS || COMPILE_TEST)
+	depends on OF
+	default USB_DWC3
+	help
+	  Some platforms from Texas Instruments like OMAP5, DRA7xxx and
+	  AM437x use this IP for USB2/3 functionality.
+
+	  Say 'Y' or 'M' here if you have one such device
+
+config USB_DWC3_EXYNOS
+	tristate "Samsung Exynos Platform"
+	depends on ARCH_EXYNOS && OF || COMPILE_TEST
+	default USB_DWC3
+	help
+	  Recent Exynos5 SoCs ship with one DesignWare Core USB3 IP inside,
+	  say 'Y' or 'M' if you have one such device.
+
 config USB_DWC3_PCI
 	tristate "PCIe-based Platforms"
 	depends on PCI
@@ -49,6 +68,7 @@ config USB_DWC3_PCI
 	help
 	  If you're using the DesignWare Core IP with a PCIe, please say
 	  'Y' or 'M' here.
+
 	  One such PCIe-based platform is Synopsys' PCIe HAPS model of
 	  this IP.
 
@@ -102,26 +122,6 @@ config USB_DWC3_HOST_INTEL
 	  It is should be enable with DWC3 INTEL driver. Because Intel platform
 	  use different design with standard USB_DWC3_HOST. So if you want to
 	  enable host mode on Intel platform, then you have to enable this config.
-
-comment "Debugging features"
-config USB_DWC3_OMAP
-	tristate "Texas Instruments OMAP5 and similar Platforms"
-	depends on EXTCON && (ARCH_OMAP2PLUS || COMPILE_TEST)
-	depends on OF
-	default USB_DWC3
-	help
-	  Some platforms from Texas Instruments like OMAP5, DRA7xxx and
-	  AM437x use this IP for USB2/3 functionality.
-
-	  Say 'Y' or 'M' here if you have one such device
-
-config USB_DWC3_EXYNOS
-	tristate "Samsung Exynos Platform"
-	depends on ARCH_EXYNOS && OF || COMPILE_TEST
-	default USB_DWC3
-	help
-	  Recent Exynos5 SoCs ship with one DesignWare Core USB3 IP inside,
-	  say 'Y' or 'M' if you have one such device.
 
 config USB_DWC3_KEYSTONE
 	tristate "Texas Instruments Keystone2 Platforms"

@@ -620,13 +620,13 @@ static const struct file_operations dwc3_link_state_fops = {
 
 static int dwc3_hiber_enabled_show(struct seq_file *s, void *unused)
 {
-	struct dwc3	 *dwc = s->private;
- 
+	struct dwc3		*dwc = s->private;
+
 	if (dwc->hiber_enabled)
 		seq_puts(s, "hibernation enabled\n");
 	else
 		seq_puts(s, "hibernation disabled\n");
- 
+
 	return 0;
 }
 
@@ -638,25 +638,25 @@ static int dwc3_hiber_enabled_open(struct inode *inode, struct file *file)
 static ssize_t dwc3_hiber_enabled_write(struct file *file,
 		const char __user *ubuf, size_t count, loff_t *ppos)
 {
-	struct seq_file	 *s = file->private_data;
-	struct dwc3	 *dwc = s->private;
+	struct seq_file		*s = file->private_data;
+	struct dwc3		*dwc = s->private;
 	char			buf[32];
-	int		 enabled = 0;
- 
+	int			enabled = 0;
+
 	if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
 		return -EFAULT;
- 
+
 	sscanf(buf, "%d", &enabled);
 	dwc->hiber_enabled = enabled;
- 
+
 	return count;
 }
 
 static const struct file_operations dwc3_hiber_enabled_fops = {
-	.open		   = dwc3_hiber_enabled_open,
-	.write		  = dwc3_hiber_enabled_write,
-	.read		   = seq_read,
-	.llseek		 = seq_lseek,
+	.open			= dwc3_hiber_enabled_open,
+	.write			= dwc3_hiber_enabled_write,
+	.read			= seq_read,
+	.llseek			= seq_lseek,
 	.release		= single_release,
 };
 
@@ -714,7 +714,6 @@ int dwc3_debugfs_init(struct dwc3 *dwc)
 			ret = -ENOMEM;
 			goto err1;
 		}
-	}
 
 		file = debugfs_create_file("hiber_enabled", S_IRUGO | S_IWUSR,
 				root, dwc, &dwc3_hiber_enabled_fops);
@@ -722,6 +721,7 @@ int dwc3_debugfs_init(struct dwc3 *dwc)
 			ret = -ENOMEM;
 			goto err1;
 		}
+	}
 
 	return 0;
 

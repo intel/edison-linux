@@ -151,8 +151,8 @@ struct intel_mid_ops {
 };
 
 /* Helper API's for INTEL_MID_OPS_INIT */
-#define DECLARE_INTEL_MID_OPS_INIT(cpuname, cpuid)	\
-				[cpuid] = get_##cpuname##_ops
+#define DECLARE_INTEL_MID_OPS_INIT(cpuname, cpuid) \
+		[cpuid] = get_##cpuname##_ops
 
 /* Maximum number of CPU ops */
 #define MAX_CPU_OPS(a) (sizeof(a)/sizeof(void *))

@@ -3,10 +3,10 @@ CFLAGS_trace.o				:= -I$(src)
 
 ccflags-$(CONFIG_USB_DWC3_DEBUG)	:= -DDEBUG
 ccflags-$(CONFIG_USB_DWC3_VERBOSE)	+= -DVERBOSE_DEBUG
-obj-$(CONFIG_USB_DWC3_DEVICE_INTEL)        += dwc3-device-intel.o
-obj-$(CONFIG_USB_DWC3_INTEL_MRFL)      += dwc3-intel-mrfl.o
+obj-$(CONFIG_USB_DWC3_DEVICE_INTEL)		+= dwc3-device-intel.o
+obj-$(CONFIG_USB_DWC3_INTEL_MRFL)		+= dwc3-intel-mrfl.o
 ifneq ($(CONFIG_DEBUG_FS),)
-	obj-$(CONFIG_USB_DWC3_DEVICE_INTEL) += debugfs.o
+	obj-$(CONFIG_USB_DWC3_DEVICE_INTEL)	+= debugfs.o
 endif
 
 ifeq ($(CONFIG_USB_DWC3_DEVICE_INTEL),)
@@ -41,7 +41,7 @@ endif
 
 obj-$(CONFIG_USB_DWC3_OMAP)		+= dwc3-omap.o
 obj-$(CONFIG_USB_DWC3_EXYNOS)		+= dwc3-exynos.o
-obj-$(CONFIG_USB_DWC3_OTG)  += otg.o
+obj-$(CONFIG_USB_DWC3_OTG)		+= otg.o
 obj-$(CONFIG_USB_DWC3_PCI)		+= dwc3-pci.o
 obj-$(CONFIG_USB_DWC3_KEYSTONE)		+= dwc3-keystone.o
 obj-$(CONFIG_USB_DWC3_QCOM)		+= dwc3-qcom.o

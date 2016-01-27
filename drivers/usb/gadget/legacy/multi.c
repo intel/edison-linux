@@ -438,23 +438,23 @@ static int __ref multi_bind(struct usb_composite_dev *cdev)
 	/* RNDIS configuration */
 	if (strncmp(ethernet_config, "rndis", 5) == 0) {
 		status = rndis_config_register(cdev);
- 
+
 		if (unlikely(status < 0))
 			goto fail2;
 	} else if (strncmp(ethernet_config, "cdc", 3) == 0) {
 		/* CDC ECM configuration  */
 		status = cdc_config_register(cdev);
- 
+
 		if (unlikely(status < 0))
 			goto fail2;
 	} else {
 		status = rndis_config_register(cdev);
- 
+
 		if (unlikely(status < 0))
 			goto fail2;
- 
+
 		status = cdc_config_register(cdev);
- 
+
 		if (unlikely(status < 0))
 			goto fail2;
 	}

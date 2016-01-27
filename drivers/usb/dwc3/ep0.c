@@ -577,7 +577,6 @@ static int dwc3_ep0_set_config(struct dwc3 *dwc, struct usb_ctrlrequest *ctrl)
 			 * Enable transition to U1/U2 state when
 			 * nothing is pending from application.
 			 */
-
 			if (!dwc->is_ebc) {
 				reg = dwc3_readl(dwc->regs, DWC3_DCTL);
 				reg |= (DWC3_DCTL_ACCEPTU1ENA
@@ -1067,10 +1066,10 @@ static void dwc3_ep0_xfernotready(struct dwc3 *dwc,
 		if (dwc->ep0_next_event == DWC3_EP0_NRDY_STATUS) {
 			u32	 size = 0;
 			struct dwc3_ep *dep = dwc->eps[event->endpoint_number];
- 
+
 			if (dep->number == 0)
 				size = dep->endpoint.maxpacket;
- 
+
 			dwc3_ep0_start_trans(dwc, dep->number,
 				dwc->ctrl_req_addr, size,
 				DWC3_TRBCTL_CONTROL_DATA);

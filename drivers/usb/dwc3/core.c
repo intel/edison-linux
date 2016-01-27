@@ -474,7 +474,7 @@ static int dwc3_core_init(struct dwc3 *dwc)
 	}
 
 	dwc3_core_soft_reset(dwc);
- 
+
 	/* Delay 1 ms Before DCTL soft reset to make it safer from hitting
 	 * Tx-CMD PHY hang issue.
 	 */
