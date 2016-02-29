@@ -2697,7 +2697,7 @@ struct sk_buff *validate_xmit_skb_list(struct sk_buff *skb, struct net_device *d
 		skb->next = NULL;
 
 		/* in case skb wont be segmented, point to itself */
-		skb->prev = skb;
+		//skb->prev = skb;
 
 		skb = validate_xmit_skb(skb, dev);
 		if (!skb)
