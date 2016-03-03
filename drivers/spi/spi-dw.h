@@ -92,6 +92,8 @@ struct dw_spi_dma_ops {
 	int (*dma_init)(struct dw_spi *dws);
 	void (*dma_exit)(struct dw_spi *dws);
 	int (*dma_transfer)(struct dw_spi *dws, int cs_change);
+	int (*dma_suspend)(struct dw_spi *dws);
+	int (*dma_resume)(struct dw_spi *dws);
 };
 
 struct dw_spi {
@@ -234,7 +236,9 @@ extern void dw_spi_remove_host(struct dw_spi *dws);
 extern int dw_spi_suspend_host(struct dw_spi *dws);
 extern int dw_spi_resume_host(struct dw_spi *dws);
 extern void dw_spi_xfer_done(struct dw_spi *dws);
+extern int dw_spi_stop_queue(struct dw_spi *dws);
 
 /* platform related setup */
-extern int dw_spi_mid_init(struct dw_spi *dws); /* Intel MID platforms */
+/* Intel MID platforms */
+extern int dw_spi_mid_init(struct dw_spi *dws, int bus_num);
 #endif /* DW_SPI_HEADER_H */

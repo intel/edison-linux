@@ -16,6 +16,7 @@
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/pm_runtime.h>
 #include <linux/spi/spi.h>
 #include <linux/module.h>
 
@@ -65,7 +66,7 @@ static int spi_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	dws->regs = pcim_iomap_table(pdev)[pci_bar];
 
-	dws->bus_num = 0;
+	dws->bus_num = ent->driver_data;
 	dws->num_cs = 4;
 	dws->irq = pdev->irq;
 
@@ -86,6 +87,10 @@ static int spi_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	/* PCI hook and SPI hook use the same drv data */
 	pci_set_drvdata(pdev, dwpci);
 
+	pm_suspend_ignore_children(&pdev->dev, true);
+	pm_runtime_put_noidle(&pdev->dev);
+	pm_runtime_allow(&pdev->dev);
+
 	dev_info(&pdev->dev, "found PCI SPI controller(ID: %04x:%04x)\n",
 		pdev->vendor, pdev->device);
 
@@ -97,6 +102,8 @@ static void spi_pci_remove(struct pci_dev *pdev)
 	struct dw_spi_pci *dwpci = pci_get_drvdata(pdev);
 
 	dw_spi_remove_host(&dwpci->dws);
+	pm_runtime_forbid(&pdev->dev);
+	pm_runtime_get_noresume(&pdev->dev);
 }
 
 #ifdef CONFIG_PM_SLEEP
@@ -115,14 +122,65 @@ static int spi_resume(struct device *dev)
 
 	return dw_spi_resume_host(&dwpci->dws);
 }
-#endif
 
-static SIMPLE_DEV_PM_OPS(dw_spi_pm_ops, spi_suspend, spi_resume);
+static int spi_dw_pci_runtime_suspend(struct device *dev)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	struct dw_spi_pci *dwpci = pci_get_drvdata(pdev);
+ 
+	dev_dbg(dev, "PCI runtime suspend called\n");
+	return dw_spi_suspend_host(&dwpci->dws);
+}
+
+static int spi_dw_pci_runtime_resume(struct device *dev)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	struct dw_spi_pci *dwpci = pci_get_drvdata(pdev);
+ 
+	dev_dbg(dev, "pci_runtime_resume called\n");
+	return dw_spi_resume_host(&dwpci->dws);
+}
+
+static int spi_dw_pci_runtime_idle(struct device *dev)
+{
+	int err;
+ 
+	dev_dbg(dev, "pci_runtime_idle called\n");
+	if (system_state == SYSTEM_BOOTING)
+		/* if SPI UART is set as default console and earlyprintk
+		 * is enabled, it cannot shutdown SPI controller during booting.
+		 */
+		err = pm_schedule_suspend(dev, 30000);
+	else
+		err = pm_schedule_suspend(dev, 500);
+ 
+	if (err != 0)
+		return 0;
+ 
+	return -EBUSY;
+}
+
+#endif
 
 static const struct pci_device_id pci_ids[] = {
 	/* Intel MID platform SPI controller 0 */
 	{ PCI_VDEVICE(INTEL, 0x0800), (kernel_ulong_t)&spi_pci_mid_desc},
+	/* Intel Medfield platform SPI controller 1 */
+	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, 0x0800), .driver_data = 0 },
+	/* Intel Cloverview platform SPI controller 1 */
+	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, 0x08E1), .driver_data = 0 },
+	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, 0x08EE), .driver_data = 1 },
+	/* Intel EVx platform SPI controller 1 */
+	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, 0x0812), .driver_data = 2 },
 	{},
+};
+
+static const struct dev_pm_ops dw_spi_pm_ops = {
+	.suspend = spi_suspend,
+	.resume = spi_resume,
+	.runtime_suspend = spi_dw_pci_runtime_suspend,
+	.runtime_resume = spi_dw_pci_runtime_resume,
+	.runtime_idle = spi_dw_pci_runtime_idle,
 };
 
 static struct pci_driver dw_spi_driver = {
@@ -135,7 +193,18 @@ static struct pci_driver dw_spi_driver = {
 	},
 };
 
-module_pci_driver(dw_spi_driver);
+static int __init mrst_spi_init(void)
+{
+	return pci_register_driver(&dw_spi_driver);
+}
+
+static void __exit mrst_spi_exit(void)
+{
+	pci_unregister_driver(&dw_spi_driver);
+}
+
+module_init(mrst_spi_init);
+module_exit(mrst_spi_exit);
 
 MODULE_AUTHOR("Feng Tang <feng.tang@intel.com>");
 MODULE_DESCRIPTION("PCI interface driver for DW SPI Core");

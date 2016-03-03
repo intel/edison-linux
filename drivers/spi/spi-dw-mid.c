@@ -18,7 +18,6 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/spi/spi.h>
-#include <linux/types.h>
 
 #include "spi-dw.h"
 
@@ -52,7 +51,7 @@ static int mid_spi_dma_init(struct dw_spi *dws)
 	 * Get pci device for DMA controller, currently it could only
 	 * be the DMA controller of Medfield
 	 */
-	dma_dev = pci_get_device(PCI_VENDOR_ID_INTEL, 0x0827, NULL);
+	dma_dev = pci_get_device(PCI_VENDOR_ID_INTEL, 0x08EF, NULL);
 	if (!dma_dev)
 		return -ENODEV;
 
@@ -246,10 +245,41 @@ static int mid_spi_dma_transfer(struct dw_spi *dws, int cs_change)
 	return 0;
 }
 
+static int mid_spi_dma_suspend(struct dw_spi *dws)
+{
+	struct dma_chan *txchan, *rxchan;
+ 
+	txchan = dws->txchan;
+	rxchan = dws->rxchan;
+ 
+	txchan->device->device_control(txchan, DMA_TERMINATE_ALL, 0);
+	rxchan->device->device_control(rxchan, DMA_TERMINATE_ALL, 0);
+ 
+	txchan->device->device_control(txchan, DMA_PAUSE, 0);
+	rxchan->device->device_control(rxchan, DMA_PAUSE, 0);
+ 
+	return 0;
+}
+
+static int mid_spi_dma_resume(struct dw_spi *dws)
+{
+	struct dma_chan *txchan, *rxchan;
+ 
+	txchan = dws->txchan;
+	rxchan = dws->rxchan;
+ 
+	txchan->device->device_control(txchan, DMA_RESUME, 0);
+	rxchan->device->device_control(rxchan, DMA_RESUME, 0);
+ 
+	return 0;
+}
+
 static struct dw_spi_dma_ops mid_dma_ops = {
 	.dma_init	= mid_spi_dma_init,
 	.dma_exit	= mid_spi_dma_exit,
 	.dma_transfer	= mid_spi_dma_transfer,
+	.dma_suspend    = mid_spi_dma_suspend,
+	.dma_resume = mid_spi_dma_resume,
 };
 #endif
 
@@ -264,12 +294,12 @@ static struct dw_spi_dma_ops mid_dma_ops = {
 #define CLK_SPI_CDIV_MASK	0x00000e00
 #define CLK_SPI_DISABLE_OFFSET	8
 
-int dw_spi_mid_init(struct dw_spi *dws)
+int dw_spi_mid_init(struct dw_spi *dws, int bus_num)
 {
 	void __iomem *clk_reg;
 	u32 clk_cdiv;
 
-	clk_reg = ioremap_nocache(MRST_CLK_SPI0_REG, 16);
+	clk_reg = ioremap_nocache(MRST_CLK_SPI0_REG + bus_num * 4, 16);
 	if (!clk_reg)
 		return -ENOMEM;
 

@@ -225,7 +225,6 @@ config SPLIT_PTLOCK_CPUS
 	default "999999" if !MMU
 	default "999999" if ARM && !CPU_CACHE_VIPT
 	default "999999" if PARISC && !PA20
-	default "999999" if X86_INTEL_MID
 	default "4"
 
 config ARCH_ENABLE_SPLIT_PMD_PTLOCK

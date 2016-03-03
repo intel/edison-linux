@@ -19,6 +19,7 @@
 #include <linux/highmem.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
+#include <linux/pm_runtime.h>
 #include <linux/spi/spi.h>
 #include <linux/gpio.h>
 
@@ -54,6 +55,12 @@ struct chip_data {
 };
 
 #ifdef CONFIG_DEBUG_FS
+static int spi_show_regs_open(struct inode *inode, struct file *file)
+{
+	file->private_data = inode->i_private;
+	return 0;
+}
+
 #define SPI_REGS_BUFSIZE	1024
 static ssize_t dw_spi_show_regs(struct file *file, char __user *user_buf,
 		size_t count, loff_t *ppos)
@@ -179,7 +186,7 @@ static void dw_writer(struct dw_spi *dws)
 	u16 txw = 0;
 
 	while (max--) {
-		/* Set the tx word if the transfer's original "tx" is not null */
+		/* Set the txw if the transfer's original "tx" is not null */
 		if (dws->tx_end - dws->len) {
 			if (dws->n_bytes == 1)
 				txw = *(u8 *)(dws->tx);
@@ -245,7 +252,40 @@ static int map_dma_buffers(struct dw_spi *dws)
 	if (dws->cur_transfer->rx_dma)
 		dws->rx_dma = dws->cur_transfer->rx_dma;
 
+	/* map dma buffer if it's not mapped */
+	if (!dws->tx_dma) {
+		dws->tx_dma = dma_map_single(NULL, dws->tx,
+				dws->len, DMA_TO_DEVICE);
+		if (dma_mapping_error(NULL, dws->tx_dma)) {
+			pr_err("map tx dma buffer failed\n");
+			goto err1;
+		}
+	}
+ 
+	if (!dws->rx_dma) {
+		dws->rx_dma = dma_map_single(NULL, dws->rx,
+				dws->len, DMA_FROM_DEVICE);
+		if (dma_mapping_error(NULL, dws->rx_dma)) {
+			pr_err("map rx dma buffer failed\n");
+			goto err2;
+		}
+	}
+
 	return 1;
+err2:
+	dma_unmap_single(NULL, dws->tx_dma, dws->len, DMA_TO_DEVICE);
+err1:
+	dws->cur_msg->is_dma_mapped = 0;
+	return 0;
+}
+ 
+static void unmap_dma_buffers(struct dw_spi *dws)
+{
+	dma_unmap_single(NULL, dws->rx_dma,
+				dws->len, DMA_FROM_DEVICE);
+	dma_unmap_single(NULL, dws->tx_dma,
+				dws->len, DMA_TO_DEVICE);
+
 }
 
 /* Caller already set message->status; dma and pio irqs are blocked */
@@ -254,7 +294,11 @@ static void giveback(struct dw_spi *dws)
 	struct spi_transfer *last_transfer;
 	struct spi_message *msg;
 
+	if (dws->dma_mapped)
+		unmap_dma_buffers(dws);
+
 	msg = dws->cur_msg;
+	list_del_init(&dws->cur_msg->queue);
 	dws->cur_msg = NULL;
 	dws->cur_transfer = NULL;
 	dws->prev_chip = dws->cur_chip;
@@ -294,6 +338,7 @@ void dw_spi_xfer_done(struct dw_spi *dws)
 		giveback(dws);
 	} else
 		tasklet_schedule(&dws->pump_transfers);
+
 }
 EXPORT_SYMBOL_GPL(dw_spi_xfer_done);
 
@@ -306,7 +351,7 @@ static irqreturn_t interrupt_transfer(struct dw_spi *dws)
 		dw_readw(dws, DW_SPI_TXOICR);
 		dw_readw(dws, DW_SPI_RXOICR);
 		dw_readw(dws, DW_SPI_RXUICR);
-		int_error_stop(dws, "interrupt_transfer: fifo overrun/underrun");
+		int_error_stop(dws, "interrupt_transfer: fifo over/underrun");
 		return IRQ_HANDLED;
 	}
 
@@ -608,7 +653,7 @@ static void dw_spi_cleanup(struct spi_device *spi)
 }
 
 /* Restart the controller, disable all interrupts, clean rx fifo */
-static void spi_hw_init(struct dw_spi *dws)
+static void dw_spi_hw_init(struct dw_spi *dws)
 {
 	spi_enable_chip(dws, 0);
 	spi_mask_intr(dws, 0xff);
@@ -630,6 +675,8 @@ static void spi_hw_init(struct dw_spi *dws)
 		dws->fifo_len = (fifo == 2) ? 0 : fifo - 1;
 		dw_writew(dws, DW_SPI_TXFLTR, 0);
 	}
+
+	spi_enable_chip(dws, 1);
 }
 
 int dw_spi_add_host(struct device *dev, struct dw_spi *dws)
@@ -668,7 +715,7 @@ int dw_spi_add_host(struct device *dev, struct dw_spi *dws)
 	master->dev.of_node = dev->of_node;
 
 	/* Basic HW init */
-	spi_hw_init(dws);
+	dw_spi_hw_init(dws);
 
 	if (dws->dma_ops && dws->dma_ops->dma_init) {
 		ret = dws->dma_ops->dma_init(dws);
@@ -723,6 +770,10 @@ int dw_spi_suspend_host(struct dw_spi *dws)
 		return ret;
 	spi_enable_chip(dws, 0);
 	spi_set_clk(dws, 0);
+
+	if (dws->dma_inited)
+		dws->dma_ops->dma_suspend(dws);
+
 	return ret;
 }
 EXPORT_SYMBOL_GPL(dw_spi_suspend_host);
@@ -731,10 +782,14 @@ int dw_spi_resume_host(struct dw_spi *dws)
 {
 	int ret;
 
-	spi_hw_init(dws);
+	if (dws->dma_inited)
+		dws->dma_ops->dma_resume(dws);
+
+	dw_spi_hw_init(dws);
 	ret = spi_master_resume(dws->master);
 	if (ret)
 		dev_err(&dws->master->dev, "fail to start queue (%d)\n", ret);
+
 	return ret;
 }
 EXPORT_SYMBOL_GPL(dw_spi_resume_host);
