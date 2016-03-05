@@ -3630,7 +3630,7 @@ int dwc3_runtime_resume(struct device *device)
 			dwc3_writel(dwc->regs, DWC3_DALEPENA, reg);
 
 			if (dep->flags_backup & DWC3_EP_STALL)
-				__dwc3_gadget_ep_set_halt(dep, 1);
+				__dwc3_gadget_ep_set_halt(dep, 1, false);
 
 			if (dep->flags_backup & DWC3_EP_BUSY) {
 				struct dwc3_request			*req;
