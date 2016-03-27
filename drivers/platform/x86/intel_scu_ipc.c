@@ -227,7 +227,18 @@ static int scu_ipc_pm_callback(struct notifier_block *nb,
  */
 void intel_scu_ipc_send_command(u32 cmd) /* Send ipc command */
 {
-	writel(cmd, ipcdev.ipc_base);
+ if (cmd != 8440)
+   pr_crit("%s: sending cmd %d\n", __func__, cmd);
+		ipcdev.cmd = cmd;
+		init_completion(&ipcdev.cmd_complete);
+
+		if (system_state == SYSTEM_RUNNING && !suspend_in_progress()) {
+				ipcdev.ioc = 1;
+				writel(cmd | IPC_IOC, ipcdev.ipc_base);
+		} else {
+				ipcdev.ioc = 0;
+				writel(cmd, ipcdev.ipc_base);
+		}
 }
 
 /*
@@ -436,21 +447,16 @@ int intel_scu_ipc_command(u32 cmd, u32 sub, u8 *in, u32 inlen,
 }
 EXPORT_SYMBOL_GPL(intel_scu_ipc_command);
 
-/*I2C commands */
-#define IPC_I2C_WRITE 1 /* I2C Write command */
-#define IPC_I2C_READ  2 /* I2C Read command */
-
 /*
  * Interrupt handler gets called when ioc bit of IPC_COMMAND_REG set to 1
  * When ioc bit is set to 1, caller api must wait for interrupt handler called
- * which in turn unlocks the caller api. Currently this is not used
+ * which in turn unlocks the caller api.
  *
  * This is edge triggered so we need take no action to clear anything
  */
 static irqreturn_t ioc(int irq, void *dev_id)
 {
-	if (ipcdev.irq_mode)
-		complete(&ipcdev.cmd_complete);
+	complete(&ipcdev.cmd_complete);
 
 	return IRQ_HANDLED;
 }
