@@ -1204,6 +1204,9 @@ static int dwc3_otg_create_children(struct dwc_otg2 *otg,
 	dwc_host->dev.dma_parms = otg->dev->dma_parms;
 	dwc_host->dev.parent = otg->dev;
 
+	dwc_host->dev.power.can_wakeup = 1;
+	dwc_host->dev.power.wakeup = wakeup_source_register("xhci-hcd");
+
 	retval = platform_device_add(dwc_host);
 	if (retval)	{
 		otg_err(otg, "failed to register dwc3 host\n");
