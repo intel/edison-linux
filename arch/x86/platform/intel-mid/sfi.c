@@ -447,7 +447,7 @@ static void __init sfi_handle_sd_dev(struct sfi_device_table_entry *pentry,
 			sd_info.name,
 			sd_info.board_ref_clock,
 			sd_info.addr);
-	pdata = dev->get_platform_data(&sd_info);
+	pdata = intel_mid_sfi_get_pdata(dev, &sd_info);
 	sd_info.platform_data = pdata;
 }
 
