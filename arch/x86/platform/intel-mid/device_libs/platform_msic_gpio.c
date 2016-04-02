@@ -27,9 +27,11 @@
 void __init *msic_gpio_platform_data(void *info)
 {
 	struct platform_device *pdev = NULL;
+	struct sfi_device_table_entry *entry = info;
 	static struct intel_msic_gpio_pdata msic_gpio_pdata;
 	int ret;
 	int gpio;
+	struct resource res;
 
 	pdev = platform_device_alloc(MSIC_GPIO_DEVICE_NAME, -1);
 
@@ -63,12 +65,19 @@ void __init *msic_gpio_platform_data(void *info)
 	msic_gpio_pdata.gpio_base = gpio;
 	msic_pdata.gpio = &msic_gpio_pdata;
 
+	pdev->dev.platform_data = &msic_gpio_pdata;
+
 	ret = platform_device_add(pdev);
 	if (ret) {
 		pr_err("failed to add msic gpio platform device\n");
 		platform_device_put(pdev);
 		return NULL;
 	}
+
+	res.name = "IRQ",
+	res.flags = IORESOURCE_IRQ,
+	res.start = entry->irq;
+	platform_device_add_resources(pdev, &res, 1);
 
 	register_rpmsg_service("rpmsg_msic_gpio", RPROC_SCU, RP_MSIC_GPIO);
 

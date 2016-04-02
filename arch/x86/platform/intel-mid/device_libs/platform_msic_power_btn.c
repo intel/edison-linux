@@ -37,20 +37,17 @@ static int mrfl_pb_irq_ack(struct intel_msic_power_btn_platform_data *pdata)
 	return 0;
 }
 
-void __init msic_power_btn_device_handler(struct sfi_device_table_entry *pentry,
-						struct devs_id *dev)
+void __init *msic_power_btn_platform_data(void *info)
 {
 	int ret;
 	struct platform_device *pdev;
+	struct sfi_device_table_entry *entry = info;
 	struct resource res;
-
-	pr_debug("IPC bus, name = %16.16s, irq = 0x%2x\n",
-			pentry->name, pentry->irq);
 
 	pdev = platform_device_alloc(INTEL_MID_POWERBTN_DEV_NAME, -1);
 	if (!pdev) {
 		pr_err("%s(): out of memory\n", __func__);
-		return;
+		return NULL;
 	}
 
 	msic_power_btn_pdata.pbstat = 0xfffff61a;
@@ -64,32 +61,34 @@ void __init msic_power_btn_device_handler(struct sfi_device_table_entry *pentry,
 	if (ret) {
 		pr_err("%s(): platform_device_add() failed\n", __func__);
 		platform_device_put(pdev);
-		return;
+		return NULL;
 	}
 
 	res.name = "IRQ",
 	res.flags = IORESOURCE_IRQ,
-	res.start = pentry->irq;
+	res.start = entry->irq;
 	platform_device_add_resources(pdev, &res, 1);
 
 	register_rpmsg_service("rpmsg_mid_powerbtn",
 			RPROC_SCU, RP_MSIC_POWER_BTN);
 
-	intel_scu_device_register(pdev);
+	return &msic_power_btn_pdata;
 }
 
 static const struct devs_id bcove_power_btn_dev_id __initconst = {
 	.name = "bcove_power_btn",
 	.type = SFI_DEV_TYPE_IPC,
 	.delay = 1,
-	.device_handler = &msic_power_btn_device_handler,
+	.get_platform_data = &msic_power_btn_platform_data,
+	.device_handler = &ipc_device_handler,
 };
 
 static const struct devs_id msic_power_btn_dev_id __initconst = {
 	.name = "msic_power_btn",
 	.type = SFI_DEV_TYPE_IPC,
 	.delay = 1,
-	.device_handler = &msic_power_btn_device_handler,
+	.get_platform_data = &msic_power_btn_platform_data,
+	.device_handler = &ipc_device_handler,
 };
 
 sfi_device(bcove_power_btn_dev_id);
