@@ -36,7 +36,7 @@
 #include <asm/reboot.h>
 
 #include "intel_mid_weak_decls.h"
-#include "intel_soc_mrfld.h"
+#include "intel_soc_pmu.h"
 
 /*
  * the clockevent devices on Moorestown/Medfield can be APBT or LAPIC clock,
@@ -70,6 +70,7 @@ EXPORT_SYMBOL_GPL(__intel_mid_cpu_chip);
 
 static void intel_mid_power_off(void)
 {
+	pmu_power_off();
 };
 
 static void intel_mid_reboot(void)
