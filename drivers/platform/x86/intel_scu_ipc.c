@@ -227,18 +227,16 @@ static int scu_ipc_pm_callback(struct notifier_block *nb,
  */
 void intel_scu_ipc_send_command(u32 cmd) /* Send ipc command */
 {
- if (cmd != 8440)
-   pr_crit("%s: sending cmd %d\n", __func__, cmd);
-		ipcdev.cmd = cmd;
-		init_completion(&ipcdev.cmd_complete);
+	ipcdev.cmd = cmd;
+	init_completion(&ipcdev.cmd_complete);
 
-		if (system_state == SYSTEM_RUNNING && !suspend_in_progress()) {
-				ipcdev.ioc = 1;
-				writel(cmd | IPC_IOC, ipcdev.ipc_base);
-		} else {
-				ipcdev.ioc = 0;
-				writel(cmd, ipcdev.ipc_base);
-		}
+	if (system_state == SYSTEM_RUNNING && !suspend_in_progress()) {
+		ipcdev.ioc = 1;
+		writel(cmd | IPC_IOC, ipcdev.ipc_base);
+	} else {
+		ipcdev.ioc = 0;
+		writel(cmd, ipcdev.ipc_base);
+	}
 }
 
 /*

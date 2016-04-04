@@ -90,13 +90,13 @@ void soc_thrm_device_handler(struct sfi_device_table_entry *pentry,
 
 static inline int byt_program_ioapic(int irq, int trigger, int polarity)
 {
-    if (mp_set_gsi_attr(irq, trigger, polarity, NUMA_NO_NODE))
-        return -EBUSY;
+	if (mp_set_gsi_attr(irq, trigger, polarity, NUMA_NO_NODE))
+		return -EBUSY;
 
-    if (mp_map_gsi_to_irq(irq, IOAPIC_MAP_ALLOC) < 0)
-        return -EBUSY;
+	if (mp_map_gsi_to_irq(irq, IOAPIC_MAP_ALLOC) < 0)
+		return -EBUSY;
 
-    return 0;
+	return 0;
 }
 
 static int __init byt_soc_thermal_init(void)

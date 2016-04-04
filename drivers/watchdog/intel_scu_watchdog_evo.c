@@ -1167,7 +1167,7 @@ static int handle_mrfl_dev_ioapic(int irq)
 	if (mp_map_gsi_to_irq(irq, IOAPIC_MAP_ALLOC) < 0)
 		return -EBUSY;
 
-    return 0;
+	return 0;
 }
 
 /* Init code */

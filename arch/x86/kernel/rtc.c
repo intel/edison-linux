@@ -149,11 +149,11 @@ void read_persistent_clock(struct timespec *ts)
 
 static int handle_mrfl_dev_ioapic(int irq)
 {
-    if (mp_set_gsi_attr(irq, 1, 0, NUMA_NO_NODE))
-        return -EBUSY;
+	if (mp_set_gsi_attr(irq, 1, 0, NUMA_NO_NODE))
+		return -EBUSY;
 
-    if (mp_map_gsi_to_irq(irq, IOAPIC_MAP_ALLOC) < 0)
-        return -EBUSY;
+	if (mp_map_gsi_to_irq(irq, IOAPIC_MAP_ALLOC) < 0)
+		return -EBUSY;
 
 	return 0;
 }
