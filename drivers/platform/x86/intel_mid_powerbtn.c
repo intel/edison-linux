@@ -108,6 +108,10 @@ static int mid_pb_probe(struct platform_device *pdev)
 	if (!input)
 		return -ENOMEM;
 
+	priv->input = input;
+	priv->irq = irq;
+	platform_set_drvdata(pdev, priv);
+
 	input->name = pdev->name;
 	input->phys = "power-button/input0";
 	input->id.bustype = BUS_HOST;
