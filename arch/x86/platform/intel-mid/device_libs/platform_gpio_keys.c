@@ -17,8 +17,7 @@
 #include <linux/gpio_keys.h>
 #include <linux/platform_device.h>
 #include <asm/intel-mid.h>
-
-#define DEVICE_NAME "gpio-keys"
+#include "platform_gpio_keys.h"
 
 /*
  * we will search these buttons in SFI GPIO table (by name)
@@ -26,16 +25,24 @@
  * buttons here, we will shrink them if no GPIO found.
  */
 static struct gpio_keys_button gpio_button[] = {
-	{KEY_POWER,		-1, 1, "power_btn",	EV_KEY, 0, 3000},
-	{KEY_PROG1,		-1, 1, "prog_btn1",	EV_KEY, 0, 20},
-	{KEY_PROG2,		-1, 1, "prog_btn2",	EV_KEY, 0, 20},
-	{SW_LID,		-1, 1, "lid_switch",	EV_SW,  0, 20},
-	{KEY_VOLUMEUP,		-1, 1, "vol_up",	EV_KEY, 0, 20},
-	{KEY_VOLUMEDOWN,	-1, 1, "vol_down",	EV_KEY, 0, 20},
-	{KEY_CAMERA,		-1, 1, "camera_full",	EV_KEY, 0, 20},
-	{KEY_CAMERA_FOCUS,	-1, 1, "camera_half",	EV_KEY, 0, 20},
-	{SW_KEYPAD_SLIDE,	-1, 1, "MagSw1",	EV_SW,  0, 20},
-	{SW_KEYPAD_SLIDE,	-1, 1, "MagSw2",	EV_SW,  0, 20},
+        {
+                .code = KEY_POWER,
+                .gpio = -1, /* GPIO number */
+                .active_low = 1,
+                .desc = "power_btn",/*Button description*/
+                .type = EV_KEY,
+                .wakeup = 0,
+                .debounce_interval = 3000,
+        },
+        {
+		.code = KEY_PROG1,
+		.gpio = 61,
+		.active_low = 1,
+		.desc = "SW1UI4",
+		.type = EV_KEY,
+		.wakeup = 0,
+		.debounce_interval = 50,
+        },
 };
 
 static struct gpio_keys_platform_data gpio_keys = {
@@ -63,8 +70,7 @@ static int __init pb_keys_init(void)
 
 	num = sizeof(gpio_button) / sizeof(struct gpio_keys_button);
 	for (i = 0; i < num; i++) {
-		gb[i].gpio = get_gpio_by_name(gb[i].desc);
-		pr_debug("info[%2d]: name = %s, gpio = %d\n", i, gb[i].desc,
+		pr_info("info[%2d]: name = %s, gpio = %d\n", i, gb[i].desc,
 					gb[i].gpio);
 		if (gb[i].gpio < 0)
 			continue;
