@@ -455,7 +455,7 @@ __irq_alloc_descs(int irq, unsigned int from, unsigned int cnt, int node,
 					   from, cnt, 0);
 	ret = -EEXIST;
 	if (irq >=0 && start != irq)
-		goto err;
+		goto done;
 
 	if (start + cnt > nr_irqs) {
 		ret = irq_expand_nr_irqs(start + cnt);
@@ -464,6 +464,7 @@ __irq_alloc_descs(int irq, unsigned int from, unsigned int cnt, int node,
 	}
 
 	bitmap_set(allocated_irqs, start, cnt);
+done:
 	mutex_unlock(&sparse_irq_lock);
 	return alloc_descs(start, cnt, node, owner);
 

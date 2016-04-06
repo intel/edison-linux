@@ -1161,23 +1161,13 @@ int remove_watchdog_sysfs_files(void)
 
 static int handle_mrfl_dev_ioapic(int irq)
 {
-	int ret = 0;
-	int ioapic;
-	struct io_apic_irq_attr irq_attr;
+	if (mp_set_gsi_attr(irq, 1, 0, NUMA_NO_NODE))
+		return -EBUSY;
 
-	ioapic = mp_find_ioapic(irq);
-	if (ioapic >= 0) {
-		irq_attr.ioapic = ioapic;
-		irq_attr.ioapic_pin = irq;
-		irq_attr.trigger = 1;
-		irq_attr.polarity = 0; /* Active high */
-		io_apic_set_pci_routing(NULL, irq, &irq_attr);
-	} else {
-		pr_warn("can not find interrupt %d in ioapic\n", irq);
-		ret = -EINVAL;
-	}
+	if (mp_map_gsi_to_irq(irq, IOAPIC_MAP_ALLOC) < 0)
+		return -EBUSY;
 
-	return ret;
+    return 0;
 }
 
 /* Init code */
