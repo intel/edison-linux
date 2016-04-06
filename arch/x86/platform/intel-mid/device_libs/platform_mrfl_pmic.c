@@ -52,3 +52,12 @@ out:
 	return &pmic_pdata;
 }
 
+static const struct devs_id mrfl_pmic_ccsm_dev_id __initconst = {
+	.name = "pmic_ccsm",
+	.type = SFI_DEV_TYPE_IPC,
+	.delay = 1,
+	.get_platform_data = &mrfl_pmic_ccsm_platform_data,
+	.device_handler = &ipc_device_handler,
+};
+
+sfi_device(mrfl_pmic_ccsm_dev_id);

@@ -18,23 +18,61 @@
 #include <linux/gpio.h>
 #include <linux/mfd/intel_msic.h>
 #include <asm/intel-mid.h>
+#include <linux/platform_data/intel_mid_remoteproc.h>
 
 #include "platform_msic.h"
+#include "platform_msic_gpio.h"
 #include "platform_ipc.h"
 
-static void __init *msic_gpio_platform_data(void *info)
+void __init *msic_gpio_platform_data(void *info)
 {
+	struct platform_device *pdev = NULL;
 	static struct intel_msic_gpio_pdata msic_gpio_pdata;
+	int ret;
+	int gpio;
 
-	int gpio = get_gpio_by_name("msic_gpio_base");
+	pdev = platform_device_alloc(MSIC_GPIO_DEVICE_NAME, -1);
+
+	if (!pdev) {
+		pr_err("out of memory for SFI platform dev %s\n",
+					MSIC_GPIO_DEVICE_NAME);
+		return NULL;
+	}
+
+	gpio = get_gpio_by_name("msic_gpio_base");
 
 	if (gpio < 0)
 		return NULL;
 
+	/*
+	 * Basincove PMIC GPIO has total 8 GPIO pins,
+	 * GPIO[5:2,0] support 1.8V, GPIO[7:6,1] support 1.8V and 3.3V,
+	 * We group GPIO[5:2] to low voltage and GPIO[7:6] to
+	 * high voltage. Because the CTL registers are contiguous,
+	 * this grouping method doesn't affect the driver usage but
+	 * easy for the driver sharing among multiple platforms.
+	 */
+	msic_gpio_pdata.ngpio_lv = 6;
+	msic_gpio_pdata.ngpio_hv = 2;
+	msic_gpio_pdata.gpio0_lv_ctlo = 0x7E;
+	msic_gpio_pdata.gpio0_lv_ctli = 0x8E;
+	msic_gpio_pdata.gpio0_hv_ctlo = 0x84;
+	msic_gpio_pdata.gpio0_hv_ctli = 0x94;
+
+	msic_gpio_pdata.can_sleep = 1;
 	msic_gpio_pdata.gpio_base = gpio;
 	msic_pdata.gpio = &msic_gpio_pdata;
 
-	return msic_generic_platform_data(info, INTEL_MSIC_BLOCK_GPIO);
+	ret = platform_device_add(pdev);
+	if (ret) {
+		pr_err("failed to add msic gpio platform device\n");
+		platform_device_put(pdev);
+		return NULL;
+	}
+
+	register_rpmsg_service("rpmsg_msic_gpio", RPROC_SCU, RP_MSIC_GPIO);
+
+	return &msic_gpio_pdata;
 }
 
 static const struct devs_id msic_gpio_dev_id __initconst = {

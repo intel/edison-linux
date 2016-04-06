@@ -19,6 +19,7 @@
 
 #include "platform_msic.h"
 #include "platform_mrfl_ocd.h"
+#include "platform_ipc.h"
 
 static int get_bcu_config(struct ocd_bcove_config_data *ocd_smip_data)
 {
@@ -66,3 +67,13 @@ void __init *mrfl_ocd_platform_data(void *info)
 
 	return &ocd_data;
 }
+
+static const struct devs_id mrfl_ocd_dev_id __initconst = {
+	.name = "bcove_bcu",
+	.type = SFI_DEV_TYPE_IPC,
+	.delay = 1,
+	.get_platform_data = &mrfl_ocd_platform_data,
+	.device_handler = &ipc_device_handler,
+};
+
+sfi_device(mrfl_ocd_dev_id);

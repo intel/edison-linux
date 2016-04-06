@@ -18,6 +18,8 @@
 #include <asm/intel-mid.h>
 #include <asm/intel_mid_gpadc.h>
 #include <asm/intel_mid_remoteproc.h>
+
+#include "platform_ipc.h"
 #include "platform_msic.h"
 #include "platform_msic_adc.h"
 
@@ -54,3 +56,13 @@ void __init *msic_adc_platform_data(void *info)
 out:
 	return &msic_adc_pdata;
 }
+
+static const struct devs_id msic_adc_dev_id __initconst = {
+	.name = "msic_adc",
+	.type = SFI_DEV_TYPE_IPC,
+	.delay = 1,
+	.get_platform_data = &msic_adc_platform_data,
+	.device_handler = &ipc_device_handler,
+};
+
+sfi_device(msic_adc_dev_id);

@@ -19,6 +19,8 @@
 #include <asm/intel_mid_thermal.h>
 #include <asm/intel-mid.h>
 #include <asm/intel_mid_remoteproc.h>
+
+#include "platform_ipc.h"
 #include "platform_mrfl_thermal.h"
 
 /* 'enum' of Thermal ADC channels */
@@ -131,3 +133,13 @@ void __init *mrfl_thermal_platform_data(void *info)
 
 	return 0;
 }
+
+static const struct devs_id mrfl_thermal_dev_id __initconst = {
+	.name = "bcove_thrm",
+	.type = SFI_DEV_TYPE_IPC,
+	.delay = 1,
+	.get_platform_data = &mrfl_thermal_platform_data,
+	.device_handler = &ipc_device_handler,
+};
+
+sfi_device(mrfl_thermal_dev_id);

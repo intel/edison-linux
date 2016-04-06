@@ -47,3 +47,13 @@ void __init *mrfl_pmic_i2c_platform_data(void *info)
 out:
 	return NULL;
 }
+
+static const struct devs_id mrfl_pmic_i2c_dev_id __initconst = {
+	.name = "i2c_pmic_adap",
+	.type = SFI_DEV_TYPE_IPC,
+	.delay = 1,
+	.get_platform_data = &mrfl_pmic_i2c_platform_data,
+	.device_handler = &ipc_device_handler,
+};
+
+sfi_device(mrfl_pmic_i2c_dev_id);

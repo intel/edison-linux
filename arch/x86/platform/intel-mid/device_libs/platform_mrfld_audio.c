@@ -22,6 +22,8 @@
 #include <asm/intel-mid.h>
 #include <linux/platform_data/intel_mid_remoteproc.h>
 #include <asm/platform_sst_audio.h>
+
+#include "platform_ipc.h"
 #include "platform_mrfld_audio.h"
 #include "platform_msic.h"
 #include "platform_wm8994.h"
@@ -149,3 +151,13 @@ void *mrfld_sst_audio_platform_data(void *info)
 
 	return NULL;
 }
+
+static const struct devs_id mrfld_sst_audio_dev_id __initconst = {
+	.name = "mrfld_sst",
+	.type = SFI_DEV_TYPE_IPC,
+	.delay = 1,
+	.get_platform_data = &mrfld_sst_audio_platform_data,
+	.device_handler = &ipc_device_handler,
+};
+
+sfi_device(mrfld_sst_audio_dev_id);

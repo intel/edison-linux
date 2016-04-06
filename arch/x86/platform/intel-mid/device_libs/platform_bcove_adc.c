@@ -15,11 +15,13 @@
 #include <linux/iio/iio.h>
 #include <linux/iio/machine.h>
 #include <linux/iio/types.h>
+#include <linux/sfi.h>
 #include <asm/intel-mid.h>
 #include <asm/intel_basincove_gpadc.h>
 #include <asm/intel_mid_remoteproc.h>
 
 #include "platform_bcove_adc.h"
+#include "platform_ipc.h"
 
 /* SRAM address where the GPADC interrupt register is cached */
 #define GPADC_SRAM_INTR_ADDR	0xfffff615
@@ -141,3 +143,13 @@ void __init *bcove_adc_platform_data(void *info)
 out:
 	return &bcove_adc_pdata;
 }
+
+static const struct devs_id bcove_adc_dev_id __initconst = {
+	.name = "bcove_adc",
+	.type = SFI_DEV_TYPE_IPC,
+	.delay = 1,
+	.get_platform_data = &bcove_adc_platform_data,
+	.device_handler = &ipc_device_handler,
+};
+
+sfi_device(bcove_adc_dev_id);

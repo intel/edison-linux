@@ -130,3 +130,12 @@ static int __init platform_soc_thermal_init(void)
 	return 0;
 }
 device_initcall(platform_soc_thermal_init);
+
+static const struct devs_id soc_thermal_dev_id __initconst = {
+	.name = "soc_thrm",
+	.type = SFI_DEV_TYPE_IPC,
+	.delay = 1,
+	.device_handler = &soc_thrm_device_handler,
+};
+
+sfi_device(soc_thermal_dev_id);

@@ -241,3 +241,11 @@ void __init *wm8958_platform_data(void *info)
 
 	return;
 }
+
+static const struct devs_id wm8994_dev_id __initconst = {
+	.name = "wm8994",
+	.type = SFI_DEV_TYPE_I2C,
+	.get_platform_data = &wm8994_platform_data,
+};
+
+sfi_device(wm8994_dev_id);

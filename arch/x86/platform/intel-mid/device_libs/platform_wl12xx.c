@@ -15,6 +15,7 @@
 #include <linux/wl12xx.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
+#include <linux/sfi.h>
 #include <asm/intel-mid.h>
 #include "platform_wl12xx.h"
 
@@ -180,3 +181,11 @@ static void wl12xx_platform_deinit(struct wl12xx_platform_data *pdata)
 out:
 	return ;
 }
+
+static const struct devs_id wl12xx_clk_vmmc_dev_id __initconst = {
+	.name = "wl12xx_clk_vmmc",
+	.type = SFI_DEV_TYPE_SD,
+	.get_platform_data = &wl12xx_platform_data,
+};
+
+sfi_device(wl12xx_clk_vmmc_dev_id);

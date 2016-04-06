@@ -14,7 +14,9 @@
 #include <linux/spi/spi.h>
 #include <linux/lnw_gpio.h>
 #include <linux/spi/intel_mid_ssp_spi.h>
+#include <linux/sfi.h>
 #include <asm/intel-mid.h>
+
 #include "platform_ads7955.h"
 
 static struct intel_mid_ssp_spi_chip chip = {
@@ -35,3 +37,11 @@ void __init *ads7955_platform_data(void *info)
 
 	return NULL;
 }
+
+static const struct devs_id ads7955_dev_id __initconst = {
+	.name = "ads7955",
+	.type = SFI_DEV_TYPE_SPI,
+	.get_platform_data = &ads7955_platform_data,
+};
+
+sfi_device(ads7955_dev_id);

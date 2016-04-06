@@ -126,3 +126,32 @@ void __init *wifi_platform_data(void *info)
 
 	return &wifi_device;
 }
+
+static const struct devs_id bcm43xx_clk_vmmc_dev_id __initconst = {
+	.name = "bcm43xx_clk_vmmc",
+	.type = SFI_DEV_TYPE_SD,
+	.get_platform_data = &wifi_platform_data,
+};
+
+static const struct devs_id bcm43xx_vmmc_dev_id __initconst = {
+	.name = "bcm43xx_vmmc",
+	.type = SFI_DEV_TYPE_SD,
+	.get_platform_data = &wifi_platform_data,
+};
+
+static const struct devs_id iwlwifi_clk_vmmc_dev_id __initconst = {
+	.name = "iwlwifi_clk_vmmc",
+	.type = SFI_DEV_TYPE_SD,
+	.get_platform_data = &wifi_platform_data,
+};
+
+static const struct devs_id wlan_fast_irq_dev_id __initconst = {
+	.name = "WLAN_FAST_IRQ",
+	.type = SFI_DEV_TYPE_SD,
+	.device_handler = &wifi_platform_data_fastirq,
+};
+
+sfi_device(bcm43xx_clk_vmmc_dev_id);
+sfi_device(bcm43xx_vmmc_dev_id);
+sfi_device(iwlwifi_clk_vmmc_dev_id);
+sfi_device(wlan_fast_irq_dev_id);
