@@ -129,7 +129,7 @@ int add_sst_platform_device(void)
 
 	populate_platform_data();
 
-	pdev = platform_device_alloc("sst-platform", -1);
+	pdev = platform_device_alloc("sst-mrfld-platform", -1);
 	if (!pdev) {
 		pr_err("failed to allocate audio platform device\n");
 		return -EINVAL;

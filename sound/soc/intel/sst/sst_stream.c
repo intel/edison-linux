@@ -29,7 +29,7 @@
 #include <sound/soc.h>
 #include <sound/compress_driver.h>
 #include <asm/platform_sst_audio.h>
-#include "../sst-mfld-platform.h"
+#include "../sst-mrfld-platform.h"
 #include "sst.h"
 #include "../sst-dsp.h"
 
@@ -146,7 +146,7 @@ int sst_start_stream(struct intel_sst_drv *sst_drv_ctx, int str_id)
 	struct stream_info *str_info;
 	u16 data = 0;
 
-	dev_dbg(sst_drv_ctx->dev, "sst_start_stream for %d\n", str_id);
+	dev_info(sst_drv_ctx->dev, "sst_start_stream for %d\n", str_id);
 	str_info = get_stream_info(sst_drv_ctx, str_id);
 	if (!str_info)
 		return -EINVAL;

@@ -2985,6 +2985,13 @@ static int wm8994_aif3_hw_params(struct snd_pcm_substream *substream,
 	return snd_soc_update_bits(codec, aif1_reg, WM8994_AIF1_WL_MASK, aif1);
 }
 
+#if IS_ENABLED(CONFIG_SND_MRFLD_MACHINE) || \
+	IS_ENABLED(CONFIG_SND_MOOR_MACHINE)
+static int wm8994_aif_mute(struct snd_soc_dai *codec_dai, int mute)
+{
+	return 0;
+}
+#else
 static int wm8994_aif_mute(struct snd_soc_dai *codec_dai, int mute)
 {
 	struct snd_soc_codec *codec = codec_dai->codec;
@@ -3011,6 +3018,7 @@ static int wm8994_aif_mute(struct snd_soc_dai *codec_dai, int mute)
 
 	return 0;
 }
+#endif
 
 static int wm8994_set_tristate(struct snd_soc_dai *codec_dai, int tristate)
 {

@@ -38,7 +38,7 @@
 #include <acpi/platform/aclinux.h>
 #include <acpi/actypes.h>
 #include <acpi/acpi_bus.h>
-#include "../sst-mfld-platform.h"
+#include "../sst-mrfld-platform.h"
 #include "../sst-dsp.h"
 #include "sst.h"
 
@@ -126,7 +126,7 @@ static struct sst_platform_info byt_rvp_platform_data = {
 	.ipc_info = &byt_ipc_info,
 	.lib_info = &byt_lib_dnld_info,
 	.res_info = &byt_rvp_res_info,
-	.platform = "sst-mfld-platform",
+	.platform = "sst-mrfld-platform",
 };
 
 /* Cherryview (Cherrytrail and Braswell) uses same mrfld dpcm fw as Baytrail,
@@ -137,7 +137,7 @@ static struct sst_platform_info chv_platform_data = {
 	.ipc_info = &byt_ipc_info,
 	.lib_info = &byt_lib_dnld_info,
 	.res_info = &byt_rvp_res_info,
-	.platform = "sst-mfld-platform",
+	.platform = "sst-mrfld-platform",
 };
 
 static int sst_platform_get_resources(struct intel_sst_drv *ctx)

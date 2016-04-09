@@ -13,6 +13,30 @@ config SND_MFLD_MACHINE
 config SND_SST_MFLD_PLATFORM
 	tristate
 
+config SND_MRFLD_MACHINE
+	tristate "SOC Machine Audio driver for Intel Merrifield MID platform"
+	depends on INTEL_SCU_IPC
+	select SND_SOC_LM49453
+	select SND_SOC_WM8994
+	select MFD_WM8994
+	select MFD_CORE
+	select REGULATOR_WM8994
+	select SND_SST_MRFLD_PLATFORM
+	select SND_SST_IPC_PCI
+	select SND_EFFECTS_OFFLOAD
+	select SND_INTEL_SST
+	help
+          This adds support for ASoC machine driver for Intel(R) MID Medfield platform
+          used as alsa device in audio substem in Intel(R) MID devices
+          Say Y if you have such a device
+          If unsure select "N".
+
+config SND_SST_MRFLD_PLATFORM
+	tristate
+
+config SND_INTEL_SST
+	tristate
+
 config SND_SST_IPC
 	tristate
 

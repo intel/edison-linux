@@ -30,12 +30,13 @@
 #include <linux/dmaengine.h>
 #include <linux/pm_runtime.h>
 #include <linux/pm_qos.h>
+#include <linux/elf.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/soc.h>
 #include <sound/compress_driver.h>
 #include <asm/platform_sst_audio.h>
-#include "../sst-mfld-platform.h"
+#include "../sst-mrfld-platform.h"
 #include "sst.h"
 #include "../sst-dsp.h"
 
@@ -104,6 +105,113 @@ int sst_start_mrfld(struct intel_sst_drv *sst_drv_ctx)
 	return 0;
 }
 
+#define SST_CALC_DMA_DSTN(lpe_viewpt_rqd, ia_viewpt_addr, elf_paddr, \
+			lpe_viewpt_addr) ((lpe_viewpt_rqd) ? \
+		elf_paddr : (ia_viewpt_addr + elf_paddr - lpe_viewpt_addr))
+
+#define MRFLD_WORD_WA 1
+
+static int sst_fill_dstn(struct intel_sst_drv *sst, struct sst_info info,
+		    Elf32_Phdr *pr, void **dstn, unsigned int *dstn_phys, int *mem_type)
+{
+#ifdef MRFLD_WORD_WA
+	/* work arnd-since only 4 byte align copying is only allowed for ICCM */
+	if ((pr->p_paddr >= info.iram_start) && (pr->p_paddr < info.iram_end)) {
+		size_t data_size = pr->p_filesz % SST_ICCM_BOUNDARY;
+
+		if (data_size)
+			pr->p_filesz += 4 - data_size;
+		*dstn = sst->iram + (pr->p_paddr - info.iram_start);
+		*dstn_phys = SST_CALC_DMA_DSTN(info.lpe_viewpt_rqd,
+				sst->iram_base, pr->p_paddr, info.iram_start);
+		*mem_type = 1;
+	}
+#else
+	if ((pr->p_paddr >= info.iram_start) &&
+		(pr->p_paddr < info.iram_end)) {
+
+		*dstn = sst->iram + (pr->p_paddr - info.iram_start);
+		*dstn_phys = SST_CALC_DMA_DSTN(info.lpe_viewpt_rqd,
+				sst->iram_base, pr->p_paddr, info.iram_start);
+		*mem_type = 1;
+	}
+#endif
+	else if ((pr->p_paddr >= info.dram_start) &&
+		 (pr->p_paddr < info.dram_end)) {
+
+		*dstn = sst->dram + (pr->p_paddr - info.dram_start);
+		*dstn_phys = SST_CALC_DMA_DSTN(info.lpe_viewpt_rqd,
+				sst->dram_base, pr->p_paddr, info.dram_start);
+		*mem_type = 1;
+	} else if ((pr->p_paddr >= info.imr_start) &&
+		   (pr->p_paddr < info.imr_end)) {
+
+		*dstn = sst->ddr + (pr->p_paddr - info.imr_start);
+		*dstn_phys =  sst->ddr_base + pr->p_paddr - info.imr_start;
+		*mem_type = 0;
+	} else {
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static void sst_fill_info(struct intel_sst_drv *sst,
+			struct sst_info *info)
+{
+	/* first we setup addresses to be used for elf sections */
+	if (sst->info.iram_use) {
+		info->iram_start = sst->info.iram_start;
+		info->iram_end = sst->info.iram_end;
+	} else {
+		info->iram_start = sst->iram_base;
+		info->iram_end = sst->iram_end;
+	}
+	if (sst->info.dram_use) {
+		info->dram_start = sst->info.dram_start;
+		info->dram_end = sst->info.dram_end;
+	} else {
+		info->dram_start = sst->dram_base;
+		info->dram_end = sst->dram_end;
+	}
+	if (sst->info.imr_use) {
+		info->imr_start = sst->info.imr_start;
+		info->imr_end = sst->info.imr_end;
+	} else {
+		info->imr_start = relocate_imr_addr_mrfld(sst->ddr_base);
+		info->imr_end = relocate_imr_addr_mrfld(sst->ddr_end);
+	}
+
+	info->lpe_viewpt_rqd = sst->info.lpe_viewpt_rqd;
+	info->dma_max_len = sst->info.dma_max_len;
+	pr_debug("%s: dma_max_len 0x%x", __func__, info->dma_max_len);
+}
+
+static inline int sst_validate_elf(const struct firmware *sst_bin, bool dynamic)
+{
+	Elf32_Ehdr *elf;
+
+	BUG_ON(!sst_bin);
+
+	pr_debug("IN %s\n", __func__);
+
+	elf = (Elf32_Ehdr *)sst_bin->data;
+
+	if ((elf->e_ident[0] != 0x7F) || (elf->e_ident[1] != 'E') ||
+	    (elf->e_ident[2] != 'L') || (elf->e_ident[3] != 'F')) {
+		pr_debug("ELF Header Not found!%zu\n", sst_bin->size);
+		return -EINVAL;
+	}
+
+	if (dynamic == true) {
+		if (elf->e_type != ET_DYN) {
+			pr_err("Not a dynamic loadable library\n");
+			return -EINVAL;
+		}
+	}
+	pr_debug("Valid ELF Header...%zu\n", sst_bin->size);
+	return 0;
+}
+
 static int sst_validate_fw_image(struct intel_sst_drv *ctx, unsigned long size,
 		struct fw_module_header **module, u32 *num_modules)
 {
@@ -157,6 +265,54 @@ static int sst_fill_memcpy_list(struct list_head *memcpy_list,
 	listnode->is_io = is_io;
 	list_add_tail(&listnode->memcpylist, memcpy_list);
 
+	return 0;
+}
+
+static int sst_parse_elf_module_memcpy(struct intel_sst_drv *sst,
+		const void *fw, struct sst_info info, Elf32_Phdr *pr,
+		struct list_head *memcpy_list)
+{
+	void *dstn;
+	unsigned int dstn_phys;
+	int ret_val = 0;
+	int mem_type;
+
+	ret_val = sst_fill_dstn(sst, info, pr, &dstn, &dstn_phys, &mem_type);
+	if (ret_val)
+		return ret_val;
+
+	ret_val = sst_fill_memcpy_list(memcpy_list, dstn,
+			(void *)fw + pr->p_offset, pr->p_filesz, mem_type);
+	if (ret_val)
+		return ret_val;
+
+	return 0;
+}
+
+static int
+sst_parse_elf_fw_memcpy(struct intel_sst_drv *sst, const void *fw_in_mem,
+			struct list_head *memcpy_list)
+{
+	int i = 0;
+
+	Elf32_Ehdr *elf;
+	Elf32_Phdr *pr;
+	struct sst_info info;
+
+	BUG_ON(!fw_in_mem);
+
+	elf = (Elf32_Ehdr *)fw_in_mem;
+	pr = (Elf32_Phdr *) (fw_in_mem + elf->e_phoff);
+	pr_debug("%s entry\n", __func__);
+
+	sst_fill_info(sst, &info);
+
+	while (i < elf->e_phnum) {
+		if (pr[i].p_type == PT_LOAD)
+			sst_parse_elf_module_memcpy(sst, fw_in_mem, info,
+					&pr[i], memcpy_list);
+		i++;
+	}
 	return 0;
 }
 
@@ -286,7 +442,16 @@ void sst_memcpy_free_resources(struct intel_sst_drv *sst_drv_ctx)
 static int sst_cache_and_parse_fw(struct intel_sst_drv *sst,
 		const struct firmware *fw)
 {
-	int retval = 0;
+	int retval;
+
+	if (sst->info.use_elf) {
+		retval = sst_validate_elf(fw, false);
+
+		if (retval) {
+			pr_err("FW image invalid...\n");
+			goto end_release;
+		}
+	}
 
 	sst->fw_in_mem = kzalloc(fw->size, GFP_KERNEL);
 	if (!sst->fw_in_mem) {
@@ -296,7 +461,12 @@ static int sst_cache_and_parse_fw(struct intel_sst_drv *sst,
 	dev_dbg(sst->dev, "copied fw to %p", sst->fw_in_mem);
 	dev_dbg(sst->dev, "phys: %lx", (unsigned long)virt_to_phys(sst->fw_in_mem));
 	memcpy(sst->fw_in_mem, fw->data, fw->size);
-	retval = sst_parse_fw_memcpy(sst, fw->size, &sst->memcpy_list);
+
+	if (sst->info.use_elf)
+		retval = sst_parse_elf_fw_memcpy(sst, sst->fw_in_mem, &sst->memcpy_list);
+	else
+		retval = sst_parse_fw_memcpy(sst, fw->size, &sst->memcpy_list);
+
 	if (retval) {
 		dev_err(sst->dev, "Failed to parse fw\n");
 		kfree(sst->fw_in_mem);

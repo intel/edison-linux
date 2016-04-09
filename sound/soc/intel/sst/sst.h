@@ -25,6 +25,7 @@
 #define __SST_H__
 
 #include <linux/firmware.h>
+#include <asm/platform_sst.h>
 
 /* driver names */
 #define SST_DRV_NAME "intel_sst_driver"

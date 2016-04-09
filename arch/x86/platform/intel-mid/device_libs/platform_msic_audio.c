@@ -26,7 +26,7 @@ static void *msic_audio_platform_data(void *info)
 {
 	struct platform_device *pdev;
 
-	pdev = platform_device_register_simple("sst-platform", -1, NULL, 0);
+	pdev = platform_device_register_simple("sst-mfld-platform", -1, NULL, 0);
 
 	if (IS_ERR(pdev)) {
 		pr_err("failed to create audio platform device\n");

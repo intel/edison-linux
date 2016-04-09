@@ -101,10 +101,10 @@ void *mrfld_sst_audio_platform_data(void *info)
 	}
 
 	if(!audio_codec || !strcmp(audio_codec, "dummy")) {
-		pdev = platform_device_register_simple("merr_dpcm_dummy",
+		pdev = platform_device_register_simple("mrfld_mc_dummy",
 					0, NULL, 0);
 		if (!pdev) {
-			pr_err("failed to register merr_dpcm_dummy platform device\n");
+			pr_err("failed to register mrfld_mc_dummy platform device\n");
 			return NULL;
 		}
 	} else if (!strcmp(audio_codec, "wm8958")) {
@@ -141,10 +141,10 @@ void *mrfld_sst_audio_platform_data(void *info)
 		pr_info("Codec %s is not implemented."
 				"Dummy codec selected...\n", audio_codec);
 
-		pdev = platform_device_register_simple("merr_dpcm_dummy",
+		pdev = platform_device_register_simple("mrfld_mc_dummy",
 							0, NULL, 0);
 		if (!pdev) {
-			pr_err("failed to register merr_dpcm_dummy platform device\n");
+			pr_err("failed to register mrfld_mc_dummy platform device\n");
 			return NULL;
 		}
 	}

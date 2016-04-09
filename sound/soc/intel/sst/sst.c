@@ -30,7 +30,7 @@
 #include <sound/core.h>
 #include <sound/soc.h>
 #include <asm/platform_sst_audio.h>
-#include "../sst-mfld-platform.h"
+#include "../sst-mrfld-platform.h"
 #include "sst.h"
 #include "../sst-dsp.h"
 
@@ -286,35 +286,6 @@ int sst_context_init(struct intel_sst_drv *ctx)
 		mutex_init(&stream->lock);
 	}
 
-	/* Register the ISR */
-	ret = devm_request_threaded_irq(ctx->dev, ctx->irq_num, ctx->ops->interrupt,
-					ctx->ops->irq_thread, 0, SST_DRV_NAME,
-					ctx);
-	if (ret)
-		goto do_free_mem;
-
-	dev_dbg(ctx->dev, "Registered IRQ %#x\n", ctx->irq_num);
-
-	/* default intr are unmasked so set this as masked */
-	sst_shim_write64(ctx->shim, SST_IMRX, 0xFFFF0038);
-
-	ctx->qos = devm_kzalloc(ctx->dev,
-		sizeof(struct pm_qos_request), GFP_KERNEL);
-	if (!ctx->qos) {
-		ret = -ENOMEM;
-		goto do_free_mem;
-	}
-	pm_qos_add_request(ctx->qos, PM_QOS_CPU_DMA_LATENCY,
-				PM_QOS_DEFAULT_VALUE);
-
-	dev_dbg(ctx->dev, "Requesting FW %s now...\n", ctx->firmware_name);
-	ret = request_firmware_nowait(THIS_MODULE, true, ctx->firmware_name,
-				      ctx->dev, GFP_KERNEL, ctx, sst_firmware_load_cb);
-	if (ret) {
-		dev_err(ctx->dev, "Firmware download failed:%d\n", ret);
-		goto do_free_mem;
-	}
-	sst_register(ctx->dev);
 	return 0;
 
 do_free_mem:
@@ -350,7 +321,7 @@ static inline void sst_save_shim64(struct intel_sst_drv *ctx,
 
 	spin_lock_irqsave(&ctx->ipc_spin_lock, irq_flags);
 
-	shim_regs->imrx = sst_shim_read64(shim, SST_IMRX),
+	shim_regs->imrx = sst_shim_read64(shim, SST_IMRX);
 
 	spin_unlock_irqrestore(&ctx->ipc_spin_lock, irq_flags);
 }
@@ -366,7 +337,7 @@ static inline void sst_restore_shim64(struct intel_sst_drv *ctx,
 	 * initialize by FW or driver when firmware is loaded
 	 */
 	spin_lock_irqsave(&ctx->ipc_spin_lock, irq_flags);
-	sst_shim_write64(shim, SST_IMRX, shim_regs->imrx),
+	sst_shim_write64(shim, SST_IMRX, shim_regs->imrx);
 	spin_unlock_irqrestore(&ctx->ipc_spin_lock, irq_flags);
 }
 
@@ -374,25 +345,26 @@ void sst_configure_runtime_pm(struct intel_sst_drv *ctx)
 {
 	pm_runtime_set_autosuspend_delay(ctx->dev, SST_SUSPEND_DELAY);
 	pm_runtime_use_autosuspend(ctx->dev);
-	/*
-	 * For acpi devices, the actual physical device state is
-	 * initially active. So change the state to active before
-	 * enabling the pm
-	 */
-	pm_runtime_enable(ctx->dev);
 
-	if (acpi_disabled)
-		pm_runtime_set_active(ctx->dev);
-	else
+	if (acpi_disabled) {
+		pm_runtime_allow(ctx->dev);
 		pm_runtime_put_noidle(ctx->dev);
-
-	sst_save_shim64(ctx, ctx->shim, ctx->shim_regs64);
+	} else {
+		/*
+		 * For acpi devices, the actual physical device state is
+		 * initially active. So change the state to active before
+		 * enabling the pm
+		 */
+		pm_runtime_set_active(ctx->dev);
+		pm_runtime_enable(ctx->dev);
+		pm_runtime_put_noidle(ctx->dev);
+		sst_save_shim64(ctx, ctx->shim, ctx->shim_regs64);
+	}
 }
 EXPORT_SYMBOL_GPL(sst_configure_runtime_pm);
 
 static int intel_sst_runtime_suspend(struct device *dev)
 {
-	int ret = 0;
 	struct intel_sst_drv *ctx = dev_get_drvdata(dev);
 
 	if (ctx->sst_state == SST_RESET) {
@@ -409,10 +381,12 @@ static int intel_sst_runtime_suspend(struct device *dev)
 	synchronize_irq(ctx->irq_num);
 	flush_workqueue(ctx->post_msg_wq);
 
-	/* save the shim registers because PMC doesn't save state */
-	sst_save_shim64(ctx, ctx->shim, ctx->shim_regs64);
+	if (!acpi_disabled) {
+		/* save the shim registers because PMC doesn't save state */
+		sst_save_shim64(ctx, ctx->shim, ctx->shim_regs64);
+	}
 
-	return ret;
+	return 0;
 }
 
 static int intel_sst_runtime_resume(struct device *dev)

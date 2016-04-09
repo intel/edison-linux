@@ -27,7 +27,8 @@
 #include <sound/core.h>
 #include <sound/soc.h>
 #include <asm/platform_sst_audio.h>
-#include "../sst-mfld-platform.h"
+#include "../sst-mrfld-platform.h"
+#include "../sst-dsp.h"
 #include "sst.h"
 
 static int sst_platform_get_resources(struct intel_sst_drv *ctx)
@@ -150,6 +151,39 @@ static int intel_sst_probe(struct pci_dev *pci,
 	ret = sst_platform_get_resources(sst_drv_ctx);
 	if (ret < 0)
 		goto do_free_drv_ctx;
+
+	/* Register the ISR */
+	ret = devm_request_threaded_irq(sst_drv_ctx->dev, sst_drv_ctx->irq_num,
+				sst_drv_ctx->ops->interrupt,
+				sst_drv_ctx->ops->irq_thread, 0, SST_DRV_NAME,
+				sst_drv_ctx);
+	if (ret)
+		goto do_free_drv_ctx;
+
+	dev_dbg(sst_drv_ctx->dev, "Registered IRQ %#x\n", sst_drv_ctx->irq_num);
+
+	/* default intr are unmasked so set this as masked */
+	sst_shim_write64(sst_drv_ctx->shim, SST_IMRX, 0xFFFF0038);
+
+	sst_drv_ctx->qos = devm_kzalloc(sst_drv_ctx->dev,
+		sizeof(struct pm_qos_request), GFP_KERNEL);
+	if (!sst_drv_ctx->qos) {
+		ret = -ENOMEM;
+		goto do_free_drv_ctx;
+	}
+	pm_qos_add_request(sst_drv_ctx->qos, PM_QOS_CPU_DMA_LATENCY,
+				PM_QOS_DEFAULT_VALUE);
+
+	dev_dbg(sst_drv_ctx->dev, "Requesting FW %s now...\n",
+						sst_drv_ctx->firmware_name);
+	ret = request_firmware_nowait(THIS_MODULE, true, sst_drv_ctx->firmware_name,
+				      sst_drv_ctx->dev, GFP_KERNEL, sst_drv_ctx,
+				      sst_firmware_load_cb);
+	if (ret) {
+		dev_err(sst_drv_ctx->dev, "Firmware download failed:%d\n", ret);
+		goto do_free_drv_ctx;
+	}
+	sst_register(sst_drv_ctx->dev);
 
 	pci_set_drvdata(pci, sst_drv_ctx);
 	sst_configure_runtime_pm(sst_drv_ctx);

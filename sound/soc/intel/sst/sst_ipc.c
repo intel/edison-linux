@@ -30,7 +30,7 @@
 #include <sound/compress_driver.h>
 #include <asm/intel-mid.h>
 #include <asm/platform_sst_audio.h>
-#include "../sst-mfld-platform.h"
+#include "../sst-mrfld-platform.h"
 #include "sst.h"
 #include "../sst-dsp.h"
 
@@ -236,6 +236,11 @@ static void process_fw_init(struct intel_sst_drv *sst_drv_ctx,
 		retval = init->result;
 		goto ret;
 	}
+	pr_info("FW Version %02x.%02x.%02x.%02x\n",
+		init->fw_version.type, init->fw_version.major,
+		init->fw_version.minor, init->fw_version.build);
+	pr_info("Build date %s Time %s\n",
+			init->build_info.date, init->build_info.time);
 
 ret:
 	sst_wake_up_block(sst_drv_ctx, retval, FW_DWNL_ID, 0 , NULL, 0);
@@ -287,7 +292,7 @@ static void process_fw_async_msg(struct intel_sst_drv *sst_drv_ctx,
 	case IPC_IA_FW_ASYNC_ERR_MRFLD:
 		dev_err(sst_drv_ctx->dev, "FW sent async error msg:\n");
 		for (i = 0; i < (data_size/4); i++)
-			print_hex_dump(KERN_DEBUG, NULL, DUMP_PREFIX_NONE,
+			print_hex_dump(KERN_INFO, NULL, DUMP_PREFIX_NONE,
 					16, 4, data_offset, data_size, false);
 		break;
 

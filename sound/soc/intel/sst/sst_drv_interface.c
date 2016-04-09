@@ -30,7 +30,7 @@
 #include <sound/soc.h>
 #include <sound/compress_driver.h>
 #include <asm/platform_sst_audio.h>
-#include "../sst-mfld-platform.h"
+#include "../sst-mrfld-platform.h"
 #include "sst.h"
 #include "../sst-dsp.h"
 
