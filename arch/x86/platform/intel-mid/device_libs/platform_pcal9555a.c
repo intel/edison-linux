@@ -57,7 +57,7 @@ void __init *pcal9555a_platform_data(void *info)
 	if (gpio_base == -1)
 		return NULL;
 	pcal9555a->gpio_base = gpio_base;
-	if (intr != -1) {
+	if (intr >= 0) {
 		i2c_info->irq = intr + INTEL_MID_IRQ_OFFSET;
 		pcal9555a->irq_base = gpio_base + INTEL_MID_IRQ_OFFSET;
 	} else {
