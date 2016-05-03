@@ -150,7 +150,10 @@ enum sst_cmd_type {
 
 enum sst_task {
 	SST_TASK_SBA = 1,
+	SST_TASK_FBA_UL,
 	SST_TASK_MMX,
+	SST_TASK_AWARE,
+	SST_TASK_FBA_DL,
 };
 
 enum sst_type {
