@@ -25,7 +25,13 @@
 #include <linux/slab.h>
 #include <sound/soc.h>
 #include <sound/tlv.h>
+
+#ifdef CONFIG_SND_MRFLD_MACHINE
+#include "sst-mrfld-platform.h"
+#else
 #include "sst-mfld-platform.h"
+#endif
+
 #include "sst-atom-controls.h"
 
 static int sst_fill_byte_control(struct sst_data *drv,
