@@ -733,7 +733,7 @@ static void intel_mid_dma_issue_pending(struct dma_chan *chan)
 
 	spin_lock_bh(&midc->lock);
 	if (!list_empty(&midc->queue))
-		midc_scan_descriptors(to_middma_device(chan->device), midc);
+		midc_start_descriptors(to_middma_device(chan->device), midc);
 	spin_unlock_bh(&midc->lock);
 }
 
@@ -933,7 +933,6 @@ static struct dma_async_tx_descriptor *intel_mid_dma_prep_memcpy(
 	if (dst_reg_width < 0) {
 		pr_err("ERR_MDMA: Failed to get DST reg width\n");
 		return NULL;
- 
 	}
 	ctl_lo.ctlx.dst_tr_width = dst_reg_width;
  
@@ -1336,12 +1335,13 @@ static void intel_mid_dma_free_chan_resources(struct dma_chan *chan)
 		list_del(&desc->desc_node);
 		dma_pool_free(mid->dma_pool, desc, desc->txd.phys);
 	}
-	midc->raw_tfr = 0;
 	list_for_each_entry_safe(desc, _desc, &midc->queue, desc_node) {
 		list_del(&desc->desc_node);
-		pci_pool_free(mid->dma_pool, desc, desc->txd.phys);
+		dma_pool_free(mid->dma_pool, desc, desc->txd.phys);
 	}
+	midc->raw_tfr = 0;
 	spin_unlock_bh(&midc->lock);
+
 	if (midc->lli_pool) {
 		dma_pool_destroy(midc->lli_pool);
 		midc->lli_pool = NULL;
@@ -1791,9 +1791,10 @@ int mid_setup_dma(struct device *dev)
 	}
 	if (!dma->dword_trf) {
 		config_dma_fifo_partition(dma);
-	/* Mask all interrupts from DMA controller to IA by default */
-	dmac1_mask_periphral_intr(dma);
-}
+		/* Mask all interrupts from DMA controller to IA by default */
+		dmac1_mask_periphral_intr(dma);
+	}
+
 	return 0;
 
 err_setup:
@@ -1880,7 +1881,6 @@ static int intel_mid_dma_probe(struct pci_dev *pdev,
 	if (err)
 		goto err_set_dma_mask;
 
-	device = kzalloc(sizeof(*device), GFP_KERNEL);
 	pci_dev_get(pdev);
 	device = mid_dma_setup_context(&pdev->dev, info);
 	if (!device)
@@ -1947,8 +1947,6 @@ static void intel_mid_dma_remove(struct pci_dev *pdev)
 /*
 * dma_suspend - suspend function
 *
-* @pci: PCI device structure
-* @state: PM message
 * @dev: device structure
 *
 * This function is called by OS when a power event occurs
@@ -1971,7 +1969,7 @@ int dma_suspend(struct device *dev)
 /**
 * dma_resume - resume function
 *
-* @pci:	device structure
+* @dev:	device structure
 *
 * This function is called by OS when a power event occurs
 */
@@ -2009,7 +2007,7 @@ static int dma_runtime_idle(struct device *dev)
 			return -EAGAIN;
 	}
 
-	return pm_schedule_suspend(dev, 0);;
+	return pm_schedule_suspend(dev, 0);
 }
 
 /******************************************************************************
