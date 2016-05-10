@@ -40,36 +40,35 @@
 #define INTEL_MID_DMAC2_ID		0x0813
 #define INTEL_MID_GP_DMAC2_ID		0x0827
 #define INTEL_MFLD_DMAC1_ID		0x0830
+#define INTEL_CLV_GP_DMAC2_ID		0x08EF
+#define INTEL_CLV_DMAC1_ID		0x08F0
+#define INTEL_MRFLD_GP_DMAC2_ID		0x11A2
+#define INTEL_MRFLD_DMAC0_ID		0x119B
+#define INTEL_BYT_LPIO1_DMAC_ID		0x0F06
+#define INTEL_BYT_LPIO2_DMAC_ID		0x0F40
+#define INTEL_BYT_DMAC0_ID		0x0F28
 
-#define INTEL_CLV_GP_DMAC2_ID      0x08EF
-#define INTEL_CLV_DMAC1_ID     0x08F0
-#define INTEL_MRFLD_GP_DMAC2_ID         0x11A2
-#define INTEL_MRFLD_DMAC0_ID       0x119B
-#define INTEL_BYT_LPIO1_DMAC_ID        0x0F06
-#define INTEL_BYT_LPIO2_DMAC_ID        0x0F40
-#define INTEL_BYT_DMAC0_ID     0x0F28
-
-#define PCI_DEVICE_ID_INTEL_GP_DMAC2_MOOR      0x1497
+#define PCI_DEVICE_ID_INTEL_GP_DMAC2_MOOR	0x1497
 
 #define MRFL_INSTANCE_SPI3     3
 #define MRFL_INSTANCE_SPI5     5
 #define MRFL_INSTANCE_SPI6     6
 
-#define LNW_PERIPHRAL_MASK_SIZE        0x20
+#define LNW_PERIPHRAL_MASK_SIZE		0x20
 
-#define INFO(_max_chan, _ch_base, _block_size, _pimr_mask, \
-		_pimr_base, _dword_trf, _pimr_offset, _pci_id,  \
-			_pdma_ops)              \
+#define INFO(_max_chan, _ch_base, _block_size, _pimr_mask,	\
+		_pimr_base, _dword_trf, _pimr_offset, _pci_id,	\
+			_pdma_ops)				\
 	((kernel_ulong_t)&(struct intel_mid_dma_probe_info) {	\
 		.max_chan = (_max_chan),			\
 		.ch_base = (_ch_base),				\
 		.block_size = (_block_size),			\
 		.pimr_mask = (_pimr_mask),			\
-		.pimr_base = (_pimr_base),          \
-		.dword_trf = (_dword_trf),          \
-		.pimr_offset = (_pimr_offset),          \
-		.pci_id = (_pci_id),                \
-		.pdma_ops = (_pdma_ops)             \
+		.pimr_base = (_pimr_base),			\
+		.dword_trf = (_dword_trf),			\
+		.pimr_offset = (_pimr_offset),			\
+		.pci_id = (_pci_id),				\
+		.pdma_ops = (_pdma_ops)				\
 	})
 
 /*****************************************************************************
@@ -88,7 +87,7 @@ static int get_ch_index(int status, unsigned int base)
 	for (i = 0; i < MAX_CHAN; i++) {
 		if (status & (1 << (i + base)))
 			return i;
-		}
+	}
 	return -1;
 }
 
@@ -102,10 +101,10 @@ static void dump_dma_reg(struct dma_chan *chan)
 {
 	struct intel_mid_dma_chan   *midc = to_intel_mid_dma_chan(chan);
 	struct middma_device	*mid = to_middma_device(chan->device);
- 
+
 	if (!mid->pimr_base)
 		return;
- 
+
 	pr_debug("<<<<<<<<<<<< DMA Dump Start >>>>>>>>>>>>");
 	pr_debug("DMA Dump for Channel id:%d & Chnl Base:%p",
 					midc->ch_id, midc->ch_regs);
@@ -138,7 +137,7 @@ static void dump_dma_reg(struct dma_chan *chan)
 				readl(midc->dma_base + FIFO_PARTITION1_HI));
 		pr_debug("CH_SAI_ERR:\t%#x", readl(midc->dma_base + CH_SAI_ERR));
 	}
- 
+
 	/* dump channel specific registers */
 	pr_debug("SAR:\t%#x", readl(midc->ch_regs + SAR));
 	pr_debug("DAR:\t%#x", readl(midc->ch_regs + DAR));
@@ -198,7 +197,7 @@ static unsigned int get_block_ts(int len, int tx_width,
 static int get_reg_width(enum dma_slave_buswidth kernel_width)
 {
 	int reg_width = -1;
- 
+
 	switch (kernel_width) {
 	case DMA_SLAVE_BUSWIDTH_1_BYTE:
 		reg_width = 0;
@@ -341,14 +340,15 @@ static void disable_dma_interrupt(struct intel_mid_dma_chan *midc)
 static void clear_dma_channel_interrupt(struct intel_mid_dma_chan *midc)
 {
 	struct middma_device *mid = to_middma_device(midc->chan.device);
- 
+
 	/*clearing this interrupts first*/
 	iowrite32((1 << midc->ch_id), mid->dma_base + CLEAR_TFR);
 	iowrite32((1 << midc->ch_id), mid->dma_base + CLEAR_BLOCK);
 	iowrite32((1 << midc->ch_id), mid->dma_base + CLEAR_ERR);
 
-    return;
- }
+
+	return;
+}
 
 /*****************************************************************************
 DMA channel helper Functions*/
@@ -393,6 +393,7 @@ static void midc_desc_put(struct intel_mid_dma_chan *midc,
 		spin_unlock_bh(&midc->lock);
 	}
 }
+
 /**
  * midc_dostart		-		begin a DMA transaction
  * @midc: channel for which txn is to be started
@@ -531,14 +532,14 @@ static void midc_scan_descriptors(struct middma_device *mid,
 static void midc_start_descriptors(struct middma_device *mid,
                 struct intel_mid_dma_chan *midc)
 {
-    if (!list_empty(&midc->queue)) {
-        pr_debug("MDMA: submitting txn in queue\n");
-        if (0 == midc_dostart(midc, midc_first_queued(midc)))
-            list_splice_init(&midc->queue, &midc->active_list);
-        else
-            pr_warn("Submit failed as ch is busy\n");
-    }
-    return;
+	if (!list_empty(&midc->queue)) {
+		pr_debug("MDMA: submitting txn in queue\n");
+		if (0 == midc_dostart(midc, midc_first_queued(midc)))
+			list_splice_init(&midc->queue, &midc->active_list);
+		else
+			pr_warn("Submit failed as ch is busy\n");
+	}
+	return;
 }
 
 /**
@@ -702,6 +703,7 @@ static inline void dma_wait_for_suspend(struct dma_chan *chan, unsigned int mask
 	cfg_lo.cfg_lo &= ~mask;
 	iowrite32(cfg_lo.cfg_lo, midc->ch_regs + CFG_LOW);
 }
+
 /**
  * intel_mid_dma_chan_suspend_v1 - suspends the given channel, waits
  *		till FIFO is cleared and disables channel.
@@ -787,6 +789,7 @@ static int dma_slave_control(struct dma_chan *chan, unsigned long arg)
 	midc->mid_slave = mid_slave;
 	return 0;
 }
+
 /**
  * intel_mid_dma_device_control -	DMA device control
  * @chan: chan for DMA control
@@ -833,7 +836,6 @@ static int intel_mid_dma_device_control(struct dma_chan *chan,
 	return 0;
 }
 
-
 /**
  * intel_mid_dma_prep_memcpy -	Prep memcpy txn
  * @chan: chan for DMA transfer
@@ -860,7 +862,6 @@ static struct dma_async_tx_descriptor *intel_mid_dma_prep_memcpy(
 	enum dma_slave_buswidth width;
 	int dst_reg_width = 0;
 	int src_reg_width = 0;
-
 
 	pr_debug("MDMA: Prep for memcpy\n");
 	BUG_ON(!chan);
@@ -928,7 +929,6 @@ static struct dma_async_tx_descriptor *intel_mid_dma_prep_memcpy(
 
 	/*calculate CTL_HI*/
 	width = mids->dma_slave.src_addr_width;
-
 	ctl_hi = get_block_ts(len, width, midc->dma->block_size, midc->dma->dword_trf);
 	pr_debug("MDMA:calc len %d for block size %d\n",
 				ctl_hi, midc->dma->block_size);
@@ -941,7 +941,7 @@ static struct dma_async_tx_descriptor *intel_mid_dma_prep_memcpy(
 		return NULL;
 	}
 	ctl_lo.ctlx.dst_tr_width = dst_reg_width;
- 
+
 	src_reg_width = get_reg_width(mids->dma_slave.src_addr_width);
 	if (src_reg_width < 0) {
 		pr_err("ERR_MDMA: Failed to get SRC reg width\n");
@@ -1181,6 +1181,7 @@ err_desc_get:
 	midc_desc_put(midc, desc);
 	return NULL;
 }
+
 /**
  * intel_mid_dma_chan_prep_desc
  * @chan: chan for DMA transfer
@@ -1362,11 +1363,11 @@ static void intel_mid_dma_free_chan_resources(struct dma_chan *chan)
 	/* Disable CH interrupts */
 	disable_dma_interrupt(midc);
 	clear_dma_channel_interrupt(midc);
- 
+
 	midc->block_intr_status = false;
 	midc->in_use = false;
 	midc->busy = false;
- 
+
 	tasklet_unlock_wait(&mid->tasklet);
 
 	spin_lock_bh(&midc->lock);
@@ -1390,11 +1391,10 @@ static void intel_mid_dma_free_chan_resources(struct dma_chan *chan)
 		dma_pool_destroy(midc->lli_pool);
 		midc->lli_pool = NULL;
 	}
- 
+
 	/* Disable the channel */
 	iowrite32(DISABLE_CHANNEL(midc->ch_id), mid->dma_base + DMA_CHAN_EN);
 	pm_runtime_put(mid->dev);
-
 }
 
 /**
@@ -1523,7 +1523,7 @@ static void dma_tasklet(unsigned long data)
 					mid->dma_base + MASK_TFR);
 		spin_unlock_bh(&midc->lock);
 	}
- 
+
 	raw_block = ioread32(mid->dma_base + RAW_BLOCK);
 	status = raw_block & mid->block_intr_mask;
 	pr_debug("MDMA: in tasklet for device %x\n", mid->pci_id);
@@ -1547,7 +1547,7 @@ static void dma_tasklet(unsigned long data)
 				status, midc->ch_id, i);
 		spin_lock_bh(&midc->lock);
 		/*clearing this interrupts first*/
- 
+
 		midc->raw_block = raw_block;
 		iowrite32((1 << midc->ch_id), mid->dma_base + CLEAR_BLOCK);
 		if (midc->block_intr_status) {
@@ -1624,16 +1624,16 @@ static irqreturn_t intel_mid_dma_interrupt(int irq, void *data)
 		pr_err("ERR_MDMA:null pointer mid\n");
 		return -EINVAL;
 	}
- 
+
 	/* Read the interrupt status registers */
 	tfr_status = ioread32(mid->dma_base + STATUS_TFR);
 	err_status = ioread32(mid->dma_base + STATUS_ERR);
 	block_status = ioread32(mid->dma_base + STATUS_BLOCK);
- 
+
 	/* Common case if the IRQ is shared with other devices */
 	if (!tfr_status && !err_status && !block_status)
 		return IRQ_NONE;
- 
+
 	pr_debug("MDMA: trf_Status %x, Mask %x\n", tfr_status, mid->intr_mask);
 	if (tfr_status) {
 		/*need to disable intr*/
@@ -1662,7 +1662,7 @@ static irqreturn_t intel_mid_dma_interrupt(int irq, void *data)
 			writel(isr, mid->mask_reg);
 		}
 	}
- 
+
 	tasklet_schedule(&mid->tasklet);
 
 	return IRQ_HANDLED;
@@ -1690,27 +1690,27 @@ static void config_dma_fifo_partition(struct middma_device *dma)
 /* v1 ops will be used for Medfield & CTP platforms */
 static struct intel_mid_dma_ops v1_dma_ops = {
 	.device_alloc_chan_resources	= intel_mid_dma_alloc_chan_resources,
-	.device_free_chan_resources = intel_mid_dma_free_chan_resources,
-	.device_prep_dma_memcpy	 = intel_mid_dma_prep_memcpy,
-	.device_prep_dma_sg	 = intel_mid_dma_prep_sg,
-	.device_prep_slave_sg	   = intel_mid_dma_prep_slave_sg,
-	.device_control		 = intel_mid_dma_device_control,
-	.device_tx_status	   = intel_mid_dma_tx_status,
-	.device_issue_pending	   = intel_mid_dma_issue_pending,
-	.dma_chan_suspend	   = intel_mid_dma_chan_suspend_v1,
+	.device_free_chan_resources	= intel_mid_dma_free_chan_resources,
+	.device_prep_dma_memcpy		= intel_mid_dma_prep_memcpy,
+	.device_prep_dma_sg		= intel_mid_dma_prep_sg,
+	.device_prep_slave_sg		= intel_mid_dma_prep_slave_sg,
+	.device_control			= intel_mid_dma_device_control,
+	.device_tx_status		= intel_mid_dma_tx_status,
+	.device_issue_pending		= intel_mid_dma_issue_pending,
+	.dma_chan_suspend		= intel_mid_dma_chan_suspend_v1,
 };
 
 /* v2 ops will be used in Merrifield and beyond plantforms */
 static struct intel_mid_dma_ops v2_dma_ops = {
-	.device_alloc_chan_resources	= intel_mid_dma_alloc_chan_resources,
-	.device_free_chan_resources	 = intel_mid_dma_free_chan_resources,
-	.device_prep_dma_memcpy		 = intel_mid_dma_prep_memcpy_v2,
-	.device_prep_dma_sg			 = intel_mid_dma_prep_sg,
-	.device_prep_slave_sg		   = intel_mid_dma_prep_slave_sg,
-	.device_control				 = intel_mid_dma_device_control,
-	.device_tx_status			   = intel_mid_dma_tx_status,
-	.device_issue_pending		   = intel_mid_dma_issue_pending,
-	.dma_chan_suspend	   = intel_mid_dma_chan_suspend_v2,
+	.device_alloc_chan_resources    = intel_mid_dma_alloc_chan_resources,
+	.device_free_chan_resources     = intel_mid_dma_free_chan_resources,
+	.device_prep_dma_memcpy         = intel_mid_dma_prep_memcpy_v2,
+	.device_prep_dma_sg             = intel_mid_dma_prep_sg,
+	.device_prep_slave_sg           = intel_mid_dma_prep_slave_sg,
+	.device_control                 = intel_mid_dma_device_control,
+	.device_tx_status               = intel_mid_dma_tx_status,
+	.device_issue_pending           = intel_mid_dma_issue_pending,
+	.dma_chan_suspend		= intel_mid_dma_chan_suspend_v2,
 };
 
 /**
@@ -1744,8 +1744,9 @@ int mid_setup_dma(struct device *dev)
 			err = -ENOMEM;
 			goto err_setup;
 		}
-	} else
+	} else {
 		dma->mask_reg = NULL;
+	}
 
 	pr_debug("MDMA:Adding %d channel for this controller\n", dma->max_chan);
 	/*init CH structures*/
@@ -1866,7 +1867,7 @@ void middma_shutdown(struct device *dev)
 }
 
 struct middma_device *mid_dma_setup_context(struct device *dev,
-						struct intel_mid_dma_probe_info *info)
+					struct intel_mid_dma_probe_info *info)
 {
 	struct middma_device *mid_device;
 	mid_device = devm_kzalloc(dev, sizeof(*mid_device), GFP_KERNEL);
@@ -1978,7 +1979,6 @@ err_enable_device:
  */
 static void intel_mid_dma_remove(struct pci_dev *pdev)
 {
-
 	pm_runtime_get_noresume(&pdev->dev);
 	pm_runtime_forbid(&pdev->dev);
 	middma_shutdown(&pdev->dev);
@@ -2123,13 +2123,14 @@ static const struct acpi_device_id dma_acpi_ids[];
 struct intel_mid_dma_probe_info *mid_get_acpi_driver_data(const char *hid)
 {
 	const struct acpi_device_id *id;
- 
+
 	pr_debug("%s", __func__);
 	for (id = dma_acpi_ids; id->id[0]; id++)
 		if (!strncmp(id->id, hid, 16))
 			return (struct intel_mid_dma_probe_info *)id->driver_data;
 	return NULL;
 }
+
 static const struct acpi_device_id dma_acpi_ids[] = {
 	{ "DMA0F28", (kernel_ulong_t)&dma_byt_info },
 	{ },
@@ -2137,10 +2138,10 @@ static const struct acpi_device_id dma_acpi_ids[] = {
 
 static struct platform_driver intel_dma_acpi_driver = {
 	.driver = {
-		.name		   = "intel_dma_acpi",
-		.owner		  = THIS_MODULE,
-		.acpi_match_table   = dma_acpi_ids,
-		.pm		 = &intel_mid_dma_pm,
+		.name			= "intel_dma_acpi",
+		.owner			= THIS_MODULE,
+		.acpi_match_table	= dma_acpi_ids,
+		.pm			= &intel_mid_dma_pm,
 	},
 	.probe  = dma_acpi_probe,
 	.remove = dma_acpi_remove,
@@ -2149,6 +2150,7 @@ static struct platform_driver intel_dma_acpi_driver = {
 static int __init intel_mid_dma_init(void)
 {
 	int ret;
+
 	pr_debug("INFO_MDMA: LNW DMA Driver Version %s\n",
 			INTEL_MID_DMA_DRIVER_VERSION);
 	ret = pci_register_driver(&intel_mid_dma_pci_driver);
@@ -2159,7 +2161,6 @@ static int __init intel_mid_dma_init(void)
 	if (ret)
 		pr_err("Platform dev registration failed");
 	return ret;
-
 }
 module_init(intel_mid_dma_init);
 
