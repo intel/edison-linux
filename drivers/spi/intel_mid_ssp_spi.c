@@ -808,26 +808,20 @@ static irqreturn_t ssp_int(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-static void poll_writer(struct work_struct *work)
-{
-	struct ssp_drv_context *sspc =
-		container_of(work, struct ssp_drv_context, poll_write);
-	struct device *dev = &sspc->pdev->dev;
-	size_t pkg_len = sspc->len;
-	int ret;
-
-	while ((pkg_len > 0)) {
-		ret = sspc->write(sspc);
-		pkg_len -= ret;
-	}
-}
-
 /*
  * Perform a single transfer.
  */
 static void poll_transfer(unsigned long data)
 {
 	struct ssp_drv_context *sspc = (void *)data;
+	size_t pkg_lenth = sspc->len;
+	int ret;
+
+	while ((pkg_lenth > 0)) {
+		ret = sspc->write(sspc);
+		sspc->read(sspc);
+		pkg_lenth -= ret;
+	}
 
 	while (!sspc->read(sspc))
 		cpu_relax();
@@ -1131,6 +1125,15 @@ static int handle_message(struct ssp_drv_context *sspc)
 		else
 			speed_hz = saved_speed_hz;
 
+		if ((speed_hz > 4000000) && (msg->the_max_pkt > 500))
+		{
+			dma_enabled = 1;
+		}
+		else
+		{
+			dma_enabled = 0;
+		}
+
 		clk_div = ssp_get_clk_div(sspc, speed_hz);
 
 		cr0 &= ~SSCR0_SCR;
@@ -1175,7 +1178,6 @@ static int handle_message(struct ssp_drv_context *sspc)
 			dma_transfer(sspc);
 		} else {
 			/* Do the transfer syncronously */
-			queue_work(sspc->wq_poll_write, &sspc->poll_write);
 			poll_transfer((unsigned long)sspc);
 			unmap_dma_buffers(sspc);
 			complete(&sspc->msg_done);
@@ -1579,9 +1581,6 @@ static int intel_mid_ssp_spi_probe(struct pci_dev *pdev,
 	spin_lock_init(&sspc->lock);
 	INIT_WORK(&sspc->pump_messages, pump_messages);
 	sspc->workqueue = create_singlethread_workqueue(dev_name(&pdev->dev));
-
-	INIT_WORK(&sspc->poll_write, poll_writer);
-	sspc->wq_poll_write = create_singlethread_workqueue("spi_poll_wr");
 
 	/* Register with the SPI framework */
 	dev_info(dev, "register with SPI framework (bus spi%d)\n",

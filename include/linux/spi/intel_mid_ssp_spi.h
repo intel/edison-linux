@@ -257,9 +257,7 @@ struct ssp_drv_context {
 
 	spinlock_t lock;
 	struct workqueue_struct *workqueue;
-	struct workqueue_struct *wq_poll_write;
 	struct work_struct pump_messages;
-	struct work_struct poll_write;
 	struct list_head queue;
 	struct completion msg_done;
 
