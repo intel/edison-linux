@@ -66,6 +66,46 @@ static struct bt_sock_list hci_sk_list = {
 	.lock = __RW_LOCK_UNLOCKED(hci_sk_list.lock)
 };
 
+static bool is_filtered_packet(struct sock *sk, struct sk_buff *skb)
+{
+	struct hci_filter *flt;
+	int flt_type, flt_event;
+
+	/* Apply filter */
+	flt = &hci_pi(sk)->filter;
+
+	if (bt_cb(skb)->pkt_type == HCI_VENDOR_PKT)
+		flt_type = 0;
+	else
+		flt_type = bt_cb(skb)->pkt_type & HCI_FLT_TYPE_BITS;
+
+	if (!test_bit(flt_type, &flt->type_mask))
+		return true;
+
+	/* Extra filter for event packets only */
+	if (bt_cb(skb)->pkt_type != HCI_EVENT_PKT)
+		return false;
+
+	flt_event = (*(__u8 *)skb->data & HCI_FLT_EVENT_BITS);
+
+	if (!hci_test_bit(flt_event, &flt->event_mask))
+		return true;
+
+	/* Check filter only when opcode is set */
+	if (!flt->opcode)
+		return false;
+
+	if (flt_event == HCI_EV_CMD_COMPLETE &&
+	    flt->opcode != get_unaligned((__le16 *)(skb->data + 3)))
+		return true;
+
+	if (flt_event == HCI_EV_CMD_STATUS &&
+	    flt->opcode != get_unaligned((__le16 *)(skb->data + 4)))
+		return true;
+
+	return false;
+}
+
 /* Send frame to RAW socket */
 void hci_send_to_sock(struct hci_dev *hdev, struct sk_buff *skb)
 {
@@ -77,7 +117,6 @@ void hci_send_to_sock(struct hci_dev *hdev, struct sk_buff *skb)
 	read_lock(&hci_sk_list.lock);
 
 	sk_for_each(sk, &hci_sk_list.head) {
-		struct hci_filter *flt;
 		struct sk_buff *nskb;
 
 		if (sk->sk_state != BT_BOUND || hci_pi(sk)->hdev != hdev)
@@ -90,29 +129,8 @@ void hci_send_to_sock(struct hci_dev *hdev, struct sk_buff *skb)
 		if (hci_pi(sk)->channel != HCI_CHANNEL_RAW)
 			continue;
 
-		/* Apply filter */
-		flt = &hci_pi(sk)->filter;
-
-		if (!test_bit((bt_cb(skb)->pkt_type == HCI_VENDOR_PKT) ?
-			      0 : (bt_cb(skb)->pkt_type & HCI_FLT_TYPE_BITS),
-			      &flt->type_mask))
+		if (is_filtered_packet(sk, skb))
 			continue;
-
-		if (bt_cb(skb)->pkt_type == HCI_EVENT_PKT) {
-			int evt = (*(__u8 *)skb->data & HCI_FLT_EVENT_BITS);
-
-			if (!hci_test_bit(evt, &flt->event_mask))
-				continue;
-
-			if (flt->opcode &&
-			    ((evt == HCI_EV_CMD_COMPLETE &&
-			      flt->opcode !=
-			      get_unaligned((__le16 *)(skb->data + 3))) ||
-			     (evt == HCI_EV_CMD_STATUS &&
-			      flt->opcode !=
-			      get_unaligned((__le16 *)(skb->data + 4)))))
-				continue;
-		}
 
 		if (!skb_copy) {
 			/* Create a private copy with headroom */
@@ -529,6 +547,15 @@ static int hci_sock_ioctl(struct socket *sock, unsigned int cmd,
 
 	BT_DBG("cmd %x arg %lx", cmd, arg);
 
+	lock_sock(sk);
+
+	if (hci_pi(sk)->channel != HCI_CHANNEL_RAW) {
+		err = -EBADFD;
+		goto done;
+	}
+
+	release_sock(sk);
+
 	switch (cmd) {
 	case HCIGETDEVLIST:
 		return hci_get_dev_list(argp);
@@ -573,13 +600,15 @@ static int hci_sock_ioctl(struct socket *sock, unsigned int cmd,
 
 	case HCIINQUIRY:
 		return hci_inquiry(argp);
-
-	default:
-		lock_sock(sk);
-		err = hci_sock_bound_ioctl(sk, cmd, arg);
-		release_sock(sk);
-		return err;
 	}
+
+	lock_sock(sk);
+
+	err = hci_sock_bound_ioctl(sk, cmd, arg);
+
+done:
+	release_sock(sk);
+	return err;
 }
 
 static int hci_sock_bind(struct socket *sock, struct sockaddr *addr,
@@ -677,22 +706,30 @@ static int hci_sock_getname(struct socket *sock, struct sockaddr *addr,
 {
 	struct sockaddr_hci *haddr = (struct sockaddr_hci *) addr;
 	struct sock *sk = sock->sk;
-	struct hci_dev *hdev = hci_pi(sk)->hdev;
+	struct hci_dev *hdev;
+	int err = 0;
 
 	BT_DBG("sock %p sk %p", sock, sk);
 
-	if (!hdev)
-		return -EBADFD;
+	if (peer)
+		return -EOPNOTSUPP;
 
 	lock_sock(sk);
+
+	hdev = hci_pi(sk)->hdev;
+	if (!hdev) {
+		err = -EBADFD;
+		goto done;
+	}
 
 	*addr_len = sizeof(*haddr);
 	haddr->hci_family = AF_BLUETOOTH;
 	haddr->hci_dev    = hdev->id;
-	haddr->hci_channel= 0;
+	haddr->hci_channel= hci_pi(sk)->channel;
 
+done:
 	release_sock(sk);
-	return 0;
+	return err;
 }
 
 static void hci_sock_cmsg(struct sock *sk, struct msghdr *msg,
@@ -893,7 +930,7 @@ static int hci_sock_setsockopt(struct socket *sock, int level, int optname,
 	lock_sock(sk);
 
 	if (hci_pi(sk)->channel != HCI_CHANNEL_RAW) {
-		err = -EINVAL;
+		err = -EBADFD;
 		goto done;
 	}
 
@@ -979,7 +1016,7 @@ static int hci_sock_getsockopt(struct socket *sock, int level, int optname,
 	lock_sock(sk);
 
 	if (hci_pi(sk)->channel != HCI_CHANNEL_RAW) {
-		err = -EINVAL;
+		err = -EBADFD;
 		goto done;
 	}
 
